@@ -1,3 +1,8 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+#![allow(unused_assignments)]
+#![allow(unused_mut)]
+
 use clap::Parser;
 use std::{path::Path, process::exit, fs, fs::File, io::Read, io};
 use cmd_lib::run_cmd;
@@ -37,7 +42,7 @@ fn main() {
     let pass_Chars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','£','$','%','^','&','*','(',')','-','_','=','+','{','}','[',']','@',';',':','?','/','>','.','<',',','|'];
     let mut data = String::new();
     let mut input: String = String::new();
-    let mut service: &str = "";
+    let service: &str = "";
     let mut passwd: String = String::new();
     let mut accountName: String = String::new();
     let mut accountPassword: String = String::new();
@@ -49,7 +54,6 @@ fn main() {
     let mut secretsLoc: String = String::new();
     let mut accLoc: String = String::new();
     let mut placeholder: String = String::new();
-    let mut user: String = String::new();
     let mut acc: Vec<String> = vec![];
     let mut dir1: String = String::new();
     let mut dir2: String = String::new();
@@ -57,23 +61,14 @@ fn main() {
 
     let opts = Options::parse();
 
+    let home = home_dir().unwrap();
+    let homeDir = home.display();    
     if opts.flag_s == true {
         println!("FMP SETUP");
         newline();
-        println!("What user should fmp be installed for?");
-        io::stdin()
-            .read_line(&mut user);
-
-        for i in 0..1 {
-            user.pop();
-        }
-        user = format!("/home/{}", user);
-
-        newline();
-
         println!("Three files will be stored in ~/.config/fmp, containing locations for other files");
         println!("Creating the directory...");
-        run_cmd!(mkdir $user/.config/fmp);
+        run_cmd!(mkdir $homeDir/.config/fmp).expect("Failed to execute command");
         println!("Done!");
 
         newline();
@@ -84,13 +79,13 @@ fn main() {
 
         println!("What directory should the encrypted password file (secrets.json.enc) go?");
         io::stdin()
-            .read_line(&mut secretsLoc);
+            .read_line(&mut secretsLoc).expect("Failed to read");
 
         newline();
 
         println!("What directory should the accounts file go?");
         io::stdin()
-            .read_line(&mut accLoc);
+            .read_line(&mut accLoc).expect("Failed to read");
 
         newline();
 
@@ -100,11 +95,11 @@ fn main() {
         }
 
         println!("Creating the secrets.json directory...");
-        run_cmd!(mkdir -p $secretsLoc);
+        run_cmd!(mkdir -p $secretsLoc).expect("Failed to execute command");
         println!("Done");
 
         println!("Creating the accounts directory...");
-        run_cmd!(mkdir -p $accLoc);
+        run_cmd!(mkdir -p $accLoc).expect("Failed to execute command");
         println!("Done");
 
         newline();
@@ -113,23 +108,23 @@ fn main() {
         secretsLoc = format!("{}/secrets.json", secretsLoc);
         accLoc = format!("{}/accounts", accLoc);
 
-        dir1 = format!("{}/.config/fmp/secretsEncLoc", user);
-        dir2 = format!("{}/.config/fmp/secretsLoc", user);
-        dir3 = format!("{}/.config/fmp/accLoc", user);
+        dir1 = format!("{}/.config/fmp/secretsEncLoc", homeDir);
+        dir2 = format!("{}/.config/fmp/secretsLoc", homeDir);
+        dir3 = format!("{}/.config/fmp/accLoc", homeDir);
 
         println!("Creating files in ~/config/fmp");
         fs::write(dir1, secretsEncLoc.clone()).expect("Could not save secrets.json.enc loaction file");
         fs::write(dir2, secretsLoc.clone()).expect("Could not save secrets.json location file");
-        run_cmd!(touch $dir3);
+        run_cmd!(touch $dir3).expect("Failed to execute command");
         println!("Done");
 
         newline();
 
         println!("Creating secrets.json file");
-        run_cmd!(touch $secretsLoc);
+        run_cmd!(touch $secretsLoc).expect("Failed to execute command");
         println!("Done");
         println!("Creating accounts file");
-        run_cmd!(touch $accLoc);
+        run_cmd!(touch $accLoc).expect("Failed to execute command");
         println!("Done");
 
         newline();
@@ -143,16 +138,15 @@ fn main() {
         println!("Done");
     }
 
-    let mut home = home_dir().unwrap();
-    home.to_str();
 
-    let dir = format!("{}/.config/fmp/secretsLoc", home.display());
+
+    let dir = format!("{}/.config/fmp/secretsLoc", homeDir);
     let secrets_path: String = fs::read_to_string(dir).expect("Could not read file");
 
-    let dir = format!("{}/.config/fmp/secretsEncLoc", home.display());
+    let dir = format!("{}/.config/fmp/secretsEncLoc", homeDir);
     let secrets_path_enc: String = fs::read_to_string("/home/wilko/.config/fmp/secretsEncLoc").expect("Could not read file");
     
-    let dir = format!("{}/.config/fmp/accLoc", home.display());
+    let dir = format!("{}/.config/fmp/accLoc", homeDir);
     let acc_path: String = fs::read_to_string("/home/wilko/.config/fmp/accLoc").expect("Could not read file");
 
 
@@ -160,7 +154,7 @@ fn main() {
     let sd: bool = Path::new(&secrets_path_enc).exists();
     if sd == false {
         println!("secrets.json path does not exist, has it been created?");
-        exit(0)
+        exit(1);
     }  
 
     // Runs read_acc and saves to acc var
@@ -193,7 +187,7 @@ fn main() {
             .expect("Failed to read line");
 
         // remove /n from account name and pass, dont know why parse wont work
-        for i in 0..1 {
+        for _i in 0..1 {
             addName.pop();
             addPassword.pop();
         }
@@ -207,7 +201,7 @@ fn main() {
         //exit
         newline();
         println!("Account created successfully");
-        exit(0);
+        exit(1);
     }
 
 
@@ -238,7 +232,7 @@ fn main() {
         write_acc(&acc_path, &acc);
 
         newline();
-        exit(0);
+        exit(1);
     }
     
 
@@ -300,7 +294,7 @@ fn main() {
             //exit
             newline();
             println!("Account created successfully");
-            exit(0);
+            exit(1);
         } 
     }
 
@@ -371,7 +365,7 @@ pub fn rem(accName: &String, accPassword: &String, mut json: String) -> String {
 }
 
 pub fn update_json(secrets_path: String, json: String, secrets_path_enc: String) {
-    fs::write(secrets_path.clone(), json);
+    fs::write(secrets_path.clone(), json).expect("Could not write");
     encrypt(secrets_path, secrets_path_enc);   
 }
 pub fn dele(secrets_path: String) {
