@@ -4,7 +4,7 @@
 #![allow(unused_mut)]
 
 use clap::Parser;
-use std::{path::Path, process::exit, fs, fs::File, io::Read, io};
+use std::{env, path::Path, process::exit, fs, fs::File, io::Read, io};
 use cmd_lib::run_cmd;
 use rustc_serialize::json::Json;
 use rand::Rng;
@@ -62,7 +62,17 @@ fn main() {
     let opts = Options::parse();
 
     let home = home_dir().unwrap();
-    let homeDir = home.display();    
+    let homeDir = home.display();  
+
+
+    //os check
+    let os: &str =  env::consts::OS;  
+
+    if os != "linux" {
+        println!("fmp only runs on Linux, running on other OSes could be destructive");
+        exit(1)
+    }
+
     if opts.flag_s == true {
         println!("FMP SETUP");
         newline();
@@ -240,13 +250,8 @@ fn main() {
     if opts.flag_p == true {
 
         // User input for password length
-        println!("How many characters long should the password be?");
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
+        let length: u32  = get_i32_input(1, "How long should the password be? ");
 
-        // Saves input string to length as unsigned integer
-        let length: u8 = input.trim().parse().expect("Input not a (positive) integer");
 
         newline();
 
@@ -312,7 +317,10 @@ pub fn table<'a>(mut service: &'a str, acc: &'a Vec<String>, json: Json) {
 }
 
 pub fn decrypt(secrets_path: String, secrets_path_enc: String) {
-    run_cmd!(openssl aes-256-cbc -d -a -pbkdf2 -in $secrets_path_enc -out $secrets_path).expect("Could not decrypt secrets.json");
+     match run_cmd!(openssl aes-256-cbc -d -a -pbkdf2 -in $secrets_path_enc -out $secrets_path) {
+        Ok(res) => return,
+        Err(e) => decrypt(secrets_path, secrets_path_enc),
+     }
 }
 
 pub fn encrypt(secrets_path: String, secrets_path_enc: String) {
@@ -383,3 +391,20 @@ pub fn rem_first_and_last(mut value: String) -> String {
 pub fn newline() {
     println!("");
 }
+
+pub fn get_i32_input(base: u32, message: &str) -> u32 {
+    println!("{}", message);
+    let mut userInput = String::new();
+    loop {
+        io::stdin().read_line(&mut userInput).expect("Failed to read line");
+
+        // Error handling, requires int to be inputed to avoid runtime panic
+        match userInput.trim().parse::<u32>() {
+            Ok(value) => {return value * base;}
+            Err(e) => {
+                println!("Please input a positive number, error: {}", e);
+                userInput = "".to_string();
+            }
+        }
+    }
+} 
