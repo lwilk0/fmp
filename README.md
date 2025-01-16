@@ -1,7 +1,7 @@
 # fmp
-A command line password manager
+A command line password manager written in rust for Linux
 
-TODO
+TODO:
 - [ ] Add error handling to directory input
 - [ ] Add Windows and Mac support
 - [ ] Create TUI
