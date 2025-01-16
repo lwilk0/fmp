@@ -250,7 +250,7 @@ fn main() {
     if opts.flag_p == true {
 
         // User input for password length
-        let length: u32  = get_i32_input(1, "How long should the password be? ");
+        let length: u32  = get_u32_input(1, "How long should the password be? ");
 
 
         newline();
@@ -392,7 +392,7 @@ pub fn newline() {
     println!("");
 }
 
-pub fn get_i32_input(base: u32, message: &str) -> u32 {
+pub fn get_u32_input(base: u32, message: &str) -> u32 {
     println!("{}", message);
     let mut userInput = String::new();
     loop {
