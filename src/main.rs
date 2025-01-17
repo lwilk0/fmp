@@ -9,7 +9,7 @@ use cmd_lib::run_cmd;
 use rustc_serialize::json::Json;
 use rand::Rng;
 use simple_home_dir::*;
-
+use import_handle;
 // Help table
 #[derive(Debug, Parser)]
 struct Options {
@@ -288,7 +288,7 @@ fn main() {
     if opts.flag_p == true {
 
         // User input for password length
-        let length: u32  = get_u32_input(1, "How long should the password be? ");
+        let length: u32  = import_handle::get_u32_input("How long should the password be? ");
 
 
         newline();
@@ -434,23 +434,6 @@ pub fn rem_first_and_last(mut value: String) -> String {
 pub fn newline() {
     println!("");
 }
-
-pub fn get_u32_input(base: u32, message: &str) -> u32 {
-    println!("{}", message);
-    let mut userInput = String::new();
-    loop {
-        io::stdin().read_line(&mut userInput).expect("Failed to read line");
-
-        // Error handling, requires int to be inputed to avoid runtime panic
-        match userInput.trim().parse::<u32>() {
-            Ok(value) => {return value * base;}
-            Err(e) => {
-                println!("Please input a positive number, error: {}", e);
-                userInput = "".to_string();
-            }
-        }
-    }
-} 
 
 pub fn get_dir_input(message: &str) -> String {
     println!("{}", message);
