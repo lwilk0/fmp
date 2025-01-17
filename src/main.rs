@@ -39,6 +39,7 @@ struct Options {
 
 
 fn main() {
+    // Init
     let pass_Chars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','£','$','%','^','&','*','(',')','-','_','=','+','{','}','[',']','@',';',':','?','/','>','.','<',',','|'];
     let mut data = String::new();
     let mut input: String = String::new();
@@ -55,15 +56,16 @@ fn main() {
     let mut accLoc: String = String::new();
     let mut placeholder: String = String::new();
     let mut acc: Vec<String> = vec![];
-    let mut dir1: String = String::new();
-    let mut dir2: String = String::new();
-    let mut dir3: String = String::new();
+    let mut secretsEncLocDir: String = String::new();
+    let mut secretsLocDir: String = String::new();
+    let mut accLocDir: String = String::new();
 
     let opts = Options::parse();
 
     let home = home_dir().unwrap();
     let homeDir = home.display();  
-
+    let fmpDir = format!("{}/.config/fmp", homeDir);
+    let fmpDirCheck = Path::new(&fmpDir).exists();
 
     //os check
     let os: &str =  env::consts::OS;  
@@ -74,11 +76,14 @@ fn main() {
     }
 
     if opts.flag_s == true {
+        
         println!("FMP SETUP");
         newline();
         println!("Three files will be stored in ~/.config/fmp, containing locations for other files");
         println!("Creating the directory...");
-        run_cmd!(mkdir $homeDir/.config/fmp).expect("Failed to execute command");
+        if fmpDirCheck == false {
+            run_cmd!(mkdir $homeDir/.config/fmp).expect("Failed to execute command");
+        }
         println!("Done!");
 
         newline();
@@ -87,23 +92,12 @@ fn main() {
 
         newline();
 
-        println!("What directory should the encrypted password file (secrets.json.enc) go?");
-        io::stdin()
-            .read_line(&mut secretsLoc).expect("Failed to read");
-
+        secretsLoc = get_dir_input("What directory should the encrypted password file (secrets.json.enc) go?");
+    
         newline();
 
-        println!("What directory should the accounts file go?");
-        io::stdin()
-            .read_line(&mut accLoc).expect("Failed to read");
-
-        newline();
-
-        for i in 0..1 {
-            secretsLoc.pop();
-            accLoc.pop();
-        }
-
+        accLoc = get_dir_input("What directory should the accounts file go?");
+        
         println!("Creating the secrets.json directory...");
         run_cmd!(mkdir -p $secretsLoc).expect("Failed to execute command");
         println!("Done");
@@ -118,14 +112,14 @@ fn main() {
         secretsLoc = format!("{}/secrets.json", secretsLoc);
         accLoc = format!("{}/accounts", accLoc);
 
-        dir1 = format!("{}/.config/fmp/secretsEncLoc", homeDir);
-        dir2 = format!("{}/.config/fmp/secretsLoc", homeDir);
-        dir3 = format!("{}/.config/fmp/accLoc", homeDir);
+        secretsEncLocDir = format!("{}/.config/fmp/secretsEncLoc", homeDir);
+        secretsLocDir = format!("{}/.config/fmp/secretsLoc", homeDir);
+        accLocDir = format!("{}/.config/fmp/accLoc", homeDir);
 
         println!("Creating files in ~/config/fmp");
-        fs::write(dir1, secretsEncLoc.clone()).expect("Could not save secrets.json.enc loaction file");
-        fs::write(dir2, secretsLoc.clone()).expect("Could not save secrets.json location file");
-        run_cmd!(touch $dir3).expect("Failed to execute command");
+        fs::write(secretsEncLocDir, secretsEncLoc.clone()).expect("Could not save secrets.json.enc loaction file");
+        fs::write(secretsLocDir, secretsLoc.clone()).expect("Could not save secrets.json location file");
+        fs::write(accLocDir, accLoc.clone()).expect("Failed to execute command");
         println!("Done");
 
         newline();
@@ -149,7 +143,7 @@ fn main() {
     }
 
 
-
+    // Read location files from ~/.config/fmp and saves to variable
     let dir = format!("{}/.config/fmp/secretsLoc", homeDir);
     let secrets_path: String = fs::read_to_string(dir).expect("Could not read file");
 
@@ -304,7 +298,13 @@ fn main() {
     }
 
     dele(secrets_path);
-    table(service, &acc, json);
+    if acc.len() != 1 {
+        println!("{}", acc.len());
+        table(service, &acc, json);
+    }
+    else {
+        println!("No accounts to display")
+    }
 
 }
 
@@ -335,12 +335,14 @@ pub fn encrypt(secrets_path: String, secrets_path_enc: String) {
 // reads account file
 pub fn read_acc(acc_path: String) -> Vec<String> {
     // Reads acc_path and saves as string to acc
-    let accStr = fs::read_to_string(acc_path)
+    let mut accStr = fs::read_to_string(acc_path)
     .expect("Could not read accounts file");
-
+    
     // Seperates each piece of data through the newline between and saves each word to vector acc
-    let acc: Vec<String> = accStr.split('\n').map(|v| v.to_string()).collect();
-
+    let mut acc: Vec<String> = accStr.split('\n').map(|v| v.to_string()).collect();
+    // Removes blank "" from acc
+    acc.retain(|x| x != "");
+    
     return acc;
 }
 
@@ -349,7 +351,7 @@ pub fn write_acc(acc_path: &String, acc: &Vec<String>) {
     fs::write(acc_path, acc.join("\n")).expect("Could not save accounts file");
 }
 
-// Json must be manipulated as a string, it will be converted to json later
+// Json must be manipulated as a string
 pub fn add(accName: &String, accPassword: String, mut json: String) -> String {
     json.pop(); // remove last }
     // adds new object containing name and pass to json
@@ -357,12 +359,13 @@ pub fn add(accName: &String, accPassword: String, mut json: String) -> String {
     return json;
 }
 
-// Json must be manipulated as a string, it will be converted to json later
+// Json must be manipulated as a string
 pub fn rem(accName: &String, accPassword: &String, mut json: String) -> String {
     // removes object from json
     let jsonDupeCheck: String = json.clone();
     let remString: String = format!(",\"{}\":\"{}\"", accName, accPassword);
     json = json.replace(remString.as_str(), "");
+    
     if json == jsonDupeCheck {
         newline();
         println!("No object was removed, either username or password is incorrect");
@@ -406,5 +409,57 @@ pub fn get_u32_input(base: u32, message: &str) -> u32 {
                 userInput = "".to_string();
             }
         }
+    }
+} 
+
+pub fn get_dir_input(message: &str) -> String {
+    println!("{}", message);
+
+    let mut userInput = String::new();
+    let mut userInput2 = String::new();
+    let mut lastPos: usize;
+    let mut dirTest: bool;
+    loop {
+        // Gets user input for dir
+        io::stdin().read_line(&mut userInput).expect("Failed to read line");
+
+
+        lastPos = userInput.len()-1;
+
+        // Dir format error handling
+        if userInput.contains("~") {
+            println!("Please do not use a tilda in the directory");
+            get_dir_input(message);
+        }
+        else if userInput.contains("$") {
+            println!("Please do not use a environmental variable in the directory");
+            get_dir_input(message);
+        }
+        else if &userInput[..lastPos] == "/" {
+            userInput.pop();
+        }
+        
+        // Check if dir exists
+        dirTest = Path::new(&userInput.trim()).exists();
+
+        // If directory does not exist
+        while dirTest == false{
+            println!("Directory does not exist, would you like to create it? yn exit");
+            io::stdin().read_line(&mut userInput2).expect("Failed to read line");
+
+            if userInput2.trim().to_lowercase().to_string() == "y" {
+                // Creates directory
+                userInput = userInput.trim().to_string();
+                run_cmd!(mkdir -p $userInput).expect("Dir not valid or needs superuser privileges to access")
+            }
+            else if userInput2.trim().to_lowercase().to_string() == "exit" {
+                exit(1)
+            }
+            else {
+                get_dir_input(message);
+            }
+            dirTest = Path::new(&userInput.trim()).exists();
+        } 
+        return userInput.trim().to_string();
     }
 } 
