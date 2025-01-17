@@ -10,3 +10,4 @@ TODO:
 - [ ] Calculate password entropy
 - [ ] Add double encryption
 - [ ] Add backup function
+- [ ] Create better decryption method
