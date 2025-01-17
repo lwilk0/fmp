@@ -20,6 +20,11 @@ struct Options {
     #[clap(short = 'a', long = "add")]
     flag_a: bool,
 
+    /// Backup all fmp files or install backup.
+    /// used as: -b, --backup
+    #[clap(short = 'b', long = "backup")]
+    flag_b: bool,
+
     /// Delete account from password manager.
     /// used as: -d, --delete
     #[clap(short = 'd', long = "delete")]
@@ -59,6 +64,7 @@ fn main() {
     let mut secretsEncLocDir: String = String::new();
     let mut secretsLocDir: String = String::new();
     let mut accLocDir: String = String::new();
+    let mut userInput: String = String::new();
 
     let opts = Options::parse();
 
@@ -148,10 +154,10 @@ fn main() {
     let secrets_path: String = fs::read_to_string(dir).expect("Could not read file");
 
     let dir = format!("{}/.config/fmp/secretsEncLoc", homeDir);
-    let secrets_path_enc: String = fs::read_to_string("/home/wilko/.config/fmp/secretsEncLoc").expect("Could not read file");
+    let mut secrets_path_enc: String = fs::read_to_string(dir).expect("Could not read file");
     
     let dir = format!("{}/.config/fmp/accLoc", homeDir);
-    let acc_path: String = fs::read_to_string("/home/wilko/.config/fmp/accLoc").expect("Could not read file");
+    let mut acc_path: String = fs::read_to_string(dir).expect("Could not read file");
 
 
     //secrets.json path test
@@ -190,11 +196,9 @@ fn main() {
             .read_line(&mut addPassword)
             .expect("Failed to read line");
 
-        // remove /n from account name and pass, dont know why parse wont work
-        for _i in 0..1 {
-            addName.pop();
-            addPassword.pop();
-        }
+        // remove /n from account name and pass
+        addName = addName.trim().to_string();
+        addPassword = addPassword.trim().to_string();
 
         // adds data to json var and saves to secrets.json
         data = add(&addName, addPassword, json.to_string());
@@ -208,28 +212,68 @@ fn main() {
         exit(1);
     }
 
+    // if flag -b or --backup is used
+    if opts.flag_b == true {
+        while userInput != "b" && userInput != "i" {
+            println!("Would you like to backup(b) or install backup(i)?");
+            io::stdin().read_line(&mut userInput).expect("Failed to read line");
+            userInput = userInput.trim().to_string();
+            newline();
+        }
+
+        if userInput == "b" {
+            // Backup location files
+            run_cmd!(cp $homeDir/.config/fmp/accLoc $homeDir/.config/fmp/accLoc.bak).expect("Failed to run command");
+            run_cmd!(cp $homeDir/.config/fmp/secretsEncLoc $homeDir/.config/fmp/secretsEncLoc.bak).expect("Failed to run command");
+            run_cmd!(cp $homeDir/.config/fmp/secretsLoc $homeDir/.config/fmp/secretsLoc.bak).expect("Failed to run command");
+        
+            // Remove location prefixes
+            for i in 0..16{secrets_path_enc.pop();}
+            for i in 0..8{acc_path.pop();}
+
+            // Backup account and secrets file
+            run_cmd!(cp $secrets_path_enc/secrets.json.enc $secrets_path_enc/secrets.json.enc.bak).expect("Failed to run command");
+            run_cmd!(cp $acc_path/accounts $acc_path/accounts.bak).expect("Failed to run command");
+            println!("Done!");
+
+            dele(secrets_path);
+            exit(1);
+        }
+        else if userInput == "i" {
+            // Install location files
+            run_cmd!(cp $homeDir/.config/fmp/accLoc.bak $homeDir/.config/fmp/accLoc).expect("Failed to run command");
+            run_cmd!(cp $homeDir/.config/fmp/secretsEncLoc.bak $homeDir/.config/fmp/secretsEncLoc).expect("Failed to run command");
+            run_cmd!(cp $homeDir/.config/fmp/secretsLoc.bak $homeDir/.config/fmp/secretsLoc).expect("Failed to run command");
+        
+            // Remove location prefixes
+            for i in 0..16{secrets_path_enc.pop();}
+            for i in 0..8{acc_path.pop();}
+
+            // Install account and secrets file
+            run_cmd!(cp $secrets_path_enc/secrets.json.enc.bak $secrets_path_enc/secrets.json.enc).expect("Failed to run command");
+            run_cmd!(cp $acc_path/accounts.bak $acc_path/accounts).expect("Failed to run command");
+            println!("Done!");
+
+            dele(secrets_path);
+            exit(1);
+        }
+    }
 
     // if flag -d or --delete is used
     if opts.flag_d == true {
 
-        newline();
         println!("What account should be removed?");
-        io::stdin()
-            .read_line(&mut remName)
-            .expect("Failed to read line");
+        io::stdin().read_line(&mut remName).expect("Failed to read line");
 
         newline();
 
         println!("What is the password for the account?");
-        io::stdin()
-            .read_line(&mut remPassword)
-            .expect("Failed to read line");
+        io::stdin().read_line(&mut remPassword).expect("Failed to read line");
 
-        // remove /n from account name and pass, dont know why parse wont work
-        for i in 0..1 {
-            remName.pop();
-            remPassword.pop();
-        }
+       
+        remName = remName.trim().to_string();
+        remPassword = remPassword.trim().to_string();
+        
         data = rem(&remName, &remPassword, json.to_string());
         update_json(secrets_path, data, secrets_path_enc);
         acc.retain(|acc| *acc != remName);
@@ -264,9 +308,7 @@ fn main() {
         let mut input: String = String::new();
 
         println!("Would you like to link this password to an account? y n");
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
+        io::stdin().read_line(&mut input).expect("Failed to read line");
 
         newline();
 
@@ -275,13 +317,11 @@ fn main() {
             accountPassword = passwd;
 
             println!("What is the account name?");
-            io::stdin()
-                .read_line(&mut accountName)
-                .expect("Failed to read line");
+            io::stdin().read_line(&mut accountName).expect("Failed to read line");
             
             // remove /n from account name, dont know why parse wont work
             for i in 0..1 {
-                accountName.pop();
+            accountName = accountName.trim().to_string();
             }
 
             // adds data to json var and saves to secrets.json
@@ -429,10 +469,12 @@ pub fn get_dir_input(message: &str) -> String {
         // Dir format error handling
         if userInput.contains("~") {
             println!("Please do not use a tilda in the directory");
+            newline();
             get_dir_input(message);
         }
         else if userInput.contains("$") {
             println!("Please do not use a environmental variable in the directory");
+            newline();
             get_dir_input(message);
         }
         else if &userInput[..lastPos] == "/" {
