@@ -11,3 +11,4 @@ TODO:
 - [ ] Add double encryption
 - [ ] Add backup function
 - [ ] Create better decryption method
+- [ ] Add support for preexisting files in install function
