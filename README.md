@@ -12,3 +12,4 @@ TODO:
 - [ ] Add backup function
 - [ ] Create better decryption method
 - [ ] Add support for preexisting files in install function
+- [ ] Add username to account
