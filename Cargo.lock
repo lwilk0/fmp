@@ -176,10 +176,11 @@ dependencies = [
 
 [[package]]
 name = "fmp"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "clap",
  "cmd_lib",
+ "ilog",
  "import-handle",
  "rand",
  "rustc-serialize",
@@ -214,6 +215,12 @@ name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
+name = "ilog"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9d6896d5a5d605a3b80da159ccc5a6e1fad346b4d2c1ad51046e22536b9a362"
 
 [[package]]
 name = "import-handle"

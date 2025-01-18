@@ -9,7 +9,9 @@ use cmd_lib::run_cmd;
 use rustc_serialize::json::Json;
 use rand::Rng;
 use simple_home_dir::*;
-use import_handle;
+use import_handle::{self, get_string_input};
+use ilog::IntLog;
+
 // Help table
 #[derive(Debug, Parser)]
 struct Options {
@@ -36,16 +38,25 @@ struct Options {
     flag_s: bool,
 
     /// Create password.
-    /// used as: -p, --create
-    #[clap(short = 'p', long = "create")]
-    flag_p: bool
-}
+    /// used as: -c, --create
+    #[clap(short = 'c', long = "create")]
+    flag_c: bool,
 
+    /// Calculate password entropy
+    /// used as: -e, --entropy
+    #[clap(short = 'e', long = "entropy")]
+    flag_e: bool
+}
 
 
 fn main() {
     // Init
-    let pass_Chars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','£','$','%','^','&','*','(',')','-','_','=','+','{','}','[',']','@',';',':','?','/','>','.','<',',','|'];
+    let pass_Chars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
+    let lower_Chars = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
+    let upper_Chars = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+    let number_chars = ['1','2','3','4','5','6','7','8','9','0'];
+    let special_chars = ['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
+    
     let mut data = String::new();
     let mut input: String = String::new();
     let service: &str = "";
@@ -65,7 +76,11 @@ fn main() {
     let mut secretsLocDir: String = String::new();
     let mut accLocDir: String = String::new();
     let mut userInput: String = String::new();
-
+    let mut passwordRate: String = String::new();
+    let mut posSymbols: u128 = 0;
+    let mut posCombinations: u128;
+    let mut entropy: u128;
+    let mut rating: &str;
     let opts = Options::parse();
 
     let home = home_dir().unwrap();
@@ -91,10 +106,6 @@ fn main() {
             run_cmd!(mkdir $homeDir/.config/fmp).expect("Failed to execute command");
         }
         println!("Done!");
-
-        newline();
-
-        println!("DO NOT END DIRECTORIES WITH A / AND WRITE OUT THE FULL DIRECTORY (Dont use '~' or $HOME))");
 
         newline();
 
@@ -284,8 +295,8 @@ fn main() {
     }
     
 
-    // if flag -p or --create is used
-    if opts.flag_p == true {
+    // if flag -c or --create is used
+    if opts.flag_c == true {
 
         // User input for password length
         let length: u32  = import_handle::get_u32_input("How long should the password be? ");
@@ -319,10 +330,9 @@ fn main() {
             println!("What is the account name?");
             io::stdin().read_line(&mut accountName).expect("Failed to read line");
             
-            // remove /n from account name, dont know why parse wont work
-            for i in 0..1 {
+            // remove /n from account name
             accountName = accountName.trim().to_string();
-            }
+            
 
             // adds data to json var and saves to secrets.json
             data = add(&accountName, accountPassword, json.to_string());
@@ -337,9 +347,42 @@ fn main() {
         } 
     }
 
+    // If flag -e or --entropy used
+    if opts.flag_e == true {
+        passwordRate = get_string_input("Enter the password: ");
+        while passwordRate.len() > 19 {
+            println!("Integer must be less than 20 due to limitations with rust integer sizes");
+            passwordRate = get_string_input("Enter the password: ");
+        }
+
+        posSymbols += char(lower_Chars, &passwordRate);
+        posSymbols += char(upper_Chars, &passwordRate);
+        posSymbols += char(number_chars, &passwordRate);
+        posSymbols += char(special_chars, &passwordRate);
+        posCombinations = posSymbols.pow(passwordRate.len() as u32);
+        entropy = u128::log2(posCombinations as u128) as u128;
+
+        if entropy <= 35 {
+            rating = "Very Weak"
+        }
+        else if entropy <= 59{
+            rating = "Weak"
+        }
+        else if entropy <= 119{
+            rating = "Strong"
+        }
+        else {
+            rating = "Very Strong"
+        }
+
+        println!("\nThere are {} combinations posible", posCombinations);
+        println!("The password has {} bit entropy", entropy);
+        println!("Password rating: {}", rating);
+        exit(1)
+    }
+
     dele(secrets_path);
     if acc.len() != 1 {
-        println!("{}", acc.len());
         table(service, &acc, json);
     }
     else {
@@ -442,6 +485,9 @@ pub fn get_dir_input(message: &str) -> String {
     let mut userInput2 = String::new();
     let mut lastPos: usize;
     let mut dirTest: bool;
+    let home = home_dir().unwrap();
+    let homeDir = home.display();  
+
     loop {
         // Gets user input for dir
         io::stdin().read_line(&mut userInput).expect("Failed to read line");
@@ -451,9 +497,15 @@ pub fn get_dir_input(message: &str) -> String {
 
         // Dir format error handling
         if userInput.contains("~") {
-            println!("Please do not use a tilda in the directory");
-            newline();
-            get_dir_input(message);
+            // If first character of string is a tilda
+            if userInput.chars().next().unwrap() == '~' {
+                userInput.remove(0);
+                userInput = format!("{}{}", homeDir, userInput)
+            }
+            else {
+                println!("Invalid location of tilda! Must be at the start of the directory!\n");
+                get_dir_input(message);
+            }
         }
         else if userInput.contains("$") {
             println!("Please do not use a environmental variable in the directory");
@@ -488,3 +540,18 @@ pub fn get_dir_input(message: &str) -> String {
         return userInput.trim().to_string();
     }
 } 
+
+pub fn char<const N: usize>(chars: [char; N], passwordRate: &String) -> u128{
+    // char test
+    let mut i = 0;
+    let mut posSymbols: u128 = 0;
+
+    while i < chars.len() {
+        if passwordRate.contains(chars[i]) {
+            i = chars.len();
+            posSymbols += chars.len() as u128;
+        }
+        i += 1;
+    }
+    return posSymbols;
+}
