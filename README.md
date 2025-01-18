@@ -1,6 +1,8 @@
 # fmp
 A command line password manager written in rust for Linux
 
+###
+
 ## How fmp Works:
 - [Decrypt and read](https://github.com/TT1882/fmp/blob/main/README.md#decrypt-and-read)
 - [Add data to encrypted file](https://github.com/TT1882/fmp/blob/main/README.md#add-data-to-encrypted-file)
@@ -10,6 +12,7 @@ A command line password manager written in rust for Linux
 - [Calculate password entropy](https://github.com/TT1882/fmp/blob/main/README.md#calculate-password-entropy)
 - [Setup fmp](https://github.com/TT1882/fmp/blob/main/README.md#setup-fmp)
 
+###
 
 ### Decrypt and read 
 Fmp interacts with a json file containing account names and passwords, encrypted with the Advanced Encryption Standard with a 256-bit key in Cipher Block Chaining(aes-256-cbd). The file is also salted and uses Password-Based Key Derivation Function 2. When fmp is ran, it decrypts this file(secrets.json.enc) and the usernames are compared with a persistent file(accounts) which allows an output to be formated and displayed.
@@ -32,6 +35,7 @@ The user inputs the password to be rated. The presence of lowercase characters, 
 ### Setup fmp
 Fmp is setup by simply asking where to save the accounts and secrets file, creating the directory if necessary, creating the directory pointer files at ~/.config/fmp and both the accounts and secrets file to there inputed location. Placeholder data is added to the secrets file to avoid errors before it is encrypted.
 
+###
 
 ## Flags:
 ```flags
@@ -43,7 +47,9 @@ Fmp is setup by simply asking where to save the accounts and secrets file, creat
   -e, --entropy  Calculate password entropy. used as: -e, --entropy
   -h, --help     Print help
 ```
-#### TODO:
+###
+
+## TODO:
 - [x] Add install function
 - [x] u32 input error handling
 - [x] Add error handling to directory input
