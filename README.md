@@ -18,22 +18,18 @@ A command line password manager written in rust for Linux
 Fmp interacts with a json file containing account names and passwords, encrypted with the Advanced Encryption Standard with a 256-bit key in Cipher Block Chaining(aes-256-cbd). The file is also salted and uses Password-Based Key Derivation Function 2. When fmp is ran, it decrypts this file(secrets.json.enc) and the usernames are compared with a persistent file(accounts) which allows an output to be formated and displayed.
 
 
-<video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883
-" controls="controls" style="max-width: 150px;">
-</video>
+<video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883"controls="controls"style="max-width:150px;"></video>
 
 ### Add data to encrypted file
 The secrets file is decrypted and the user is asked the username and password to the account they want to add. The "add" function is then called, which formats the inputs in json syntax and saves it to a variable. The "update_json" function is called next, appending the data to the full json data, then saves the data to the secrets file which is re-encrypted. The username is added to the accounts file.
 
-<video src="https://github.com/user-attachments/assets/fd2b7ddf-b728-4d4a-b443-00674e28657b" controls="controls" style="max-width: 150px;">
-</video>
+<video src="https://github.com/user-attachments/assets/fd2b7ddf-b728-4d4a-b443-00674e28657b" controls="controls"style="max-width:150px;"></video>
 
 ### Remove data from encrypted file
 The secrets file is decrypted and the user is propted for the username and password to the account they want to remove. The inputs are compaired to the data within the secrets file through the "rem" function and if they match, the data corresponding to the inputs are removed and the file is re-encrypted. The accont name is removed from the accounts file.
 
 <video src="https://github.com/user-attachments/assets/1e42d47f-c7d4-477d-ace4-5d7cf850d446
-" controls="controls" style="max-width: 150px;">
-</video>
+"controls="controls"style="max-width:150px;"></video>
 
 ### Backup all files and install backup
 The user is promted on whether they want to backup files or install a backup. If a backup is selected all the files associated with fmp are coppied to a file in the same location with the prefix .bak e.g. account.bak. If an install is selected all the .bak files are coppied to there non .bak counterparts.
