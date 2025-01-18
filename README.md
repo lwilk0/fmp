@@ -20,6 +20,20 @@ The user is first prompted to input the length of the password they want, then r
 ### Calculating password entropy
 The user inputs the password to be rated. The presence of lowercase characters, uppercase characters, special characters and numbers and detected by the "char" function. If they are present, the number of the characters within the group are added to a variable(posSymbols). For example, if a lowercase character is present, 26 is added to the variable. The number of combinations avaliable for a password of its size and contents is calculated by puting the posSymbols variable to the power of the password length. The entropy is finaly calculated by finding the logarithm base 2 of the number of combinations.
 
+### Setup of fmp
+Fmp is setup by simply asking where to save the accounts and secrets file, creating the directory if necessary, creating the directory pointer files at ~/.config/fmp and both the accounts and secrets file to there inputed location. Placeholder data is added to the secrets file to avoid errors before it is encrypted.
+
+
+## Flags:
+```flags
+  -a, --add      Add an account to password manager. used as: -a, --add
+  -b, --backup   Backup all fmp files or install backup. used as: -b, --backup
+  -d, --delete   Delete account from password manager. used as: -d, --delete
+  -s, --setup    Setup fmp. used as: -s, --setup
+  -c, --create   Create password. used as: -c, --create
+  -e, --entropy  Calculate password entropy used as: -e, --entropy
+  -h, --help     Print help
+```
 #### TODO:
 - [x] Add install function
 - [x] u32 input error handling
