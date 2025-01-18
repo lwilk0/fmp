@@ -16,7 +16,7 @@ The user is promted on whether they want to backup files or install a backup. If
 
 ###
 
-TODO:
+#### TODO:
 - [x] Add install function
 - [x] u32 input error handling
 - [x] Add error handling to directory input
