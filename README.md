@@ -40,7 +40,7 @@ Fmp is setup by simply asking where to save the accounts and secrets file, creat
   -d, --delete   Delete account from password manager. used as: -d, --delete
   -s, --setup    Setup fmp. used as: -s, --setup
   -c, --create   Create password. used as: -c, --create
-  -e, --entropy  Calculate password entropy used as: -e, --entropy
+  -e, --entropy  Calculate password entropy. used as: -e, --entropy
   -h, --help     Print help
 ```
 #### TODO:
