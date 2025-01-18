@@ -55,6 +55,7 @@ Fmp is setup by simply asking where to save the accounts and secrets file, creat
 - [x] Add error handling to directory input
 - [x] Add backup function
 - [x] Calculate password entropy
+- [ ] Ensure exit encryption
 - [ ] Allow for entropy calculations larger than 19 characters
 - [ ] Add Windows and Mac support
 - [ ] Create TUI
