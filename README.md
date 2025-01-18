@@ -6,9 +6,10 @@ TODO:
 - [x] u32 input error handling
 - [x] Add error handling to directory input
 - [x] Add backup function
+- [x] Calculate password entropy
+- [ ] Allow for entropy calculations larger than 19 characters
 - [ ] Add Windows and Mac support
 - [ ] Create TUI
-- [ ] Calculate password entropy
 - [ ] Add double encryption
 - [ ] Create better decryption method
 - [ ] Add support for preexisting files in install function
