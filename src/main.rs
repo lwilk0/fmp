@@ -15,7 +15,6 @@ use ilog::IntLog;
 // Help table
 #[derive(Debug, Parser)]
 struct Options {
-    /// required non-flag argument.
 
     /// Add an account to password manager.
     /// used as: -a, --add
@@ -42,7 +41,7 @@ struct Options {
     #[clap(short = 'c', long = "create")]
     flag_c: bool,
 
-    /// Calculate password entropy
+    /// Calculate password entropy.
     /// used as: -e, --entropy
     #[clap(short = 'e', long = "entropy")]
     flag_e: bool
@@ -157,6 +156,8 @@ fn main() {
         run_cmd!(openssl aes-256-cbc -a -salt -pbkdf2 -in $secretsLoc -out $secretsEncLoc).expect("Could not encrypt secrets.json");
         run_cmd!(rm $secretsLoc).expect("Could not remove secrets.json");
         println!("Done");
+
+        exit(1)
     }
 
 
@@ -225,6 +226,7 @@ fn main() {
 
     // if flag -b or --backup is used
     if opts.flag_b == true {
+        newline();
         while userInput != "b" && userInput != "i" {
             println!("Would you like to backup(b) or install backup(i)?");
             io::stdin().read_line(&mut userInput).expect("Failed to read line");
@@ -273,6 +275,8 @@ fn main() {
     // if flag -d or --delete is used
     if opts.flag_d == true {
 
+        newline();
+
         println!("What account should be removed?");
         io::stdin().read_line(&mut remName).expect("Failed to read line");
 
@@ -298,6 +302,7 @@ fn main() {
     // if flag -c or --create is used
     if opts.flag_c == true {
 
+        newline();
         // User input for password length
         let length: u32  = import_handle::get_u32_input("How long should the password be? ");
 
@@ -349,6 +354,9 @@ fn main() {
 
     // If flag -e or --entropy used
     if opts.flag_e == true {
+
+        newline();
+
         passwordRate = get_string_input("Enter the password: ");
         while passwordRate.len() > 19 {
             println!("Integer must be less than 20 due to limitations with rust integer sizes");
@@ -378,11 +386,13 @@ fn main() {
         println!("\nThere are {} combinations posible", posCombinations);
         println!("The password has {} bit entropy", entropy);
         println!("Password rating: {}", rating);
+
+        encrypt(secrets_path, secrets_path_enc);
         exit(1)
     }
 
     dele(secrets_path);
-    if acc.len() != 1 {
+    if acc.len() != 0 {
         table(service, &acc, json);
     }
     else {
@@ -407,12 +417,14 @@ pub fn decrypt(secrets_path: String, secrets_path_enc: String) {
 }
 
 pub fn encrypt(secrets_path: String, secrets_path_enc: String) {
-    run_cmd!(rm $secrets_path_enc).expect("Could not remove secrets.json.enc");
+    dele(secrets_path.clone());
     newline();
     println!("Enter password to re-encrypt file");
     newline();
-    run_cmd!(openssl aes-256-cbc -a -salt -pbkdf2 -in $secrets_path -out $secrets_path_enc).expect("Could not encrypt secrets.json");
-    dele(secrets_path);
+    match run_cmd!(openssl aes-256-cbc -a -salt -pbkdf2 -in $secrets_path -out $secrets_path_enc) {
+        Ok(res) => return,
+        Err(e) => encrypt(secrets_path, secrets_path_enc),
+    }
 }
 
 // reads account file
@@ -447,11 +459,20 @@ pub fn rem(accName: &String, accPassword: &String, mut json: String) -> String {
     // removes object from json
     let jsonDupeCheck: String = json.clone();
     let remString: String = format!(",\"{}\":\"{}\"", accName, accPassword);
+
     json = json.replace(remString.as_str(), "");
-    
+
+    newline();
+
     if json == jsonDupeCheck {
-        newline();
-        println!("No object was removed, either username or password is incorrect");
+        let remString: String = format!("\"{}\":\"{}\",", accName, accPassword);
+        json = json.replace(remString.as_str(), "");
+        if json == jsonDupeCheck {
+            println!("No account removed, did not match any data");
+        }
+        else {
+            println!("Account removed successfully")
+        }
     } else {
         println!("Account removed successfully")
     }
