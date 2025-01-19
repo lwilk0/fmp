@@ -28,8 +28,7 @@ The secrets file is decrypted and the user is asked the username and password to
 ### Remove data from encrypted file
 The secrets file is decrypted and the user is propted for the username and password to the account they want to remove. The inputs are compaired to the data within the secrets file through the "rem" function and if they match, the data corresponding to the inputs are removed and the file is re-encrypted. The accont name is removed from the accounts file.
 
-<video src="https://github.com/user-attachments/assets/1e42d47f-c7d4-477d-ace4-5d7cf850d446
-"controls="controls"style="max-width:150px;"></video>
+<video src="https://github.com/user-attachments/assets/1e42d47f-c7d4-477d-ace4-5d7cf850d446" controls="controls" style="max-width:150px;"></video>
 
 ### Backup all files and install backup
 The user is promted on whether they want to backup files or install a backup. If a backup is selected all the files associated with fmp are coppied to a file in the same location with the prefix .bak e.g. account.bak. If an install is selected all the .bak files are coppied to there non .bak counterparts.
