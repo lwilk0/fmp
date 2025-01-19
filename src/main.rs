@@ -4,13 +4,14 @@
 #![allow(unused_mut)]
 
 use clap::Parser;
-use std::{env, path::Path, process::exit, fs, fs::File, io::Read, io};
+use std::{env, path::Path, process::exit, fs, fs::File, io::Read};
 use cmd_lib::run_cmd;
 use rustc_serialize::json::Json;
 use rand::Rng;
 use simple_home_dir::*;
-use import_handle::{self, get_string_input};
+use import_handle;
 use ilog::IntLog;
+use dir_input::{self, get_dir_input};
 
 // Help table
 #[derive(Debug, Parser)]
@@ -55,10 +56,14 @@ fn main() {
     let upper_Chars = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
     let number_chars = ['1','2','3','4','5','6','7','8','9','0'];
     let special_chars = ['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
+   
+    let service: &str = "";
+    let mut rating: &str = "";
     
     let mut data = String::new();
     let mut input: String = String::new();
-    let service: &str = "";
+    
+
     let mut passwd: String = String::new();
     let mut accountName: String = String::new();
     let mut accountPassword: String = String::new();
@@ -76,31 +81,35 @@ fn main() {
     let mut accLocDir: String = String::new();
     let mut userInput: String = String::new();
     let mut passwordRate: String = String::new();
+
+    let mut length: u32 = 0;
     let mut posSymbols: u128 = 0;
-    let mut posCombinations: u128;
-    let mut entropy: u128;
-    let mut rating: &str;
+    let mut posCombinations: u128 = 0;
+    let mut entropy: u128 = 0;
     let opts = Options::parse();
 
     let home = home_dir().unwrap();
     let homeDir = home.display();  
+
     let fmpDir = format!("{}/.config/fmp", homeDir);
     let fmpDirCheck = Path::new(&fmpDir).exists();
 
     //os check
     let os: &str =  env::consts::OS;  
-
     if os != "linux" {
         println!("fmp only runs on Linux, running on other OSes could be destructive");
         exit(1)
     }
 
+    // if -s of --setup flag is used
     if opts.flag_s == true {
         
         println!("FMP SETUP");
         newline();
         println!("Three files will be stored in ~/.config/fmp, containing locations for other files");
         println!("Creating the directory...");
+
+        // Check if ~/.config/fmp exists
         if fmpDirCheck == false {
             run_cmd!(mkdir $homeDir/.config/fmp).expect("Failed to execute command");
         }
@@ -133,9 +142,11 @@ fn main() {
         accLocDir = format!("{}/.config/fmp/accLoc", homeDir);
 
         println!("Creating files in ~/config/fmp");
+
         fs::write(secretsEncLocDir, secretsEncLoc.clone()).expect("Could not save secrets.json.enc loaction file");
         fs::write(secretsLocDir, secretsLoc.clone()).expect("Could not save secrets.json location file");
         fs::write(accLocDir, accLoc.clone()).expect("Failed to execute command");
+        
         println!("Done");
 
         newline();
@@ -196,29 +207,21 @@ fn main() {
     if opts.flag_a == true {
 
         newline();
-        println!("What should the account be named?");
-        io::stdin()
-            .read_line(&mut addName)
-            .expect("Failed to read line");
+
+        addName = import_handle::get_string_input("What is the account name? ");
 
         newline();
 
-        println!("What is the password for the account?");
-        io::stdin()
-            .read_line(&mut addPassword)
-            .expect("Failed to read line");
-
-        // remove /n from account name and pass
-        addName = addName.trim().to_string();
-        addPassword = addPassword.trim().to_string();
+        addPassword = import_handle::get_string_input("What is the account password? ");
 
         // adds data to json var and saves to secrets.json
         data = add(&addName, addPassword, json.to_string());
-        update_json(secrets_path, data, secrets_path_enc);
+        update_json(secrets_path.clone(), data, secrets_path_enc);
         acc.push(addName);
         write_acc(&acc_path, &acc);
 
         //exit
+        dele(&secrets_path);
         newline();
         println!("Account created successfully");
         exit(1);
@@ -228,9 +231,7 @@ fn main() {
     if opts.flag_b == true {
         newline();
         while userInput != "b" && userInput != "i" {
-            println!("Would you like to backup(b) or install backup(i)?");
-            io::stdin().read_line(&mut userInput).expect("Failed to read line");
-            userInput = userInput.trim().to_string();
+            userInput = import_handle::get_string_input("Would you like to backup(b) or install backup(i)?");
             newline();
         }
 
@@ -249,7 +250,7 @@ fn main() {
             run_cmd!(cp $acc_path/accounts $acc_path/accounts.bak).expect("Failed to run command");
             println!("Done!");
 
-            dele(secrets_path);
+            dele(&secrets_path);
             exit(1);
         }
         else if userInput == "i" {
@@ -267,7 +268,7 @@ fn main() {
             run_cmd!(cp $acc_path/accounts.bak $acc_path/accounts).expect("Failed to run command");
             println!("Done!");
 
-            dele(secrets_path);
+            dele(&secrets_path);
             exit(1);
         }
     }
@@ -277,23 +278,19 @@ fn main() {
 
         newline();
 
-        println!("What account should be removed?");
-        io::stdin().read_line(&mut remName).expect("Failed to read line");
+        remName = import_handle::get_string_input("What account should be removed?");
 
         newline();
 
-        println!("What is the password for the account?");
-        io::stdin().read_line(&mut remPassword).expect("Failed to read line");
+        remPassword = import_handle::get_string_input("What is the password for the account?");
 
-       
-        remName = remName.trim().to_string();
-        remPassword = remPassword.trim().to_string();
-        
+        // Remove account from json and accounts
         data = rem(&remName, &remPassword, json.to_string());
-        update_json(secrets_path, data, secrets_path_enc);
+        update_json(secrets_path.clone(), data, secrets_path_enc);
         acc.retain(|acc| *acc != remName);
         write_acc(&acc_path, &acc);
 
+        dele(&secrets_path);
         newline();
         exit(1);
     }
@@ -303,8 +300,9 @@ fn main() {
     if opts.flag_c == true {
 
         newline();
+
         // User input for password length
-        let length: u32  = import_handle::get_u32_input("How long should the password be? ");
+        length = import_handle::get_u32_input("How long should the password be? ");
 
 
         newline();
@@ -323,29 +321,24 @@ fn main() {
         // Resets input var
         let mut input: String = String::new();
 
-        println!("Would you like to link this password to an account? y n");
-        io::stdin().read_line(&mut input).expect("Failed to read line");
-
+        input = import_handle::get_string_input("Would you like to link this password to an account? y n");
+        
         newline();
 
         if input.to_lowercase().trim().to_string() == "y" {
 
             accountPassword = passwd;
 
-            println!("What is the account name?");
-            io::stdin().read_line(&mut accountName).expect("Failed to read line");
-            
-            // remove /n from account name
-            accountName = accountName.trim().to_string();
-            
+            accountName = import_handle::get_string_input("What is the account name?");
 
             // adds data to json var and saves to secrets.json
             data = add(&accountName, accountPassword, json.to_string());
-            update_json(secrets_path, data, secrets_path_enc);
+            update_json(secrets_path.clone(), data, secrets_path_enc);
             acc.push(accountName);
             write_acc(&acc_path, &acc);
 
             //exit
+            dele(&secrets_path);
             newline();
             println!("Account created successfully");
             exit(1);
@@ -357,17 +350,20 @@ fn main() {
 
         newline();
 
-        passwordRate = get_string_input("Enter the password: ");
+        passwordRate = import_handle::get_string_input("Enter the password: ");
+        
         while passwordRate.len() > 19 {
             println!("Integer must be less than 20 due to limitations with rust integer sizes");
-            passwordRate = get_string_input("Enter the password: ");
+            passwordRate = import_handle::get_string_input("Enter the password: ");
         }
 
         posSymbols += char(lower_Chars, &passwordRate);
         posSymbols += char(upper_Chars, &passwordRate);
         posSymbols += char(number_chars, &passwordRate);
         posSymbols += char(special_chars, &passwordRate);
+       
         posCombinations = posSymbols.pow(passwordRate.len() as u32);
+       
         entropy = u128::log2(posCombinations as u128) as u128;
 
         if entropy <= 35 {
@@ -391,18 +387,22 @@ fn main() {
         exit(1)
     }
 
-    dele(secrets_path);
+    dele(&secrets_path);
+
     if acc.len() != 0 {
         table(service, &acc, json);
     }
     else {
+        newline();
         println!("No accounts to display")
     }
 
 }
 
 pub fn table<'a>(mut service: &'a str, acc: &'a Vec<String>, json: Json) {
+   
     newline();
+  
     for i in 0..acc.len() {
         service = acc[i].as_str();
         println!("{} password - {}", acc[i], rem_first_and_last(json[service].to_string()));
@@ -417,10 +417,15 @@ pub fn decrypt(secrets_path: String, secrets_path_enc: String) {
 }
 
 pub fn encrypt(secrets_path: String, secrets_path_enc: String) {
-    dele(secrets_path.clone());
+    
+    dele(&secrets_path);
+    
     newline();
+   
     println!("Enter password to re-encrypt file");
+    
     newline();
+   
     match run_cmd!(openssl aes-256-cbc -a -salt -pbkdf2 -in $secrets_path -out $secrets_path_enc) {
         Ok(res) => return,
         Err(e) => encrypt(secrets_path, secrets_path_enc),
@@ -435,6 +440,7 @@ pub fn read_acc(acc_path: String) -> Vec<String> {
     
     // Seperates each piece of data through the newline between and saves each word to vector acc
     let mut acc: Vec<String> = accStr.split('\n').map(|v| v.to_string()).collect();
+    
     // Removes blank "" from acc
     acc.retain(|x| x != "");
     
@@ -448,7 +454,9 @@ pub fn write_acc(acc_path: &String, acc: &Vec<String>) {
 
 // Json must be manipulated as a string
 pub fn add(accName: &String, accPassword: String, mut json: String) -> String {
-    json.pop(); // remove last }
+    // remove last }
+    json.pop(); 
+
     // adds new object containing name and pass to json
     json = format!("{},\"{}\":\"{}\"}}", json, accName, accPassword);
     return json;
@@ -456,6 +464,7 @@ pub fn add(accName: &String, accPassword: String, mut json: String) -> String {
 
 // Json must be manipulated as a string
 pub fn rem(accName: &String, accPassword: &String, mut json: String) -> String {
+    
     // removes object from json
     let jsonDupeCheck: String = json.clone();
     let remString: String = format!(",\"{}\":\"{}\"", accName, accPassword);
@@ -467,6 +476,7 @@ pub fn rem(accName: &String, accPassword: &String, mut json: String) -> String {
     if json == jsonDupeCheck {
         let remString: String = format!("\"{}\":\"{}\",", accName, accPassword);
         json = json.replace(remString.as_str(), "");
+
         if json == jsonDupeCheck {
             println!("No account removed, did not match any data");
         }
@@ -483,84 +493,25 @@ pub fn update_json(secrets_path: String, json: String, secrets_path_enc: String)
     fs::write(secrets_path.clone(), json).expect("Could not write");
     encrypt(secrets_path, secrets_path_enc);   
 }
-pub fn dele(secrets_path: String) {
+pub fn dele(secrets_path: &String) {
     run_cmd!(rm $secrets_path).expect("Could not remove secrets.json");
 }
 
 pub fn rem_first_and_last(mut value: String) -> String {
-    value.pop();      // remove last character
+    // remove last character
+    value.pop();      
+
     if value.len() > 0 {
-        value.remove(0);  // remove first character
+        // remove first character
+        value.remove(0);  
     }
+
     return value;
 }
 
 pub fn newline() {
     println!("");
 }
-
-pub fn get_dir_input(message: &str) -> String {
-    println!("{}", message);
-
-    let mut userInput = String::new();
-    let mut userInput2 = String::new();
-    let mut lastPos: usize;
-    let mut dirTest: bool;
-    let home = home_dir().unwrap();
-    let homeDir = home.display();  
-
-    loop {
-        // Gets user input for dir
-        io::stdin().read_line(&mut userInput).expect("Failed to read line");
-
-
-        lastPos = userInput.len()-1;
-
-        // Dir format error handling
-        if userInput.contains("~") {
-            // If first character of string is a tilda
-            if userInput.chars().next().unwrap() == '~' {
-                userInput.remove(0);
-                userInput = format!("{}{}", homeDir, userInput)
-            }
-            else {
-                println!("Invalid location of tilda! Must be at the start of the directory!\n");
-                get_dir_input(message);
-            }
-        }
-        else if userInput.contains("$") {
-            println!("Please do not use a environmental variable in the directory");
-            newline();
-            get_dir_input(message);
-        }
-        else if &userInput[..lastPos] == "/" {
-            userInput.pop();
-        }
-        
-        // Check if dir exists
-        dirTest = Path::new(&userInput.trim()).exists();
-
-        // If directory does not exist
-        while dirTest == false{
-            println!("Directory does not exist, would you like to create it? yn exit");
-            io::stdin().read_line(&mut userInput2).expect("Failed to read line");
-
-            if userInput2.trim().to_lowercase().to_string() == "y" {
-                // Creates directory
-                userInput = userInput.trim().to_string();
-                run_cmd!(mkdir -p $userInput).expect("Dir not valid or needs superuser privileges to access")
-            }
-            else if userInput2.trim().to_lowercase().to_string() == "exit" {
-                exit(1)
-            }
-            else {
-                get_dir_input(message);
-            }
-            dirTest = Path::new(&userInput.trim()).exists();
-        } 
-        return userInput.trim().to_string();
-    }
-} 
 
 pub fn char<const N: usize>(chars: [char; N], passwordRate: &String) -> u128{
     // char test
