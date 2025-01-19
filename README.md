@@ -1,5 +1,6 @@
 # fmp
 A command line password manager written in rust for Linux
+<video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883" controls="controls" style="max-width:150px;"></video>
 
 ###
 
@@ -17,39 +18,23 @@ A command line password manager written in rust for Linux
 ### Decrypt and read 
 Fmp interacts with a json file containing account names and passwords, encrypted with the Advanced Encryption Standard with a 256-bit key in Cipher Block Chaining(aes-256-cbd). The file is also salted and uses Password-Based Key Derivation Function 2. When fmp is ran, it decrypts this file(secrets.json.enc) and the usernames are compared with a persistent file(accounts) which allows an output to be formated and displayed.
 
-
-<video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883" controls="controls" style="max-width:150px;"></video>
-
 ### Add data to encrypted file
 The secrets file is decrypted and the user is asked the username and password to the account they want to add. The "add" function is then called, which formats the inputs in json syntax and saves it to a variable. The "update_json" function is called next, appending the data to the full json data, then saves the data to the secrets file which is re-encrypted. The username is added to the accounts file.
-
-<video src="https://github.com/user-attachments/assets/fd2b7ddf-b728-4d4a-b443-00674e28657b" controls="controls" style="max-width:150px;"></video>
 
 ### Remove data from encrypted file
 The secrets file is decrypted and the user is propted for the username and password to the account they want to remove. The inputs are compaired to the data within the secrets file through the "rem" function and if they match, the data corresponding to the inputs are removed and the file is re-encrypted. The accont name is removed from the accounts file.
 
-<video src="https://github.com/user-attachments/assets/1e42d47f-c7d4-477d-ace4-5d7cf850d446" controls="controls" style="max-width:150px;"></video>
-
 ### Backup all files and install backup
 The user is promted on whether they want to backup files or install a backup. If a backup is selected all the files associated with fmp are coppied to a file in the same location with the prefix .bak e.g. account.bak. If an install is selected all the .bak files are coppied to there non .bak counterparts.
-
-<video src="https://github.com/user-attachments/assets/92815dde-8b0b-4142-bdc0-b969c7cda16d" controls="controls" style="max-width: 150px;"></video>
 
 ### Create a password
 The user is first prompted to input the length of the password they want, then random characters from a password-permited charactes array are concatenated together to form a password of the length. The user is asked if they want to save it to an account. If so, an account name is inputed and the [add](https://github.com/TT1882/fmp/blob/main/README.md#add-data-to-encrypted-file) function is called.
 
-<video src="https://github.com/user-attachments/assets/6a685bdd-caa8-44a8-83bf-232b50adeb2f" controls="controls" style="max-width: 150px;"></video>
-
 ### Calculate password entropy
 The user inputs the password to be rated. The presence of lowercase characters, uppercase characters, special characters and numbers and detected by the "char" function. If they are present, the number of the characters within the group are added to a variable(posSymbols). For example, if a lowercase character is present, 26 is added to the variable. The number of combinations avaliable for a password of its size and contents is calculated by puting the posSymbols variable to the power of the password length. The entropy is finaly calculated by finding the logarithm base 2 of the number of combinations.
 
-<video src="https://github.com/user-attachments/assets/7747ae10-cf06-496d-87f9-872ec813b6e6" controls="controls" style="max-width: 150px;"></video>
-
 ### Setup fmp
 Fmp is setup by simply asking where to save the accounts and secrets file, creating the directory if necessary, creating the directory pointer files at ~/.config/fmp and both the accounts and secrets file to there inputed location. Placeholder data is added to the secrets file to avoid errors before it is encrypted.
-
-<video src="https://github.com/user-attachments/assets/d5900239-8bd1-4e7b-8f56-fe6d4204656c
-" controls="controls" style="max-width: 150px;"></video>
 
 ###
 
@@ -71,7 +56,7 @@ Fmp is setup by simply asking where to save the accounts and secrets file, creat
 - [x] Add error handling to directory input
 - [x] Add backup function
 - [x] Calculate password entropy
-- [ ] Ensure exit encryption
+- [x] Ensure exit encryption
 - [ ] Allow for entropy calculations larger than 19 characters
 - [ ] Add Windows and Mac support
 - [ ] Create TUI
