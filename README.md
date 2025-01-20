@@ -1,5 +1,5 @@
 # fmp
-A command line password manager written in rust for Linux
+A command line password manager written in rust for Linux, currently being re-written.
 <video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883" controls="controls" style="max-width:150px;"></video>
 
 ###
