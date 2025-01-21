@@ -4,6 +4,7 @@ use std::{fs::{self, File}, io::Write, path::Path, process::exit};
 use import_handle::get_string_input;
 use cmd_lib::run_cmd;
 
+use super::account;
 #[derive(Deserialize, Debug)]
 pub struct UserPass {
     pub username: String,
@@ -18,7 +19,7 @@ pub struct UserPass {
 // while var.username == "err" {
 //    // username is incorect, handle accordingly
 //}
-pub fn read_json(fmp_vault_location: String, account: &str) -> UserPass{
+pub fn read_json(fmp_vault_location: String, account: String) -> UserPass{
     // Find where wanted json is located
     let json_directory = format!("{}/{}/data.json", fmp_vault_location, account);
     // For error handling
@@ -36,15 +37,15 @@ pub fn read_json(fmp_vault_location: String, account: &str) -> UserPass{
     return error;
 }
 
-// Reads json file from username and vault file location
+// Creates new account
 //
 // USAGE
 //
-// let var: UserPass = read_json(get_fmp_vault_location(), "account");
+// let var: UserPass = new_json_account(get_fmp_vault_location(), "name", "username", "password");
 // while var == "err" {
 //    // Get new username from user and try again
 //}
-pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, password: &str) -> String {
+pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, password: &str, mut account: Vec<String>) -> String {
     // What file data.json will end up in
     let new_account_dir = format!("{}/{}", fmp_vault_location, name);
     // data.json location
@@ -85,6 +86,9 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
     json["username"] = serde_json::Value::String(username.to_owned());
     json["password"] = serde_json::Value::String(password.to_owned());
     save_json_file(new_account_file, json);
+
+    account.push(String::from(name));
+    account::write_account(account::get_account_location(), &account);
     println!("\nSucessfully saved new account");
     return "ok".to_string();
 }

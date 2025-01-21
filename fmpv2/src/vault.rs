@@ -1,12 +1,14 @@
 use dirs;
 use cmd_lib::run_cmd;
 
+use super::account;
+use super::json;
 
 // Finds where fmp's vault is
 //
 // USAGE
 //
-// let var: String = get_fmp_vault_location;
+// let var: String = get_fmp_vault_location();
 pub fn get_fmp_vault_location() -> String{
     // Gets users home directory
     let home_dir = dirs::home_dir().expect("Could not find home directory!");
@@ -49,4 +51,13 @@ pub fn decrypt_fmp_vault() {
     run_cmd!(gpg -d $fmp_vault_as_encrypted_tar | tar xz).expect("Failed to execute command");
 
     println!("\nDecrypted");
+}
+
+pub fn read_vault(){
+    let accounts_list: Vec<String> = account::read_account(account::get_account_location());
+        for i in 0..accounts_list.len() {
+            let service = accounts_list[i].clone();
+            let json = json::read_json(get_fmp_vault_location(), service);
+            println!("{}, {}", json.username, json.password)
+        }
 }

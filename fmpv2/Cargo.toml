@@ -1,6 +1,6 @@
 [package]
 name = "fmp"
-version = "1.1.6-rc.2"
+version = "1.1.6-rc.3"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 license = "GPL-3.0"
@@ -13,5 +13,3 @@ cmd_lib = "1.9.0"
 serde_json = "1.0.137"
 serde = { version = "1.0.137", features = ["derive"] }
 import-handle = "1.0.4"
-glob = "0.3.2"
-walkdir = "2.5.0"
