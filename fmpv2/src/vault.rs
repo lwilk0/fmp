@@ -1,6 +1,7 @@
 use dirs;
 use cmd_lib::run_cmd;
 
+
 // Finds where fmp's vault is
 //
 // USAGE
