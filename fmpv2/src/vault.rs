@@ -53,11 +53,20 @@ pub fn decrypt_fmp_vault() {
     println!("\nDecrypted");
 }
 
+// Reads all json files and prints to screen
+//
+// USAGE
+//
+// read_vault() 
 pub fn read_vault(){
+    // Gets list of accounts
     let accounts_list: Vec<String> = account::read_account(account::get_account_location());
+        // Loop for each entry in accounts_list
         for i in 0..accounts_list.len() {
+            // Find corrosponding json file and read
             let service = accounts_list[i].clone();
             let json = json::read_json(get_fmp_vault_location(), service);
-            println!("{}, {}", json.username, json.password)
+            // Output
+            println!("{}: Username: {} Password: {}", accounts_list[i], json.username, json.password)
         }
 }
