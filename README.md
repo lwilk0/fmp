@@ -1,4 +1,7 @@
 # fmp
+
+PLEASE DO NOT USE CURRENTLY. The code is unsafe and is being rewritten!!
+
 A command line password manager written in rust for Linux, currently being re-written as code is unsafe and unreadable.
 <video src="https://github.com/user-attachments/assets/760bba84-b978-4071-9252-167a1a09a883" controls="controls" style="max-width:150px;"></video>
 
