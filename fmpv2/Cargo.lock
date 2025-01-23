@@ -102,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "fmp"
-version = "1.1.6-rc.4"
+version = "1.1.6-rc.5"
 dependencies = [
  "cmd_lib",
  "dirs",

@@ -1,10 +1,12 @@
 use serde_json;
 use serde::Deserialize;
-use std::{fs::{self, File}, io::Write, path::Path, process::exit};
+use std::{fs::{self, File}, io::Write, path::Path};
 use import_handle::get_string_input;
 use cmd_lib::run_cmd;
 
+use super::vault;
 use super::account;
+
 #[derive(Deserialize, Debug)]
 pub struct UserPass {
     pub username: String,
@@ -21,16 +23,13 @@ pub struct UserPass {
 //}
 pub fn read_json(fmp_vault_location: String, account: String) -> UserPass{
     // Find where wanted json is located
-    let json_directory = format!("{}/{}/data.json", fmp_vault_location, account);
+    let json_file_directory = format!("{}/{}/data.json", fmp_vault_location, account);
     // For error handling
     let error: UserPass = UserPass {username: "err".to_string(), password: "err".to_string(),};
     
     // If directory exists
-    if Path::new(&json_directory).exists() {
-        // Read json file to string
-        let json_as_string: String = fs::read_to_string(&json_directory).unwrap();
-        // Convert to json in UserPass structure
-        let json: UserPass = serde_json::from_str(&json_as_string).unwrap();
+    if Path::new(&json_file_directory).exists() {
+        let json: UserPass = load_json_as_userpass(&json_file_directory);
         return json;
     }
     println!("Invalid Input, username does not exist!");
@@ -72,7 +71,7 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
         // If input is e or exit, the program is exited
         else {
             println!("Exiting...");
-            exit(1)
+            vault::exit_vault(vault::get_fmp_vault_location());
         }
         
     }
@@ -81,10 +80,9 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
     run_cmd!(echo "{}" > $new_account_file).expect("Failed to create directory");
     
     // Loads data.json file
-    let mut json: serde_json::Value = load_json(&new_account_file);
+    let mut json: serde_json::Value = load_json_as_value(&new_account_file);
     // Add data to json
-    json["username"] = serde_json::Value::String(username.to_owned());
-    json["password"] = serde_json::Value::String(password.to_owned());
+    json = add_fields_to_json(json, username, password);
     save_json_file(new_account_file, json);
 
     account.push(String::from(name));
@@ -111,11 +109,66 @@ pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
 //
 // USAGE
 //
-// var = load_json(json_file_directory)
-pub fn load_json(json_file_directory: &String) -> serde_json::Value {
+// var = load_json_as_value(json_file_directory)
+pub fn load_json_as_value(json_file_directory: &String) -> serde_json::Value {
     // Read json file to string
     let json_as_string: String = fs::read_to_string(&json_file_directory).unwrap();
     // Convert to json in UserPass structure
     let json: serde_json::Value = serde_json::from_str(&json_as_string).unwrap();
+    return json;
+}
+
+// Loads json file and returns as UserPass
+//
+// USAGE
+//
+// var = load_json_as_userpass(json_file_directory)
+pub fn load_json_as_userpass(json_file_directory: &String) -> UserPass {
+    // Read json file to string
+    let json_as_string: String = fs::read_to_string(&json_file_directory).unwrap();
+    // Convert to json in UserPass structure
+    let json: UserPass = serde_json::from_str(&json_as_string).unwrap();
+    return json;
+}
+
+// Changes the password of an account
+//
+// USAGE
+//
+// change_password(get_fmp_vault_location(), "password", "account")
+pub fn change_password(fmp_vault_location: String, password: &str, account: &str) {
+    // Finds data.json location
+    let json_file_directory = format!("{}/{}/data.json", fmp_vault_location, account);
+    // Loads json
+    let json: UserPass = load_json_as_userpass(&json_file_directory);
+    // Saves username from josn
+    let username = json.username;
+    // Creates blank json
+    let mut new_json: serde_json::Value = serde_json::from_str("{}").unwrap();
+    new_json = add_fields_to_json(new_json, username.as_str(), password);
+    save_json_file(json_file_directory, new_json);
+}
+
+// Changes the password of an account
+//
+// USAGE
+//
+// change_password(get_fmp_vault_location(), "username", "account")
+pub fn change_username(fmp_vault_location: String, username: &str, account: &str) {
+    // Finds data.json location
+    let json_file_directory = format!("{}/{}/data.json", fmp_vault_location, account);
+    // Loads json
+    let json: UserPass = load_json_as_userpass(&json_file_directory);
+    // Saves username from josn
+    let password = json.password;
+    // Creates blank json
+    let mut new_json: serde_json::Value = serde_json::from_str("{}").unwrap();
+    new_json = add_fields_to_json(new_json, password.as_str(), username);
+    save_json_file(json_file_directory, new_json);
+}
+
+pub fn add_fields_to_json(mut json: serde_json::Value, username: &str, password: &str) -> serde_json::Value {
+    json["username"] = serde_json::Value::String(username.to_owned());
+    json["password"] = serde_json::Value::String(password.to_owned());
     return json;
 }
