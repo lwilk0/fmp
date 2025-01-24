@@ -42,23 +42,3 @@ The vault is decrypted and the user is propted to enter the name of the account 
 A .fmpVault folder is saved in the users home directory, along with an accounts file inside it. The vault is then compressed with Tar/GZip and encrypted.
 ### Calculate Entropy:
 The user is prompted to enter the password they want to find the entropy of. The character pool size of the password is found and the entropy is calculated with the formula L * log2(C), where L is the length of the password and C is the character pool. The entropy is ranked and displayed.
-
-
-## TODO:
-- [x] Add install function
-- [x] u32 input error handling
-- [x] Add error handling to directory input
-- [x] Calculate password entropy
-- [x] Ensure exit encryption
-- [x] Allow for entropy calculations larger than 19 characters
-- [x] Add username to account
-- [x] Create better decryption method
-- [ ] Lineup output usernames and passwords
-- [ ] Allow for multiple account inputs
-- [ ] Add support for multiple vaults
-- [ ] Allow for password re-entry after fail
-- [ ] Add backup function
-- [ ] Display message when vault is empty
-- [ ] Switch from run_cmd to commands
-- [ ] Add Windows and Mac support
-- [ ] Create TUI
