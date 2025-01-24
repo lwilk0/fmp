@@ -20,7 +20,7 @@ pub fn get_account_location() -> String{
 // let account = read_account();
 pub fn read_account(account_path: String) -> Vec<String> {
     // Reads acc_path and saves as string to acc
-    let  account_string = fs::read_to_string(account_path).expect("Could not read accounts file");
+    let account_string = fs::read_to_string(account_path).expect("Could not read accounts file");
     // Seperates each piece of data through the newline between and saves each word to vector acc
     let mut account: Vec<String> = account_string.split('\n').map(|v| v.to_string()).collect();
     // Removes blank "" from acc
