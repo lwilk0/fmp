@@ -53,6 +53,7 @@ The user is prompted to enter the password they want to find the entropy of. The
 - [x] Allow for entropy calculations larger than 19 characters
 - [x] Add username to account
 - [x] Create better decryption method
+- [ ] Lineup output usernames and passwords
 - [ ] Allow for multiple account inputs
 - [ ] Add support for multiple vaults
 - [ ] Allow for password re-entry after fail
