@@ -1,11 +1,12 @@
 [package]
-name = "fmp"
+name = "forgot-my-password"
 version = "1.2.8"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 license = "GPL-3.0"
 description = "Simple password manager"
-
+repository = "https://github.com/TT1882/fmp"
+keywords = ["cli", "crypto", "cryptography", "serde", "rust"]
 
 [dependencies]
 dirs = "6.0.0"
