@@ -93,6 +93,10 @@ pub fn read_vault() {
     // Gets list of accounts
     let accounts_list: Vec<String> = account::read_account(account::get_account_location());
         // Loop for each entry in accounts_list
+        if accounts_list.len() == 0 {
+            println!("No accounts have been created! Use fmp -a to create an account.");
+            return;
+        }
         for i in 0..accounts_list.len() {
             // Find corrosponding json file and read
             let service = accounts_list[i].clone();

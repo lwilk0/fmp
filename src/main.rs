@@ -60,30 +60,58 @@ fn main() {
 
     // If flag -a or --add is used
     if opts.flag_a == true {
+        let mut user_input: String = "y".to_string();
         // Decrypt vault
         vault::decrypt_fmp_vault();
-        let account = account::read_account(account::get_account_location());
-        // Get user inputs
-        let name = import_handle::get_string_input("What should the account be named? ");
-        let username = import_handle::get_string_input("\nWhat is the account username?");
-        let password = import_handle::get_string_input("\nWhat is the account password");
-        // Create new account
-        json::new_json_account(vault::get_fmp_vault_location(), name.as_str(), username.as_str(), password.as_str(), account);
+        while user_input == "y" || user_input == "yes" {
+            let account = account::read_account(account::get_account_location());
+            // Get user inputs
+            let mut name = import_handle::get_string_input("What should the account be named? ");
+            let username = import_handle::get_string_input("\nWhat is the account username?");
+            let password = import_handle::get_string_input("\nWhat is the account password");
+            println!("");
+            // Create new account
+            let mut error_handle = json::new_json_account(vault::get_fmp_vault_location(), name.as_str(), username.as_str(), password.as_str(), account.clone());
+            // Handle error
+            while error_handle != "ok" {
+                name = import_handle::get_string_input("Enter new account name: ");
+                error_handle = json::new_json_account(vault::get_fmp_vault_location(), name.as_str(), username.as_str(), password.as_str(), account.clone());
+            }
+            // Ask user if they would like to add a new account
+            user_input = String::new();
+            while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
+                user_input = import_handle::get_string_input("\nWould you like to enter a new account? (y)es, (n)o").to_lowercase();
+                println!("");
+            }
+        }
         // Exit
         vault::encrypt_and_exit();
     }
 
     // If flag -d or --delete is used
     if opts.flag_d == true {
+        let mut user_input: String = "y".to_string();
         // Decrypt vault
         vault::decrypt_fmp_vault();
-        // Get account name
-        let name = import_handle::get_string_input("What account should be removed? ");
-        // Removes account 
-        json::remove_account(vault::get_fmp_vault_location(), name.as_str());
-        let mut account = account::read_account(account::get_account_location());
-        account.retain(|account| *account != name);
-        account::write_account(account::get_account_location(), &account);
+        while user_input == "y" || user_input == "yes" {
+            let account = account::read_account(account::get_account_location());
+            // Get account name
+            let mut name = import_handle::get_string_input("What account should be removed? ");
+            println!("");
+            // Removes account 
+            let mut error_handle = json::remove_account(vault::get_fmp_vault_location(), name.as_str(), account.clone());
+            // Handle error
+            while error_handle != "ok" {
+                name = import_handle::get_string_input("Enter correct account name: ");
+                error_handle = json::remove_account(vault::get_fmp_vault_location(), name.as_str(), account.clone());
+            }
+            // Ask user if they would like to remove another account
+            user_input = String::new();
+            while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
+                user_input = import_handle::get_string_input("\nWould you like to remove another account? (y)es, (n)o").to_lowercase();
+                println!("");
+            }
+        }
         // Exit
         vault::encrypt_and_exit();
     }

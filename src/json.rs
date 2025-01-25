@@ -77,8 +77,9 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
     // Creates new account directory and data.json file containing "{}"
     Command::new("mkdir")
         .arg(new_account_dir.as_str()).output().expect("Failed to create directory");
-    Command::new("echo")
-        .args(["{}", ">", new_account_file.as_str()]).output().expect("Failed to add {} to file");
+    Command::new("touch")
+        .arg(new_account_file.as_str()).output().expect("Failed to create data.json file");
+    fs::write(&new_account_file, "{}").expect("Could not save to data.json file");
 
     // Loads data.json file
     let mut json: serde_json::Value = load_json_as_value(&new_account_file);
@@ -96,7 +97,10 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
 //
 // USAGE
 //
-// save_json_file(json_file_loaction, json)
+// let var save_json_file(json_file_loaction, json)
+// while var != "ok" {
+//    // Get new account from user and try again
+//}
 pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
     // Saves json to string
     let json_to_write = serde_json::to_string(&json).unwrap();
@@ -107,7 +111,7 @@ pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
 }
 
 // Remove account from .fmpVault
-pub fn remove_account(fmp_vault_location: String, name: &str) {
+pub fn remove_account(fmp_vault_location: String, name: &str, mut account: Vec<String>) -> String{
     let location = format!("{}/{}", fmp_vault_location, name);
     // Find if specified account exists
     if Path::new(&location).exists() {
@@ -115,11 +119,14 @@ pub fn remove_account(fmp_vault_location: String, name: &str) {
         //run_cmd!(rm -r $location).expect("Could not remove account");
         Command::new("rm")
             .args(["-r", location.as_str()]).output().expect("Could not remove account folder");
+        account.retain(|account| *account != name);
+        account::write_account(account::get_account_location(), &account);
+        return "ok".to_string();
+
     }
     else {
         println!("Account does not exist");
-        // Exit
-        vault::exit_vault(fmp_vault_location);
+        return "err".to_string();
     }
 }
 
