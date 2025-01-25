@@ -64,8 +64,25 @@ pub fn calculate_entropy(password: String) {
         character_pool += 32;
     }
  
+    let entropy = password.len() as f64 * (character_pool as f64).log2();
+    let rating: &str;
+    // Gets password rating
+    if entropy <= 35.0 {
+        rating = "Very Weak"
+    }
+    else if entropy <= 59.0 {
+        rating = "Weak"
+    }
+    else if entropy <= 119.0 {
+        rating = "Strong"
+    }
+    else {
+        rating = "Very Strong"
+    }
+
     // Calculates and prints entropy
     // FORMULA
     // L * log2(C), where L is the length of the password and C is the character pool
-    println!("The password has {:.2} bit entropy", password.len() as f64 * (character_pool as f64).log2() )
+    println!("The password has {:.2} bit entropy, giving it a rating of {}", entropy, rating)
+
 }

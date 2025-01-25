@@ -7,6 +7,7 @@ mod password;
 mod vault;
 mod json;
 mod account;
+mod checks;
 
 #[derive(Debug, Parser)]
 struct Options {
@@ -43,6 +44,8 @@ struct Options {
 }
 
 fn main() {
+    checks::os_check();
+    checks::vault_exists_check(vault::get_fmp_vault_location());
     // Stores flag user input bools
     let opts = Options::parse();
 
