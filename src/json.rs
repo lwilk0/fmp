@@ -110,6 +110,13 @@ pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
 }
 
 // Remove account from .fmpVault
+//
+// USAGE
+//
+// let var remove_account(get_fmp_vault_location(), "name", account)
+// while var != "ok" {
+//    // Get new account from user and try again
+//}
 pub fn remove_account(fmp_vault_location: String, name: &str, mut account: Vec<String>) -> String{
     let location = format!("{}/{}", fmp_vault_location, name);
     println!("Removing account...\n");

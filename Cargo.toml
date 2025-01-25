@@ -1,11 +1,11 @@
 [package]
 name = "forgot-my-password"
-version = "1.2.9"
+version = "1.2.11"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 license = "GPL-3.0"
 description = "Simple password manager"
-repository = "https://github.com/TT1882/fmp"
+repository = "https://github.com/TT1882/Forgot-My-Password.git"
 keywords = ["cli", "crypto", "cryptography", "serde", "rust"]
 
 [dependencies]
