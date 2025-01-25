@@ -16,13 +16,16 @@ cargo install --path .
 
 ## Flags:
 ```flags
-  -a, --add              Add an account to vault. used as: -a, --add
-  -d, --delete           Delete account from vault. used as: -d, --delete
-  -p, --change-password  Change password in account. used as: -p , --change-password
-  -u, --change-username  Change username in account. used as: -u , --change-username
-  -c, --create-vault     Create vault. used as -c --create-vault
-  -e, --entropy          Calculate password entropy. used as -e --entropy
-  -h, --help             Print help
+  -a, --add                Add an account to vault. used as: -a, --add
+  -b, --backup             Backup vault or install backup user as -b, --backup
+  -c, --create-vault       Create vault. used as -c --create-vault
+  -d, --delete             Delete account from vault. used as: -d, --delete
+  -e, --entropy            Calculate password entropy. used as -e --entropy
+  -g, --generate-password  Generate new password. used as -g --generate-pasword
+  -E, --encrypt            Encrypt vault. used as -E, --encrypt
+  -p, --change-password    Change password for an account. used as: -p , --change-password
+  -u, --change-username    Change username for an account. used as: -u , --change-username
+  -h, --help               Print help
 ```
 ###
 
