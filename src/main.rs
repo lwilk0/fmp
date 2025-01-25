@@ -41,6 +41,11 @@ struct Options {
     /// used as -e --entropy
     #[clap(short = 'e', long = "entropy")]
     flag_e: bool,
+
+    /// Generate new password.
+    /// used as -g --generate-pasword
+    #[clap(short = 'g', long = "generate-password")]
+    flag_g: bool,
 }
 
 fn main() {
@@ -143,6 +148,13 @@ fn main() {
     if opts.flag_e == true {
         let password: String = import_handle::get_string_input("Enter the password for entropy calculation");
         password::calculate_entropy(password);
+        vault::exit_vault(vault::get_fmp_vault_location());
+    }
+
+    // If flag -g or --generate-pasword is used
+    if opts.flag_g == true {
+        let length = import_handle::get_u32_input("How long should the password be? ");
+        password::generate_password(length);
         vault::exit_vault(vault::get_fmp_vault_location());
     }
 

@@ -10,9 +10,9 @@ use super::account;
 // USAGE
 //
 // generate_password(12)
-pub fn generate_password(length: u8) {
+pub fn generate_password(length: u32) {
     let password_characters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
-    let generated_password: String = String::new();
+    let mut generated_password: String = String::new();
     // Loop for length
     for i in 0..length {
         // Generate random integer between 0 and length of password_characters
@@ -20,10 +20,10 @@ pub fn generate_password(length: u8) {
         // Get character at location random_integer of password_characters
         let random_character: char = password_characters[random_integer];
         // Concatenate generated password thus far with random_character
-        let generated_password: String = format!("{}{}", generated_password, random_character);
+        generated_password = format!("{}{}", generated_password, random_character);
     }
     // Prints generated password
-    println!("{}", generated_password);
+    println!("\n{}\n", generated_password);
     // Ask user if they want to link the password to account
     let mut user_input: String = String::new();
     while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {

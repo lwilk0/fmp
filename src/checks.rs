@@ -18,7 +18,8 @@ pub fn os_check() {
 //
 // vault_exists_check(get_fmp_vault_location());
 pub fn vault_exists_check(fmp_vault_location: String) {
-    if Path::new(&fmp_vault_location).exists() == false {
+    let directory = format!("{}.tar.gz.gpg", fmp_vault_location);
+    if Path::new(&directory).exists() == false {
         println!("The fmp vault does not exist in the current users home directory! It can be created with fmp -c");
         exit(1);
     }
