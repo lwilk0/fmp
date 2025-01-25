@@ -2,9 +2,7 @@ use dirs;
 use std::{path::Path, process::{exit, Command}};
 use prettytable::{Table, row};
 
-use super::account;
-use super::json;
-use super::vault;
+use crate::{account::{read_account, get_account_location}, json::read_json};
 
 // Finds where fmp's vault is
 //
@@ -92,7 +90,7 @@ pub fn decrypt_fmp_vault(){
 // read_vault() 
 pub fn read_vault() {
     // Gets list of accounts
-    let accounts_list: Vec<String> = account::read_account(account::get_account_location());
+    let accounts_list: Vec<String> = read_account(get_account_location());
         // Loop for each entry in accounts_list
         if accounts_list.len() == 0 {
             println!("No accounts have been created! Use fmp -a to create an account.");
@@ -104,7 +102,7 @@ pub fn read_vault() {
         for i in 0..accounts_list.len() {
             // Find corrosponding json file and read
             let account = accounts_list[i].clone();
-            let json = json::read_json(get_fmp_vault_location(), account);
+            let json = read_json(get_fmp_vault_location(), account);
             // Output
             table.add_row(row![accounts_list[i], json.username, json.password]);
         }
@@ -140,7 +138,7 @@ pub fn exit_vault(fmp_vault_location: String) {
 //
 // encrtpt_and_exit();
 pub fn encrypt_and_exit() {
-    vault::encrypt_fmp_vault();
-    vault::delete_vault(vault::get_fmp_vault_location());
-    vault::exit_vault(vault::get_fmp_vault_location());
+    encrypt_fmp_vault();
+    delete_vault(get_fmp_vault_location());
+    exit_vault(get_fmp_vault_location());
 }

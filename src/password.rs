@@ -1,9 +1,8 @@
 use rand::Rng;
 use import_handle;
 
-use super::json;
-use super::vault;
-use super::account;
+use crate::{vault::{get_fmp_vault_location, encrypt_and_exit}, account::{read_account, get_account_location}, json::new_json_account};
+
 
 // Generates a password
 //
@@ -32,13 +31,13 @@ pub fn generate_password(length: u32) {
     // If they do want to link account
     if user_input == "y" || user_input == "yes" {
         // Get user inputs
-        let account = account::read_account(account::get_account_location());
+        let account = read_account(get_account_location());
         let name = import_handle::get_string_input("What should the account be named? ");
         let username = import_handle::get_string_input("\nWhat is the account username?");
         // Create new account
-        json::new_json_account(vault::get_fmp_vault_location(), name.as_str(), username.as_str(), &generated_password, account);
+        new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), &generated_password, account);
         // Exit
-        vault::encrypt_and_exit();
+        encrypt_and_exit();
     }
 }
 

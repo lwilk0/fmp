@@ -3,8 +3,7 @@ use serde::Deserialize;
 use std::{fs::{self, File}, io::Write, path::Path, process::Command};
 use import_handle::get_string_input;
 
-use super::vault;
-use super::account;
+use crate::{vault::{exit_vault, get_fmp_vault_location}, account::{write_account, get_account_location}};
 
 #[derive(Deserialize, Debug)]
 pub struct UserPass {
@@ -70,7 +69,7 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
         // If input is e or exit, the program is exited
         else {
             println!("Exiting...");
-            vault::exit_vault(vault::get_fmp_vault_location());
+            exit_vault(get_fmp_vault_location());
         }
         
     }
@@ -88,7 +87,7 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
     save_json_file(new_account_file, json);
 
     account.push(String::from(name));
-    account::write_account(account::get_account_location(), &account);
+    write_account(get_account_location(), &account);
     println!("\nSucessfully saved new account");
     return "ok".to_string();
 }
@@ -121,7 +120,7 @@ pub fn remove_account(fmp_vault_location: String, name: &str, mut account: Vec<S
             .args(["-r", location.as_str()]).output().expect("Could not remove account folder");
         // Remove account from accounts file
         account.retain(|account| *account != name);
-        account::write_account(account::get_account_location(), &account);
+        write_account(get_account_location(), &account);
         println!("\nSuccessfully removed account");
         return "ok".to_string();
     }
