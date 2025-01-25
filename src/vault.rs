@@ -1,5 +1,6 @@
 use dirs;
 use std::{path::Path, process::{exit, Command}};
+use prettytable::{Table, row};
 
 use super::account;
 use super::json;
@@ -97,13 +98,17 @@ pub fn read_vault() {
             println!("No accounts have been created! Use fmp -a to create an account.");
             return;
         }
+        // Create the table
+        let mut table = Table::new();
+        table.add_row(row!["Account", "Username", "Password"]);
         for i in 0..accounts_list.len() {
             // Find corrosponding json file and read
-            let service = accounts_list[i].clone();
-            let json = json::read_json(get_fmp_vault_location(), service);
+            let account = accounts_list[i].clone();
+            let json = json::read_json(get_fmp_vault_location(), account);
             // Output
-            println!("{}: Username: {} Password: {}", accounts_list[i], json.username, json.password)
+            table.add_row(row![accounts_list[i], json.username, json.password]);
         }
+        table.printstd();
 }
 
 // Removes the vault folder
