@@ -14,7 +14,7 @@ pub fn generate_password(length: u32) {
     let password_characters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
     let mut generated_password: String = String::new();
     // Loop for length
-    for i in 0..length {
+    for _i in 0..length {
         // Generate random integer between 0 and length of password_characters
         let random_integer: usize = rand::thread_rng().gen_range(1..=password_characters.len()-1);
         // Get character at location random_integer of password_characters

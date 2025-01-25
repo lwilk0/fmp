@@ -1,6 +1,5 @@
 use dirs;
-use cmd_lib::run_cmd;
-use std::{path::Path, process::exit};
+use std::{path::Path, process::{exit, Command}};
 
 use super::account;
 use super::json;
@@ -33,20 +32,26 @@ pub fn encrypt_fmp_vault() {
     
     println!("Encrypting fmp vault...\n");
     if Path::new(&fmp_vault_as_encrypted_tar).exists() {
-       run_cmd!(rm $fmp_vault_as_encrypted_tar).expect("Could not remove encrypted file");
+        Command::new("rm")
+            .arg(fmp_vault_as_encrypted_tar.as_str()).output().expect("Could not remove encrypted file");
     }
     // Turns .fmpVault into tarball
-    run_cmd!(tar -czf $fmp_vault_as_tar $fmp_vault_location).expect("Failed to execute command");
+    Command::new("tar")
+        .args(["-czf", fmp_vault_as_tar.as_str(), fmp_vault_location.as_str()]).output().expect("Failed to execute command");
     // Encrypts vault, handles incorect password
-    run_cmd!(gpg -c --no-symkey-cache $fmp_vault_as_tar).expect("Could not encrypt vault");
+    Command::new("gpg")
+        .args(["-c", "--no-symkey-cache", fmp_vault_as_tar.as_str()]).output().expect("Could not encrypt vault, please run fmp -E to encrypt");
+    // If pasword is incorrect, tarball is removed
     while Path::new(&fmp_vault_as_encrypted_tar).exists() == false {
-        run_cmd!(rm $fmp_vault_as_tar).expect("Could not remove file");
-        exit_vault(get_fmp_vault_location());
+        Command::new("rm")
+            .arg(fmp_vault_as_tar.as_str()).output().expect("Could not remove file");
+        exit(1);
     }
     // Cleanup
-    run_cmd!(rm -r $fmp_vault_location).expect("Could not remove file");
-    run_cmd!(rm -r $fmp_vault_as_tar).expect("Could not remove file");
-
+    Command::new("rm")
+        .args(["-r", fmp_vault_as_tar.as_str()]).output().expect("Could not remove file");
+    Command::new("rm")
+        .args(["-r", fmp_vault_location.as_str()]).output().expect("Could not remove file");
     println!("\nEncrypted!");
 }
 
@@ -56,22 +61,25 @@ pub fn encrypt_fmp_vault() {
 //
 // decrypt_fmp_vault();
 pub fn decrypt_fmp_vault(){
-    let home_dir = dirs::home_dir().expect("Could not find home directory!");
     let fmp_vault_location = get_fmp_vault_location();
     let fmp_vault_as_encrypted_tar = format!("{}.tar.gz.gpg", fmp_vault_location);
     let fmp_vault_as_tar = format!("{}.tar.gz", fmp_vault_location);
     println!("Decrypting fmp vault...\n");
 
     // Decrypts vault, handles incorrect password
-    run_cmd!(gpg -q --no-symkey-cache $fmp_vault_as_encrypted_tar);
+    Command::new("gpg")
+        .args(["-q", "--no-symkey-cache", fmp_vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
+    // If file has not been decrypted
     if Path::new(&fmp_vault_as_tar).exists() == false{
         println!("Bad decrypt!");
         exit_vault(get_fmp_vault_location());
     }
     // Decrypts tarball
-    run_cmd!(tar -xf $fmp_vault_as_tar -C /).expect("Failed to execute command");
+    Command::new("tar")
+        .args(["-xf", fmp_vault_as_tar.as_str(), "-C", "/"]).output().expect("Failed to execute command");
     // Removes tarball
-    run_cmd!(rm $fmp_vault_as_tar).expect("Could not remove tarball vault");
+    Command::new("rm")
+        .arg(fmp_vault_as_tar.as_str()).output().expect("Could not remove tarball vault");
     println!("Decrypted\n");
  
 }
@@ -101,7 +109,9 @@ pub fn read_vault() {
 // delete_vault(get_fmp_vault_location())
 pub fn delete_vault(fmp_vault_location: String) {
     if Path::new(&fmp_vault_location).exists() {
-        run_cmd!(rm -r $fmp_vault_location).expect("Could not remove .fmpVault");
+        //run_cmd!(rm -r $fmp_vault_location).expect("Could not remove .fmpVault");
+        Command::new("rm")
+            .args(["-r", fmp_vault_location.as_str()]).output().expect("Could not remove .fmpVault");
     }
 }
 

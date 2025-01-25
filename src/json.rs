@@ -1,8 +1,7 @@
 use serde_json;
 use serde::Deserialize;
-use std::{fs::{self, File}, io::Write, path::Path};
+use std::{fs::{self, File}, io::Write, path::Path, process::Command};
 use import_handle::get_string_input;
-use cmd_lib::run_cmd;
 
 use super::vault;
 use super::account;
@@ -61,8 +60,8 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
 
         // if input is y or yes, the directory will be removed
         if user_input == "y" || user_input == "yes" {
-            run_cmd!(rm -r $new_account_dir).expect("Failed to delete directory");
-            println!("\nAccount Removed!")
+            Command::new("rm")
+                .args(["-r", new_account_dir.as_str()]).output().expect("Failed to delete directory");
         }
         // Return with error to handle
         else if user_input == "n" || user_input == "no" {
@@ -76,9 +75,11 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
         
     }
     // Creates new account directory and data.json file containing "{}"
-    run_cmd!(mkdir $new_account_dir).expect("Failed to create directory");
-    run_cmd!(echo "{}" > $new_account_file).expect("Failed to create directory");
-    
+    Command::new("mkdir")
+        .arg(new_account_dir.as_str()).output().expect("Failed to create directory");
+    Command::new("echo")
+        .args(["{}", ">", new_account_file.as_str()]).output().expect("Failed to add {} to file");
+
     // Loads data.json file
     let mut json: serde_json::Value = load_json_as_value(&new_account_file);
     // Add data to json
@@ -111,7 +112,9 @@ pub fn remove_account(fmp_vault_location: String, name: &str) {
     // Find if specified account exists
     if Path::new(&location).exists() {
         // Remove account
-        run_cmd!(rm -r $location).expect("Could not remove account");
+        //run_cmd!(rm -r $location).expect("Could not remove account");
+        Command::new("rm")
+            .args(["-r", location.as_str()]).output().expect("Could not remove account folder");
     }
     else {
         println!("Account does not exist");

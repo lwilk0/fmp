@@ -1,7 +1,6 @@
 use clap::Parser;
 use import_handle;
-use cmd_lib::run_cmd;
-use std::path::Path;
+use std::{path::Path, process::Command};
 
 mod password;
 mod vault;
@@ -46,6 +45,11 @@ struct Options {
     /// used as -g --generate-pasword
     #[clap(short = 'g', long = "generate-password")]
     flag_g: bool,
+
+    /// Encrypt vault.
+    /// used as -E, --encrypt
+    #[clap(short = 'E', long = "encrypt")]
+    flag_en: bool,
 }
 
 fn main() {
@@ -114,18 +118,20 @@ fn main() {
     if opts.flag_c == true {
         println!("FMP SETUP\n");
         println!("Creating .fmpVault in home directory...\n");
-        let encrypted_vault_location = format!("{}/.tar.gz.gpg", vault::get_fmp_vault_location());
         let vault_location = vault::get_fmp_vault_location();
+        let encrypted_vault_location = format!("{}/.tar.gz.gpg", vault_location);
+        let accounts_loaction = format!("{}/accounts", vault_location);
+        let mut user_input:String = String::new();
         // If encrypted vault exists
         if Path::new(&encrypted_vault_location).exists() {
-            let user_input = "";
             // Ask user for input, handles incorect input
             if user_input != "y" && user_input != "yes" && user_input != "no" && user_input != "n" {
-                let user_input = import_handle::get_string_input(".fmpVault.tar.gz.gpg already exists, remove it? y(es), n(o)").to_lowercase();
+                user_input = import_handle::get_string_input(".fmpVault.tar.gz.gpg already exists, remove it? y(es), n(o)").to_lowercase();
             }
             // Remove .fmpVault.tar.gpg
             if user_input == "y" || user_input == "yes" {
-                run_cmd!(rm $encrypted_vault_location).expect("Failed to remove .fmpVault");
+                Command::new("rm")
+                    .arg(encrypted_vault_location.as_str()).output().expect("Failed to remove old vault");
             }
             // Exit
             else {
@@ -133,11 +139,13 @@ fn main() {
             }
         }
         // Make .fmpVault folder
-        run_cmd!(mkdir $vault_location).expect("Failed to make .fmpVault folder");
+        Command::new("mkdir")
+            .arg(vault_location.as_str()).output().expect("Failed to make .fmpVault folder");
         println!("Done");
         println!("Creating accounts file...\n");
         // Create accounts file
-        run_cmd!(touch $vault_location/accounts).expect("Failed to make account file");
+        Command::new("touch")
+            .arg(accounts_loaction.as_str()).output().expect("Failed to make account file");
         println!("Done\n");
         // Exit
         vault::encrypt_and_exit();
@@ -158,6 +166,10 @@ fn main() {
         vault::exit_vault(vault::get_fmp_vault_location());
     }
 
+    // If flag -E or --encrypt is used
+    if opts.flag_en == true {
+        vault::encrypt_and_exit();
+    }
     // If no flags are supplied
     vault::decrypt_fmp_vault();
     vault::read_vault();
