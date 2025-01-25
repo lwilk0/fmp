@@ -1,6 +1,6 @@
 [package]
 name = "forgot-my-password"
-version = "1.2.8"
+version = "1.2.9"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 license = "GPL-3.0"
