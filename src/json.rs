@@ -1,7 +1,7 @@
 use serde_json;
 use serde::Deserialize;
 use std::{fs::{self, File}, io::Write, path::Path, process::Command};
-use import_handle::get_string_input;
+use input_handle::get_string_input;
 
 use crate::{vault::{exit_vault, get_fmp_vault_location}, account::{write_account, get_account_location}};
 

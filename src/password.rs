@@ -1,5 +1,5 @@
 use rand::Rng;
-use import_handle;
+use input_handle;
 
 use crate::{vault::{get_fmp_vault_location, encrypt_and_exit}, account::{read_account, get_account_location}, json::new_json_account};
 
@@ -26,14 +26,14 @@ pub fn generate_password(length: u32) {
     // Ask user if they want to link the password to account
     let mut user_input: String = String::new();
     while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
-        user_input = import_handle::get_string_input("Would you like to save this password to an account? (y)es, (n)o").to_lowercase();
+        user_input = input_handle::get_string_input("Would you like to save this password to an account? (y)es, (n)o").to_lowercase();
     }
     // If they do want to link account
     if user_input == "y" || user_input == "yes" {
         // Get user inputs
         let account = read_account(get_account_location());
-        let name = import_handle::get_string_input("What should the account be named? ");
-        let username = import_handle::get_string_input("\nWhat is the account username?");
+        let name = input_handle::get_string_input("What should the account be named? ");
+        let username = input_handle::get_string_input("\nWhat is the account username?");
         // Create new account
         new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), &generated_password, account);
         // Exit

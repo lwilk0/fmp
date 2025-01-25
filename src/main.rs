@@ -1,5 +1,5 @@
 use clap::Parser;
-use import_handle;
+use input_handle;
 use std::{path::Path, process::{Command, exit}};
 
 mod account; use account::{get_account_location, read_account};
@@ -71,21 +71,21 @@ fn main() {
         while user_input == "y" || user_input == "yes" {
             let account = read_account(get_account_location());
             // Get user inputs
-            let mut name = import_handle::get_string_input("What should the account be named? ");
-            let username = import_handle::get_string_input("\nWhat is the account username?");
-            let password = import_handle::get_string_input("\nWhat is the account password");
+            let mut name = input_handle::get_string_input("What should the account be named? ");
+            let username = input_handle::get_string_input("\nWhat is the account username?");
+            let password = input_handle::get_string_input("\nWhat is the account password");
             println!("");
             // Create new account
             let mut error_handle = new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), password.as_str(), account.clone());
             // Handle error
             while error_handle != "ok" {
-                name = import_handle::get_string_input("Enter new account name: ");
+                name = input_handle::get_string_input("Enter new account name: ");
                 error_handle = new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), password.as_str(), account.clone());
             }
             // Ask user if they would like to add a new account
             user_input = String::new();
             while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
-                user_input = import_handle::get_string_input("\nWould you like to enter a new account? (y)es, (n)o").to_lowercase();
+                user_input = input_handle::get_string_input("\nWould you like to enter a new account? (y)es, (n)o").to_lowercase();
                 println!("");
             }
         }
@@ -101,19 +101,19 @@ fn main() {
         while user_input == "y" || user_input == "yes" {
             let account = read_account(get_account_location());
             // Get account name
-            let mut name = import_handle::get_string_input("What account should be removed? ");
+            let mut name = input_handle::get_string_input("What account should be removed? ");
             println!("");
             // Removes account 
             let mut error_handle = remove_account(get_fmp_vault_location(), name.as_str(), account.clone());
             // Handle error
             while error_handle != "ok" {
-                name = import_handle::get_string_input("Enter correct account name: ");
+                name = input_handle::get_string_input("Enter correct account name: ");
                 error_handle = remove_account(get_fmp_vault_location(), name.as_str(), account.clone());
             }
             // Ask user if they would like to remove another account
             user_input = String::new();
             while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
-                user_input = import_handle::get_string_input("\nWould you like to remove another account? (y)es, (n)o").to_lowercase();
+                user_input = input_handle::get_string_input("\nWould you like to remove another account? (y)es, (n)o").to_lowercase();
                 println!("");
             }
         }
@@ -126,8 +126,8 @@ fn main() {
         // Decrypt vault
         decrypt_fmp_vault();
         // Get user input
-        let name = import_handle::get_string_input("What account password should be changed? ");
-        let password = import_handle::get_string_input("\nWhat should the password be changed to?");
+        let name = input_handle::get_string_input("What account password should be changed? ");
+        let password = input_handle::get_string_input("\nWhat should the password be changed to?");
         // Changes password
         change_password(get_fmp_vault_location(), password.as_str(), &name);
         // Exit
@@ -139,8 +139,8 @@ fn main() {
         // Decrypt vault
         decrypt_fmp_vault();
         // Get user input
-        let name = import_handle::get_string_input("What account username should be changed? ");
-        let username = import_handle::get_string_input("\nWhat should the username be changed to?");
+        let name = input_handle::get_string_input("What account username should be changed? ");
+        let username = input_handle::get_string_input("\nWhat should the username be changed to?");
         // Change username
         change_username(get_fmp_vault_location(), &username.as_str(), &name);
         // Exit
@@ -159,7 +159,7 @@ fn main() {
         if Path::new(&encrypted_vault_location).exists() {
             // Ask user for input, handles incorect input
             if user_input != "y" && user_input != "yes" && user_input != "no" && user_input != "n" {
-                user_input = import_handle::get_string_input(".fmpVault.tar.gz.gpg already exists, remove it? y(es), n(o)").to_lowercase();
+                user_input = input_handle::get_string_input(".fmpVault.tar.gz.gpg already exists, remove it? y(es), n(o)").to_lowercase();
             }
             // Remove .fmpVault.tar.gpg
             if user_input == "y" || user_input == "yes" {
@@ -187,14 +187,14 @@ fn main() {
 
     // If flag -e or --entropy is used
     if opts.flag_e == true {
-        let password: String = import_handle::get_string_input("Enter the password for entropy calculation");
+        let password: String = input_handle::get_string_input("Enter the password for entropy calculation");
         calculate_entropy(password);
         exit_vault(get_fmp_vault_location());
     }
 
     // If flag -g or --generate-pasword is used
     if opts.flag_g == true {
-        let length = import_handle::get_u32_input("How long should the password be? ");
+        let length = input_handle::get_u32_input("How long should the password be? ");
         generate_password(length);
         exit_vault(get_fmp_vault_location());
     }
@@ -210,7 +210,7 @@ fn main() {
         let fmp_vault_location_as_backup = format!("{}.bk", fmp_vault_location_as_encrypted_tar);
         let mut user_input: String = String::new();
         if user_input != "b" && user_input != "backup" && user_input != "i" && user_input != "install" {
-            user_input = import_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall");
+            user_input = input_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall");
         }
 
         if user_input == "b" || user_input == "backup" {
