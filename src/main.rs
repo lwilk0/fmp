@@ -1,6 +1,6 @@
 use clap::Parser;
 use import_handle;
-use std::{path::Path, process::Command};
+use std::{path::Path, process::{Command, exit}};
 
 mod password;
 mod vault;
@@ -16,25 +16,20 @@ struct Options {
     #[clap(short = 'a', long = "add")]
     flag_a: bool,
 
-    /// Delete account from vault.
-    /// used as: -d, --delete
-    #[clap(short = 'd', long = "delete")]
-    flag_d: bool,
-
-    /// Change password in account.
-    /// used as: -p , --change-password 
-    #[clap(short = 'p', long = "change-password")]
-    flag_p: bool,
-
-    /// Change username in account.
-    /// used as: -u , --change-username 
-    #[clap(short = 'u', long = "change-username")]
-    flag_u: bool,
+    /// Backup vault or install backup
+    /// user as -b, --backup
+    #[clap(short = 'b', long = "backup")]
+    flag_b: bool,
 
     /// Create vault.
     /// used as -c --create-vault
     #[clap(short = 'c', long = "create-vault")]
     flag_c: bool,
+
+    /// Delete account from vault.
+    /// used as: -d, --delete
+    #[clap(short = 'd', long = "delete")]
+    flag_d: bool,
 
     /// Calculate password entropy.
     /// used as -e --entropy
@@ -50,6 +45,16 @@ struct Options {
     /// used as -E, --encrypt
     #[clap(short = 'E', long = "encrypt")]
     flag_en: bool,
+
+    /// Change password for an account.
+    /// used as: -p , --change-password 
+    #[clap(short = 'p', long = "change-password")]
+    flag_p: bool,
+
+    /// Change username for an account.
+    /// used as: -u , --change-username 
+    #[clap(short = 'u', long = "change-username")]
+    flag_u: bool,
 }
 
 fn main() {
@@ -197,6 +202,36 @@ fn main() {
     // If flag -E or --encrypt is used
     if opts.flag_en == true {
         vault::encrypt_and_exit();
+    }
+
+    // If flag -b or --backup is used
+    if opts.flag_b == true {
+        let fmp_vault_location_as_encrypted_tar = format!("{}.tar.gz.gpg", vault::get_fmp_vault_location());
+        let fmp_vault_location_as_backup = format!("{}.bk", fmp_vault_location_as_encrypted_tar);
+        let mut user_input: String = String::new();
+        if user_input != "b" && user_input != "backup" && user_input != "i" && user_input != "install" {
+            user_input = import_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall");
+        }
+
+        if user_input == "b" || user_input == "backup" {
+            if Path::new(&fmp_vault_location_as_encrypted_tar).exists() == false {
+                println!("No vault found in home directory. Has it been created?");
+                vault::exit_vault(fmp_vault_location_as_encrypted_tar.clone());
+            }
+            Command::new("cp")
+                .args([fmp_vault_location_as_encrypted_tar.as_str(), fmp_vault_location_as_backup.as_str()]).output().expect("Could not create backup");
+            println!("\nSuccessfully backed up vault");
+        }
+        else {
+            if Path::new(&fmp_vault_location_as_backup).exists() == false {
+                println!("No backup file found in home directory. Has it been created?");
+                vault::exit_vault(fmp_vault_location_as_encrypted_tar.clone());
+            }
+            Command::new("cp")
+                .args([fmp_vault_location_as_backup.as_str(), fmp_vault_location_as_encrypted_tar.as_str()]).output().expect("Could not install backup");
+            println!("\nSuccessfully installed backup");
+        }
+        exit(1);
     }
     // If no flags are supplied
     vault::decrypt_fmp_vault();

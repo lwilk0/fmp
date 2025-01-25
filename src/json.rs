@@ -50,7 +50,7 @@ pub fn new_json_account(fmp_vault_location: String, name: &str, username: &str, 
     let new_account_file = format!("{}/data.json", new_account_dir);
     // For user input
     let mut user_input: String = String::new();
-    println!("Creating Account...");
+    println!("Creating account...");
     // Handles account already existing
     if Path::new(&new_account_dir).exists() {
         // Gets user input
@@ -113,16 +113,17 @@ pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
 // Remove account from .fmpVault
 pub fn remove_account(fmp_vault_location: String, name: &str, mut account: Vec<String>) -> String{
     let location = format!("{}/{}", fmp_vault_location, name);
+    println!("Removing account...\n");
     // Find if specified account exists
     if Path::new(&location).exists() {
-        // Remove account
-        //run_cmd!(rm -r $location).expect("Could not remove account");
+        // Remove account folder
         Command::new("rm")
             .args(["-r", location.as_str()]).output().expect("Could not remove account folder");
+        // Remove account from accounts file
         account.retain(|account| *account != name);
         account::write_account(account::get_account_location(), &account);
+        println!("\nSuccessfully removed account");
         return "ok".to_string();
-
     }
     else {
         println!("Account does not exist");
