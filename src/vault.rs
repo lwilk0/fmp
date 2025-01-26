@@ -1,8 +1,29 @@
 use dirs;
 use std::{path::Path, process::{exit, Command}};
 use prettytable::{Table, row};
+use input_handle::get_string_input;
+use crate::{account::{read_account, get_account_location}, json::read_json, checks::vault_exists_check};
 
-use crate::{account::{read_account, get_account_location}, json::read_json};
+// Gets vault from user, should only be called once at main
+//
+// USAGE
+//
+// let vault_location = vault_to_access();
+pub fn vault_to_access()  -> String{
+    // Asks user what vault to access
+    let mut vault_to_be_accessed = get_string_input("What vault should be accessed? ");
+    // Check if vault with that name exists
+    let mut vault_exists = vault_exists_check(get_vault_location(&vault_to_be_accessed));
+    // If it does not
+    while vault_exists == "no" {
+        println!("\nNo vault with that name exists, it can be created with fmp -c\n");
+        vault_to_be_accessed = get_string_input("What vault should be accessed? ");
+        vault_exists = vault_exists_check(get_vault_location(&vault_to_be_accessed));
+    }
+    println!("");
+    let vault_location = get_vault_location(&vault_to_be_accessed);
+    return vault_location; 
+}
 
 // Finds where vault is
 //
