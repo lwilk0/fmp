@@ -171,6 +171,7 @@ pub fn gen_password(vault: &String) {
     }
     // If they do
     if user_input == "y" || user_input == "yes" {
+        decrypt_vault(vault);
         // Get user inputs
         let account = read_account(get_account_location(vault));
         let name = get_string_input("What should the account be named? ");
