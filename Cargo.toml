@@ -1,5 +1,5 @@
 [package]
-name = "forgot-my-password"
+name = "fmp"
 version = "1.2.16"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
