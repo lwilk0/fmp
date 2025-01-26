@@ -1,15 +1,11 @@
 use rand::Rng;
-use input_handle;
-
-use crate::{vault::{get_fmp_vault_location, encrypt_and_exit}, account::{read_account, get_account_location}, json::new_json_account};
-
 
 // Generates a password
 //
 // USAGE
 //
 // generate_password(12)
-pub fn generate_password(length: u32) {
+pub fn generate_password(length: u32) -> String {
     let password_characters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1','2','3','4','5','6','7','8','9','0','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/',':',';','<','=','>','?','@','[','\\',']','^','_','`','{','|','}','~'];
     let mut generated_password: String = String::new();
     // Loop for length
@@ -24,29 +20,15 @@ pub fn generate_password(length: u32) {
     // Prints generated password
     println!("\n{}\n", generated_password);
     // Ask user if they want to link the password to account
-    let mut user_input: String = String::new();
-    while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
-        user_input = input_handle::get_string_input("Would you like to save this password to an account? (y)es, (n)o").to_lowercase();
-    }
-    // If they do want to link account
-    if user_input == "y" || user_input == "yes" {
-        // Get user inputs
-        let account = read_account(get_account_location());
-        let name = input_handle::get_string_input("What should the account be named? ");
-        let username = input_handle::get_string_input("\nWhat is the account username?");
-        // Create new account
-        new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), &generated_password, account);
-        // Exit
-        encrypt_and_exit();
-    }
+    return generated_password;
 }
 
 // Calculates the entropy of a password
 //
 // USAGE
 //
-// calculate_entropy("password")
-pub fn calculate_entropy(password: String) {
+// let var: (f64, &str) = calculate_entropy(&"password")
+pub fn calculate_entropy(password: &String) -> (f64, &str) {
     let mut character_pool: u8 = 0;
 
     // Calculates password pool
@@ -62,7 +44,9 @@ pub fn calculate_entropy(password: String) {
     if password.chars().any(|c| c.is_ascii_punctuation()){
         character_pool += 32;
     }
- 
+    // Calculates and prints entropy
+    // FORMULA
+    // L * log2(C), where L is the length of the password and C is the character pool
     let entropy = password.len() as f64 * (character_pool as f64).log2();
     let rating: &str;
     // Gets password rating
@@ -78,10 +62,6 @@ pub fn calculate_entropy(password: String) {
     else {
         rating = "Very Strong"
     }
-
-    // Calculates and prints entropy
-    // FORMULA
-    // L * log2(C), where L is the length of the password and C is the character pool
-    println!("The password has {:.2} bit entropy, giving it a rating of {}", entropy, rating)
-
+    // Return entropy and rating as tuple
+    return (entropy, rating);
 }

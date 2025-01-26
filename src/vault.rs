@@ -87,8 +87,8 @@ pub fn decrypt_fmp_vault(){
 //
 // USAGE
 //
-// read_vault() 
-pub fn read_vault() {
+// print_vault_entries() 
+pub fn print_vault_entries() {
     // Gets list of accounts
     let accounts_list: Vec<String> = read_account(get_account_location());
         // Loop for each entry in accounts_list
@@ -116,7 +116,6 @@ pub fn read_vault() {
 // delete_vault(get_fmp_vault_location())
 pub fn delete_vault(fmp_vault_location: String) {
     if Path::new(&fmp_vault_location).exists() {
-        //run_cmd!(rm -r $fmp_vault_location).expect("Could not remove .fmpVault");
         Command::new("rm")
             .args(["-r", fmp_vault_location.as_str()]).output().expect("Could not remove .fmpVault");
     }

@@ -1,9 +1,9 @@
 use clap::Parser;
-use input_handle;
+use input_handle::get_string_input;
 use std::{path::Path, process::{Command, exit}};
 
 mod account; use account::{get_account_location, read_account};
-mod vault; use vault::{exit_vault, get_fmp_vault_location, decrypt_fmp_vault, encrypt_and_exit, read_vault, delete_vault};
+mod vault; use vault::{exit_vault, get_fmp_vault_location, decrypt_fmp_vault, encrypt_and_exit, print_vault_entries, delete_vault};
 mod checks; use checks::{os_check, vault_exists_check};
 mod json; use json::{new_json_account, remove_account, change_password, change_username};
 mod password; use password::{calculate_entropy, generate_password};
@@ -187,15 +187,37 @@ fn main() {
 
     // If flag -e or --entropy is used
     if opts.flag_e == true {
+        // Get password to rate
         let password: String = input_handle::get_string_input("Enter the password for entropy calculation");
-        calculate_entropy(password);
+        // Calculate entropy
+        let entropy_tuple: (f64, &str) = calculate_entropy(&password);
+        println!("The password has {:.2} bit entropy, giving it a rating of {}", entropy_tuple.0, entropy_tuple.1);
         exit_vault(get_fmp_vault_location());
     }
 
     // If flag -g or --generate-pasword is used
     if opts.flag_g == true {
+        // Gets wanted length from user
         let length = input_handle::get_u32_input("How long should the password be? ");
-        generate_password(length);
+        // Generate password of that length
+        let generated_password = generate_password(length);
+        let mut user_input: String = String::new();
+        // Ask user if they want to save password to account
+        while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
+            user_input = get_string_input("Would you like to save this password to an account? (y)es, (n)o").to_lowercase();
+        }
+        // If they do
+        if user_input == "y" || user_input == "yes" {
+            // Get user inputs
+            let account = read_account(get_account_location());
+            let name = get_string_input("What should the account be named? ");
+            let username = get_string_input("\nWhat is the account username?");
+            // Create new account
+            new_json_account(get_fmp_vault_location(), name.as_str(), username.as_str(), &generated_password, account);
+            // Exit
+            encrypt_and_exit();
+        }
+        // Exit
         exit_vault(get_fmp_vault_location());
     }
 
@@ -208,25 +230,34 @@ fn main() {
     if opts.flag_b == true {
         let fmp_vault_location_as_encrypted_tar = format!("{}.tar.gz.gpg", get_fmp_vault_location());
         let fmp_vault_location_as_backup = format!("{}.bk", fmp_vault_location_as_encrypted_tar);
+        // Ask user if they want to create or install backup
         let mut user_input: String = String::new();
+        // Input validation
         if user_input != "b" && user_input != "backup" && user_input != "i" && user_input != "install" {
             user_input = input_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall");
         }
-
+        // If user wants to backup
         if user_input == "b" || user_input == "backup" {
+            // Check that encrypted vault exists
             if Path::new(&fmp_vault_location_as_encrypted_tar).exists() == false {
+                // If it does not exist
                 println!("No vault found in home directory. Has it been created?");
                 exit_vault(fmp_vault_location_as_encrypted_tar.clone());
             }
+            // Backup
             Command::new("cp")
                 .args([fmp_vault_location_as_encrypted_tar.as_str(), fmp_vault_location_as_backup.as_str()]).output().expect("Could not create backup");
             println!("\nSuccessfully backed up vault");
         }
+        // If user wants to install backup
         else {
+            // Check if backup exists
             if Path::new(&fmp_vault_location_as_backup).exists() == false {
+                // If it does not
                 println!("No backup file found in home directory. Has it been created?");
                 exit_vault(fmp_vault_location_as_encrypted_tar.clone());
             }
+            // Install backup
             Command::new("cp")
                 .args([fmp_vault_location_as_backup.as_str(), fmp_vault_location_as_encrypted_tar.as_str()]).output().expect("Could not install backup");
             println!("\nSuccessfully installed backup");
@@ -235,6 +266,6 @@ fn main() {
     }
     // If no flags are supplied
     decrypt_fmp_vault();
-    read_vault();
+    print_vault_entries();
     delete_vault(get_fmp_vault_location());
 }
