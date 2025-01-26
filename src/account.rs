@@ -4,21 +4,18 @@ use std::fs;
 //
 // USAGE
 //
-// let var: String = get_account_vault_location();
-pub fn get_account_location() -> String{
-    // Gets users home directory
-    let home_dir = dirs::home_dir().expect("Could not find home directory!");
+// let var: String = get_account_location(&vault_location);
+pub fn get_account_location(vault: &String) -> String{
     // Appends directory name to end of home directory
-    let account_location = home_dir.join(".fmpVault/accounts");
-
-    return account_location.display().to_string();
+    let account_location = format!("{}/accounts", vault);
+    return account_location;
 }
 
 // Reads account file
 //
 // USAGE
 //
-// let account = read_account();
+// let account = read_account(account_path);
 pub fn read_account(account_path: String) -> Vec<String> {
     // Reads acc_path and saves as string to acc
     let account_string = fs::read_to_string(account_path).expect("Could not read accounts file");

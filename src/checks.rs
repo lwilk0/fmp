@@ -6,6 +6,7 @@ use std::{env, process::exit, path::Path};
 //
 // os_check();
 pub fn os_check() {
+    // If current OS is not linux
     if env::consts::OS != "linux" {
         println!("Sorry, fmp currently only supports Linux.");
         exit(1);
@@ -16,11 +17,16 @@ pub fn os_check() {
 //
 // USAGE
 //
-// vault_exists_check(get_fmp_vault_location());
-pub fn vault_exists_check(fmp_vault_location: String) {
-    let directory = format!("{}.tar.gz.gpg", fmp_vault_location);
+//let mut var = vault_exists_check(get_vault_location(&vault_name));
+//    while var == "no" {
+//        // Vault with name vault_name does not exist
+//    }
+pub fn vault_exists_check(vault_name: String) -> String{
+    // Encrypted vault location
+    let directory = format!("{}.tar.gz.gpg", vault_name);
+    // If it does not exist
     if Path::new(&directory).exists() == false {
-        println!("The fmp vault does not exist in the current users home directory! It can be created with fmp -c");
-        exit(1);
+        return "no".to_string();
     }
+    return "yes".to_string();
 }
