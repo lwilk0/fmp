@@ -1,6 +1,6 @@
-use input_handle::get_string_input;
+use input_handle::{get_string_input, get_u32_input};
 use std::{path::Path, process::{Command, exit}};
-use crate::{vault::{get_vault_location, exit_vault, encrypt_and_exit, decrypt_vault, print_vault_entries, delete_vault}, account::{read_account, get_account_location}, json::{new_json_account, remove_account, change_password, change_username}, password::{calculate_entropy, generate_password}};
+use crate::{vault::{get_vault_location, exit_vault, encrypt_and_exit, decrypt_vault, print_vault_entries, delete_vault}, account::{read_account, get_account_location}, json::{new_json_account, remove_account, change_password, change_username, read_json, UserPass}, password::{calculate_entropy, generate_password}};
 
 pub fn create() {
     println!("FMP SETUP\n");
@@ -122,21 +122,50 @@ pub fn change_account_username(vault: &String) {
     encrypt_and_exit(vault);
 }
 
-pub fn entropy() {
-    // Get password to rate
-    let password: String = input_handle::get_string_input("Enter the password for entropy calculation");
+pub fn entropy(vault: String) {
+    let password: String;
+    // Ask user if they want to enter a password or use an already existing one
+    let mut user_input = String::new();
+    while user_input != "e" && user_input != "enter" && user_input != "a" && user_input != "account" {
+        user_input = get_string_input("Would you like to enter a password or use one linked to an account? (e)nter, (a)ccount");
+        println!("");
+
+    }
+    if user_input == "e" || user_input == "enter" {
+        // Get password to rate
+        password = get_string_input("Enter the password for entropy calculation");
+    }
+    else {
+        decrypt_vault(&vault);
+        let mut account = get_string_input("What is the account for the password you want to rate?");
+        println!("");
+        let mut json: UserPass = read_json(vault.clone(), account);
+        while json.username == "err" {
+            println!("");
+            account = get_string_input("What is the account for the password you want to rate?");
+            json = read_json(vault.clone(), account);
+            println!("");
+        }
+        password = json.password;
+    }
     // Calculate entropy
     let entropy_tuple: (f64, &str) = calculate_entropy(&password);
-    println!("The password has {:.2} bit entropy, giving it a rating of {}", entropy_tuple.0, entropy_tuple.1);
+    println!("The password has {:.2} bits of entropy, giving it a rating of {}\n", entropy_tuple.0, entropy_tuple.1.to_lowercase());
+    exit_vault(&vault);
 }
 
 pub fn gen_password(vault: &String) {
     // Gets wanted length from user
-    let length = input_handle::get_u32_input("How long should the password be? ");
+    let length = get_u32_input("How long should the password be? ");
     // Generate password of that length
     let generated_password = generate_password(length);
-    let mut user_input: String = String::new();
+    // Prints generated password
+    println!("\n{}", generated_password);
+    // Calculate entropy
+    let entropy_tuple: (f64, &str) = calculate_entropy(&generated_password);
+    println!("The password has {:.2} bits of entropy, giving it a rating of {}.\n", entropy_tuple.0, entropy_tuple.1.to_lowercase());
     // Ask user if they want to save password to account
+    let mut user_input: String = String::new();
     while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" {
         user_input = get_string_input("Would you like to save this password to an account? (y)es, (n)o").to_lowercase();
     }

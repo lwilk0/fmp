@@ -90,7 +90,7 @@ fn main() {
 
     // If flag -e or --entropy is used
     if opts.flag_e == true {
-        entropy()
+        entropy(vault_location.clone())
     }
 
     // If flag -g or --generate-pasword is used

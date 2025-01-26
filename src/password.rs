@@ -17,9 +17,6 @@ pub fn generate_password(length: u32) -> String {
         // Concatenate generated password thus far with random_character
         generated_password = format!("{}{}", generated_password, random_character);
     }
-    // Prints generated password
-    println!("\n{}\n", generated_password);
-    // Ask user if they want to link the password to account
     return generated_password;
 }
 
