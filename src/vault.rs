@@ -34,9 +34,8 @@ pub fn get_vault_location(vault: &String) -> String{
     // Gets users home directory
     let home_dir = dirs::home_dir().expect("Could not find home directory!");
     // Appends directory name to end of home directory
-    let vault = home_dir.join(format!(".{}", vault));
-
-    return vault.display().to_string();
+    let vault_location = home_dir.join(format!(".{}", vault));
+    return vault_location.display().to_string();
 }
 
 // Encrypts the .vault file to .vault.tar.gz.gpg
@@ -63,14 +62,14 @@ pub fn encrypt_vault(vault: &String) {
         .args(["-c", "--no-symkey-cache", vault_as_tar.as_str()]).output().expect("Could not encrypt vault, please run fmp -E to encrypt");
     // If pasword is incorrect, tarball is removed
     while Path::new(&vault_as_encrypted_tar).exists() == false {
-        println!("Incorrect credentials! This should never be called. Please create an issue on github.\n");
+        encrypt_dnc(&vault_as_tar);
     }
     // Cleanup
     Command::new("rm")
         .args(["-r", vault_as_tar.as_str()]).output().expect("Could not remove file");
     Command::new("rm")
         .args(["-r", vault.as_str()]).output().expect("Could not remove file");
-    println!("\nEncrypted!");
+    println!("Encrypted!");
 }
 
 // Decrypts the .vault.tar.gz.gpg file to .vault
@@ -88,7 +87,7 @@ pub fn decrypt_vault(vault: &String){
     Command::new("gpg")
         .args(["-q", "--no-symkey-cache", vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
     // If file has not been decrypted
-    if Path::new(&vault_as_tar).exists() == false{
+    while Path::new(&vault_as_tar).exists() == false{
         println!("Incorrect credentials! Try again.\n");
         decrypt_dnc(&vault_as_encrypted_tar);
     }
@@ -179,8 +178,17 @@ pub fn delete_vault_full(vault: &String, vault_encrypted: &String) {
 // DO NOT CALL
 // REASON
 // This function is a workaround to wierd behavior with gpg in while loops.
-pub fn decrypt_dnc(vault_as_encrypted_tar: &String) {
+fn decrypt_dnc(vault_as_encrypted_tar: &String) {
     // Decrypts vault, handling for incorrect password
     Command::new("gpg")
         .args(["-q", "--no-symkey-cache", vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
+}
+
+// DO NOT CALL
+// REASON
+// This function is a workaround to wierd behavior with gpg in while loops.
+fn encrypt_dnc(vault_as_tar: &String) {
+    // Encrypts vault, handles incorect password
+    Command::new("gpg")
+        .args(["-c", "--no-symkey-cache", vault_as_tar.as_str()]).output().expect("Could not encrypt vault, please run fmp -E to encrypt");
 }

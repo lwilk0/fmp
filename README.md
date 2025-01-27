@@ -54,3 +54,5 @@ The user is asked what they would like to call the vault. A folder with the inpu
 The user is asked what account they would like to remove, and the corrosponing vault is decrypted. All files relating to the vault are deleted.
 ### Generate Password:
 The user is asked for the length of the password they want to generate. Random characters are generated and concatenated to form a password of the specified length. The user is asked if they would like to add it to an account
+### Rename Vault:
+Asks user what vault name to change and what they whant to change it to. Decrypts vault, changes its name then re-encrypts it. Old vault files are removed.

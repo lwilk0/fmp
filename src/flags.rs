@@ -225,7 +225,35 @@ pub fn backup(vault: &String) {
 
 pub fn decrypt_vault_all_files(vault: &String) {
     let vault_encrypted = format!("{}.tar.gz.gpg", vault);
+    // Delete all files related to the vault
     delete_vault_full(vault, &vault_encrypted);
+}
+
+pub fn rename(vault: &String) {
+    let new_name = get_string_input("What would you like to rename the vault to? ");
+    // Format variables
+    let vault_new_directory = get_vault_location(&new_name);
+    let vault_old_encrypted = format!("{}.tar.gz.gpg", vault);
+    let vault_old_encrypted_backup = format!("{}.bk", vault);
+    // Decrypt old vault
+    decrypt_vault(vault);
+    // Rename folder
+    Command::new("mv") 
+        .args([vault.to_string(), vault_new_directory.to_string()]).output().expect("Could not rename vault");
+    println!("{}", vault_new_directory);
+    println!("{}", vault);
+    println!("{}", vault_old_encrypted);
+    // Remove old encrypted file
+    Command::new("rm") 
+        .arg(vault_old_encrypted.as_str()).output().expect("Could not remove old encrypted vault");
+    // If old encrypted file backup exists
+    if Path::new(&vault_old_encrypted_backup).exists() {
+        // Remove old encrypted file backup
+        Command::new("rm") 
+            .arg(vault_old_encrypted_backup.as_str()).output().expect("Could not remove old encrypted vault");
+    }
+    // Exit
+    encrypt_and_exit(&vault_new_directory);
 }
 
 pub fn no_flags(vault: &String) {

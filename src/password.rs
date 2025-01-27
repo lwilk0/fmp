@@ -11,7 +11,7 @@ pub fn generate_password(length: u32) -> String {
     // Loop for length
     for _i in 0..length {
         // Generate random integer between 0 and length of password_characters
-        let random_integer: usize = rand::thread_rng().gen_range(1..=password_characters.len()-1);
+        let random_integer: usize = rand::rng().random_range(1..=password_characters.len()-1);
         // Get character at location random_integer of password_characters
         let random_character: char = password_characters[random_integer];
         // Concatenate generated password thus far with random_character
