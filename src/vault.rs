@@ -63,9 +63,7 @@ pub fn encrypt_vault(vault: &String) {
         .args(["-c", "--no-symkey-cache", vault_as_tar.as_str()]).output().expect("Could not encrypt vault, please run fmp -E to encrypt");
     // If pasword is incorrect, tarball is removed
     while Path::new(&vault_as_encrypted_tar).exists() == false {
-        Command::new("rm")
-            .arg(vault_as_tar.as_str()).output().expect("Could not remove file");
-        exit(1);
+        println!("Incorrect credentials! This should never be called. Please create an issue on github.\n");
     }
     // Cleanup
     Command::new("rm")
@@ -91,8 +89,8 @@ pub fn decrypt_vault(vault: &String){
         .args(["-q", "--no-symkey-cache", vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
     // If file has not been decrypted
     if Path::new(&vault_as_tar).exists() == false{
-        println!("Bad decrypt!");
-        exit_vault(vault);
+        println!("Incorrect credentials! Try again.\n");
+        decrypt_dnc(&vault_as_encrypted_tar);
     }
     // Decrypts tarball
     Command::new("tar")
@@ -176,4 +174,13 @@ pub fn delete_vault_full(vault: &String, vault_encrypted: &String) {
         .arg(vault_encrypted.as_str()).output().expect("Failed to remove old vault");
     Command::new("rm")
         .args(["-r", vault.as_str()]).output().expect("Failed to remove old vault");
+}
+
+// DO NOT CALL
+// REASON
+// This function is a workaround to wierd behavior with gpg in while loops.
+pub fn decrypt_dnc(vault_as_encrypted_tar: &String) {
+    // Decrypts vault, handling for incorrect password
+    Command::new("gpg")
+        .args(["-q", "--no-symkey-cache", vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
 }

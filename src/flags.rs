@@ -36,7 +36,7 @@ pub fn create() {
     // Create accounts file
     Command::new("touch")
         .arg(accounts_location.as_str()).output().expect("Failed to make account file");
-    println!("\nDone");
+    println!("\nDone\n");
     // Exit
     encrypt_and_exit(vault_create_location);
 }
