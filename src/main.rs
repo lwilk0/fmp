@@ -5,7 +5,7 @@ mod json;
 mod password;
 mod vault; use vault::{vault_to_access, encrypt_and_exit};
 mod checks; use checks::os_check;
-mod flags; use flags::{add, backup, change_account_password, change_account_username, create, delete, entropy, gen_password, no_flags};
+mod flags; use flags::{add, backup, change_account_password, change_account_username, create, delete, entropy, gen_password, decrypt_vault_all_files, no_flags};
 #[derive(Debug, Parser)]
 struct Options {
 
@@ -29,13 +29,18 @@ struct Options {
     #[clap(short = 'd', long = "delete")]
     flag_d: bool,
 
+    /// Delete vault.
+    /// used as: -D, --delete
+    #[clap(short = 'D', long = "delete-vault")]
+    flag_dv: bool,
+
     /// Calculate password entropy.
     /// used as -e --entropy
     #[clap(short = 'e', long = "entropy")]
     flag_e: bool,
 
     /// Generate new password.
-    /// used as -g --generate-pasword
+    /// used as -g --generate-password
     #[clap(short = 'g', long = "generate-password")]
     flag_g: bool,
 
@@ -93,7 +98,7 @@ fn main() {
         entropy(vault_location.clone())
     }
 
-    // If flag -g or --generate-pasword is used
+    // If flag -g or --generate-password is used
     if opts.flag_g == true {
         gen_password(&vault_location);
     }
@@ -107,6 +112,12 @@ fn main() {
     if opts.flag_b == true {
         backup(&vault_location);
     }
+
+    // If flag -D or --delete-vault is used
+    if opts.flag_dv == true {
+        decrypt_vault_all_files(&vault_location);
+    }
+
     // If no flags are supplied
     no_flags(&vault_location);
 }

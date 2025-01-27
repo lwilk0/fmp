@@ -17,7 +17,7 @@ pub struct UserPass {
 //
 // let var: UserPass = read_json(get_vault_location(), "account");
 // while var.username != "ok" {
-//    // username is incorect, handle accordingly
+//    // username is incorrect, handle accordingly
 //}
 pub fn read_json(vault: String, account: String) -> UserPass{
     // Find where wanted json is located
@@ -96,7 +96,7 @@ pub fn new_json_account(vault: &String, name: &str, username: &str, password: &s
 //
 // USAGE
 //
-// let var save_json_file(json_file_loaction, json)
+// let var save_json_file(json_file_location, json)
 // while var != "ok" {
 //    // Get new account from user and try again
 //}
@@ -173,7 +173,7 @@ pub fn change_password(vault: &String, password: &str, account: &str) {
     let json_file_directory = format!("{}/{}/data.json", vault, account);
     // Loads json
     let json: UserPass = load_json_as_userpass(&json_file_directory);
-    // Saves username from josn
+    // Saves username from json
     let username = json.username;
     // Creates blank json
     let mut new_json: serde_json::Value = serde_json::from_str("{}").unwrap();
@@ -191,7 +191,7 @@ pub fn change_username(vault: &String, username: &str, account: &str) {
     let json_file_directory = format!("{}/{}/data.json", vault, account);
     // Loads json
     let json: UserPass = load_json_as_userpass(&json_file_directory);
-    // Saves username from josn
+    // Saves username from json
     let password = json.password;
     // Creates blank json
     let mut new_json: serde_json::Value = serde_json::from_str("{}").unwrap();

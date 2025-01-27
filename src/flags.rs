@@ -1,6 +1,6 @@
 use input_handle::{get_string_input, get_u32_input};
 use std::{path::Path, process::{Command, exit}};
-use crate::{vault::{get_vault_location, exit_vault, encrypt_and_exit, decrypt_vault, print_vault_entries, delete_vault}, account::{read_account, get_account_location}, json::{new_json_account, remove_account, change_password, change_username, read_json, UserPass}, password::{calculate_entropy, generate_password}};
+use crate::{account::{get_account_location, read_account}, json::{change_password, change_username, new_json_account, read_json, remove_account, UserPass}, password::{calculate_entropy, generate_password}, vault::{decrypt_vault, delete_vault, delete_vault_full, encrypt_and_exit, exit_vault, get_vault_location, print_vault_entries}};
 
 pub fn create() {
     println!("FMP SETUP\n");
@@ -9,19 +9,19 @@ pub fn create() {
     let vault_name = get_string_input("What should the vault be called? ");
     // Format variables
     let vault_create_location = &get_vault_location(&vault_name);
-    let encrypted_vault_location = format!("{}/.tar.gz.gpg", vault_create_location);
-    let accounts_loaction = format!("{}/accounts", vault_create_location);
+    let encrypted_vault_location = format!("{}.tar.gz.gpg", vault_create_location);
+    let accounts_location = format!("{}/accounts", vault_create_location);
     let mut user_input:String = String::new();
     // If encrypted vault exists
     if Path::new(&encrypted_vault_location).exists() {
-        // Ask user for input, handles incorect input
+        // Ask user for input, handles incorrect input
         if user_input != "y" && user_input != "yes" && user_input != "no" && user_input != "n" {
-            user_input = input_handle::get_string_input("A vault with that name already exists, remove it? y(es), n(o)").to_lowercase();
-        }
+            user_input = input_handle::get_string_input("\nA vault with that name already exists, remove it? y(es), n(o)").to_lowercase();
+        };
         // Remove vault
         if user_input == "y" || user_input == "yes" {
-            Command::new("rm")
-                .arg(encrypted_vault_location.as_str()).output().expect("Failed to remove old vault");
+            println!("\nDecrypt the vault to remove it...\n");
+            delete_vault_full(&vault_create_location, &encrypted_vault_location);
         }
         // Exit
         else {
@@ -31,12 +31,12 @@ pub fn create() {
     // Make .vault folder
     Command::new("mkdir")
         .arg(&vault_create_location.as_str()).output().expect("Failed to make .vault folder");
-    println!("Done");
-    println!("Creating accounts file...\n");
+    println!("\nDone");
+    println!("\nCreating accounts file...");
     // Create accounts file
     Command::new("touch")
-        .arg(accounts_loaction.as_str()).output().expect("Failed to make account file");
-    println!("Done\n");
+        .arg(accounts_location.as_str()).output().expect("Failed to make account file");
+    println!("\nDone");
     // Exit
     encrypt_and_exit(vault_create_location);
 }
@@ -221,6 +221,11 @@ pub fn backup(vault: &String) {
             println!("\nSuccessfully installed backup");
         }
         exit(1);
+}
+
+pub fn decrypt_vault_all_files(vault: &String) {
+    let vault_encrypted = format!("{}.tar.gz.gpg", vault);
+    delete_vault_full(vault, &vault_encrypted);
 }
 
 pub fn no_flags(vault: &String) {

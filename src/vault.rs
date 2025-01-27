@@ -162,3 +162,18 @@ pub fn encrypt_and_exit(vault: &String) {
     delete_vault(vault);
     exit_vault(vault);
 }
+
+// Removes all files related to a vault
+//
+// USAGE
+//
+// delete_vault_full(&vault_location, &vault_location_encrypted)
+pub fn delete_vault_full(vault: &String, vault_encrypted: &String) {
+    // Decrypts vault
+    decrypt_vault(&vault);
+    // Remove all vault files
+    Command::new("rm")
+        .arg(vault_encrypted.as_str()).output().expect("Failed to remove old vault");
+    Command::new("rm")
+        .args(["-r", vault.as_str()]).output().expect("Failed to remove old vault");
+}

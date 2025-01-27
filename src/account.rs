@@ -19,7 +19,7 @@ pub fn get_account_location(vault: &String) -> String{
 pub fn read_account(account_path: String) -> Vec<String> {
     // Reads acc_path and saves as string to acc
     let account_string = fs::read_to_string(account_path).expect("Could not read accounts file");
-    // Seperates each piece of data through the newline between and saves each word to vector acc
+    // Separates each piece of data through the newline between and saves each word to vector acc
     let mut account: Vec<String> = account_string.split('\n').map(|v| v.to_string()).collect();
     // Removes blank "" from acc
     account.retain(|x| x != "");
@@ -32,6 +32,6 @@ pub fn read_account(account_path: String) -> Vec<String> {
 //
 //  write_account(account_path, account);
 pub fn write_account(account_path: String, account: &Vec<String>) {
-    // Saves vector to accounts file, each piece of data seperated through newline
+    // Saves vector to accounts file, each piece of data separated through newline
     fs::write(account_path, account.join("\n")).expect("Could not save accounts file");
 }
