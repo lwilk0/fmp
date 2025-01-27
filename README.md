@@ -46,11 +46,11 @@ The vault is decrypted and the user is propted to enter the name of the account 
 A .vault folder is saved in the users home directory, along with an accounts file inside it. The vault is then compressed with Tar/GZip and encrypted.
 ### Calculate Entropy:
 The user is prompted to enter the password they want to find the entropy of. The character pool size of the password is found and the entropy is calculated with the formula L * log2(C), where L is the length of the password and C is the character pool. The entropy is ranked and displayed.
-### Backup Vault
+### Backup Vault:
 The user is asked if they want to create or install a backup. If they choose to backup, then the vault.tar.gz.gpg is copied to a file called vault.tar.gz.gpg.bk. If a backup install is selected, the vault.tar.gz.gpg.bk is copied to the vault.tar.gz.gpg file.
-### Create Vault
+### Create Vault:
 The user is asked what they would like to call the vault. A folder with the inputted name appended with a dot is created in the users home directory and an accounts file is added to it. The folder is then encrypted.
-### Delete Vault
+### Delete Vault:
 The user is asked what account they would like to remove, and the corrosponing vault is decrypted. All files relating to the vault are deleted.
-### Generate Password
+### Generate Password:
 The user is asked for the length of the password they want to generate. Random characters are generated and concatenated to form a password of the specified length. The user is asked if they would like to add it to an account
