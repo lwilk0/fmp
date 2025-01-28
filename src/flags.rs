@@ -1,6 +1,6 @@
 use input_handle::{get_string_input, get_u32_input};
 use std::{path::Path, process::{Command, exit}};
-use crate::{account::{get_account_location, read_account}, json::{change_password, change_username, new_json_account, read_json, remove_account, UserPass}, password::{calculate_entropy, generate_password}, vault::{decrypt_vault, delete_vault, delete_vault_full, encrypt_and_exit, exit_vault, get_vault_location, print_vault_entries}};
+use crate::{account::{get_account_location, read_account}, json::{change_password, change_username, new_json_account, read_json, remove_account, UserPass}, password::{calculate_entropy, generate_password}, vault::{decrypt_vault, delete_vault, delete_vault_full, encrypt_and_exit, encrypt_vault, exit_vault, get_vault_location, print_vault_entries}};
 
 pub fn create() {
     println!("FMP SETUP\n");
@@ -278,6 +278,13 @@ pub fn rename(vault: &String) {
     }
     // Exit
     encrypt_and_exit(&vault_new_directory);
+}
+
+pub fn change_vault_password(vault: &String) {
+    decrypt_vault(vault);
+    println!("\nEnter new password:\n");
+    encrypt_vault(vault);
+    exit_vault(vault);
 }
 
 pub fn no_flags(vault: &String) {

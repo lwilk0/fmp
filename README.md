@@ -16,17 +16,19 @@ cargo install --path .
 
 ## Flags:
 ```flags
-  -a, --add                Add an account to vault. used as: -a, --add
-  -b, --backup             Backup vault or install backup user as -b, --backup
-  -c, --create-vault       Create vault. used as -c --create-vault
-  -d, --delete             Delete account from vault. used as: -d, --delete
-  -D, --delete-vault       Delete vault. used as: -D, --delete
-  -e, --entropy            Calculate password entropy. used as -e --entropy
-  -g, --generate-password  Generate new password. used as -g --generate-password
-  -E, --encrypt            Encrypt vault. used as -E, --encrypt
-  -p, --change-password    Change password for an account. used as: -p , --change-password
-  -u, --change-username    Change username for an account. used as: -u , --change-username
-  -h, --help               Print help
+  -a, --add                    Add an account to vault. used as: -a, --add
+  -b, --backup                 Backup vault or install backup user as -b, --backup
+  -c, --create-vault           Create vault. used as -c --create-vault
+  -C, --change-vault-password  Change vault password. used as -C --change-vault-password
+  -d, --delete                 Delete account from vault. used as: -d, --delete
+  -D, --delete-vault           Delete vault. used as: -D, --delete
+  -e, --entropy                Calculate password entropy. used as -e --entropy
+  -E, --encrypt                Encrypt vault. used as -E, --encrypt
+  -g, --generate-password      Generate new password. used as -g --generate-password
+  -p, --change-password        Change password for an account. used as: -p , --change-password
+  -r, --rename-vault           Rename vault. used as: -r , --rename-vault
+  -u, --change-username        Change username for an account. used as: -u , --change-username
+  -h, --help                   Print help
 ```
 ###
 
@@ -56,3 +58,5 @@ The user is asked what account they would like to remove, and the corrosponing v
 The user is asked for the length of the password they want to generate. Random characters are generated and concatenated to form a password of the specified length. The user is asked if they would like to add it to an account
 ### Rename Vault:
 Asks user what vault name to change and what they whant to change it to. Decrypts vault, changes its name then re-encrypts it. Old vault files are removed.
+### Change Vault Password:
+Simply decrypts user specified vault and encrypts with the password they want to change it to.

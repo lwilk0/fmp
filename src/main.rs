@@ -5,7 +5,7 @@ mod json;
 mod password;
 mod vault; use vault::{vault_to_access, encrypt_and_exit};
 mod checks; use checks::os_check;
-mod flags; use flags::{add, backup, change_account_password, change_account_username, create, delete, entropy, gen_password, decrypt_vault_all_files, rename, no_flags};
+mod flags; use flags::{add, backup, change_account_password, change_account_username, change_vault_password, create, delete, entropy, gen_password, decrypt_vault_all_files, rename, no_flags};
 #[derive(Debug, Parser)]
 struct Options {
 
@@ -23,6 +23,11 @@ struct Options {
     /// used as -c --create-vault
     #[clap(short = 'c', long = "create-vault")]
     flag_c: bool,
+
+    /// Change vault password.
+    /// used as -C --change-vault-password
+    #[clap(short = 'C', long = "change-vault-password")]
+    flag_cvp: bool,
 
     /// Delete account from vault.
     /// used as: -d, --delete
@@ -129,6 +134,10 @@ fn main() {
         rename(&vault_location)
     }
 
+    // If flag -C or --change-vault-password
+    if opts.flag_cvp == true {
+        change_vault_password(&vault_location);
+    }
     // If no flags are supplied
     no_flags(&vault_location);
 }
