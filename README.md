@@ -33,7 +33,7 @@ cargo install --path .
 ###
 
 ## How FMP Works:
-FMP works by reading an encrypted folder (.vault). Within this folder is a accounts file and multiple other folders, each containing a data.json file. Each file has the name of the account it represents (e.g. GitHub), the accounts file contains all of these account names, and each data.json contains the username and password of the corresponding account. The folder is encrypted with Gnu Privacy Guard (GPG) after being compressed into a Tar/GZip archive.
+FMP works by reading an encrypted folder (.vault). Within this folder is a accounts file and multiple other folders, each containing a data.json file. Each folder has the name of the account it represents (e.g. GitHub), the accounts file contains all of these account names, and each data.json contains the username and password of the corresponding account. The folder is encrypted with Gnu Privacy Guard (GPG) after being compressed into a Tar/GZip archive.
 ### Read Vault:
 The vault is read by first decrypting the .vault.tar.gz.gpg file using the GPG command line utility, then the tarball is decompressed, leaving the plain .vault folder behind. The accounts file is read and each data.json's password and username is read according to the accounts list. All files par the encrypted tarball are removed and the program is exited.
 ### Add Account:
