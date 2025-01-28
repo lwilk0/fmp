@@ -235,7 +235,7 @@ pub fn rename(vault: &String) {
     let mut vault_new_directory = get_vault_location(&new_name);
     let mut vault_new_directory_encrypted = format!("{}.tar.gz.gpg", vault_new_directory);
     let vault_old_encrypted = format!("{}.tar.gz.gpg", vault);
-    let vault_old_encrypted_backup = format!("{}.bk", vault);
+    let vault_old_encrypted_backup = format!("{}.bk", vault_old_encrypted);
     // If vault with that name already exists
     while Path::new(&vault_new_directory_encrypted).exists() {
         // Ask user what to do with it
@@ -270,6 +270,7 @@ pub fn rename(vault: &String) {
     Command::new("rm") 
         .arg(vault_old_encrypted.as_str()).output().expect("Could not remove old encrypted vault");
     // If old encrypted file backup exists
+    println!("{}", vault_old_encrypted_backup);
     if Path::new(&vault_old_encrypted_backup).exists() {
         // Remove old encrypted file backup
         Command::new("rm") 
