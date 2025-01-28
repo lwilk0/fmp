@@ -230,19 +230,42 @@ pub fn decrypt_vault_all_files(vault: &String) {
 }
 
 pub fn rename(vault: &String) {
-    let new_name = get_string_input("What would you like to rename the vault to? ");
+    let mut new_name = get_string_input("What would you like to rename the vault to? ");
     // Format variables
-    let vault_new_directory = get_vault_location(&new_name);
+    let mut vault_new_directory = get_vault_location(&new_name);
+    let mut vault_new_directory_encrypted = format!("{}.tar.gz.gpg", vault_new_directory);
     let vault_old_encrypted = format!("{}.tar.gz.gpg", vault);
     let vault_old_encrypted_backup = format!("{}.bk", vault);
+    // If vault with that name already exists
+    while Path::new(&vault_new_directory_encrypted).exists() {
+        // Ask user what to do with it
+        let mut user_input = get_string_input("Vault already exists, would you like to remove it? y(es), n(o), e(xit)");
+        // Input validation
+        while user_input != "y" && user_input != "yes" && user_input != "n" && user_input != "no" && user_input != "e" && user_input != "exit"{
+            println!("\nInvalid input, please try again");
+            user_input = get_string_input("Vault already exists, would you like to remove it? y(es), n(o), e(xit)");
+        }
+        // If user wants to remove vault
+        if user_input == "y" || user_input == "yes" {
+            delete_vault_full(&vault_new_directory, &vault_new_directory_encrypted);
+        }
+        // If user does not want to remove vault
+        else if user_input == "n" || user_input == "no" {
+            println!("Enter new name:");
+            new_name = get_string_input("What would you like to rename the vault to? ");
+            vault_new_directory = get_vault_location(&new_name);
+            vault_new_directory_encrypted = format!("{}.tar.gz.gpg", vault_new_directory);
+        }
+        // Exit
+        else {
+            exit(1);
+        }
+    }
     // Decrypt old vault
     decrypt_vault(vault);
     // Rename folder
     Command::new("mv") 
         .args([vault.to_string(), vault_new_directory.to_string()]).output().expect("Could not rename vault");
-    println!("{}", vault_new_directory);
-    println!("{}", vault);
-    println!("{}", vault_old_encrypted);
     // Remove old encrypted file
     Command::new("rm") 
         .arg(vault_old_encrypted.as_str()).output().expect("Could not remove old encrypted vault");

@@ -1,6 +1,6 @@
 [package]
 name = "fmp"
-version = "1.2.19"
+version = "1.2.20"
 edition = "2021"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 license = "GPL-3.0"
