@@ -60,4 +60,4 @@ The user is asked for the length of the password they want to generate. Random c
 Asks user what vault name to change and what they whant to change it to. Decrypts vault, changes its name then re-encrypts it. Old vault files are removed.
 ### Change Vault Password:
 Simply decrypts user specified vault and encrypts with the password they want to change it to.
-aaa
+aaaa
