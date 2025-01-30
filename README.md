@@ -4,6 +4,7 @@ A command line password manager written in rust for Linux.
 
 ## Installation:
 1. **Prerequisites**
+
 Before installing fmp, the following must be installed on your system:
 - gpg
 - cargo
