@@ -3,16 +3,39 @@
 A command line password manager written in rust for Linux.
 
 ## Installation:
-1. **Clone the repo:**
+1. **Prerequisites**
+Before installing fmp, the following must be installed on your system:
+- gpg
+- cargo
+- rust
+- tar
+
+2. **Clone the repo:**
 ```bash
 git clone https://github.com/TT1882/Forgot-My-Password.git
 cd Forgot-My-Password
 ```
-2. **Build and install FMP with cargo:**
+3. **Build and install FMP with cargo:**
 ```bash
 cargo build --release
 cargo install --path .
 ```
+#### Note:
+Sometimes, this error will be thrown when running cargo install
+```bash
+warning: be sure to add '/home/dir/.cargo/bin' to your PATH to be able to run the installed binaries
+```
+To fix this, run:
+```bash
+export PATH=$PATH:~/.cargo/bin/
+```
+
+4. **Test for FMP**
+To test is FMP, run:
+```
+fmp -c
+```
+This will prompt you to create a vault for FMP.
 
 ## Flags:
 ```flags
