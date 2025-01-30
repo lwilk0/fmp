@@ -192,7 +192,7 @@ pub fn backup(vault: &String) {
         let mut user_input: String = String::new();
         // Input validation
         if user_input != "b" && user_input != "backup" && user_input != "i" && user_input != "install" {
-            user_input = input_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall");
+            user_input = input_handle::get_string_input("Would you like to create a backup or install a backup? (b)ackup, (i)nstall, (e)xit");
         }
         // If user wants to backup
         if user_input == "b" || user_input == "backup" {
@@ -208,7 +208,7 @@ pub fn backup(vault: &String) {
             println!("\nSuccessfully backed up vault");
         }
         // If user wants to install backup
-        else {
+        else if user_input == "i" || user_input == "install" {
             // Check if backup exists
             if Path::new(&vault_location_as_backup).exists() == false {
                 // If it does not
@@ -219,6 +219,9 @@ pub fn backup(vault: &String) {
             Command::new("cp")
                 .args([vault_location_as_backup.as_str(), vault_location_as_encrypted_tar.as_str()]).output().expect("Could not install backup");
             println!("\nSuccessfully installed backup");
+        }
+        else {
+            exit(1);
         }
         exit(1);
 }
