@@ -30,9 +30,10 @@ To fix this, run:
 export PATH=$PATH:~/.cargo/bin/
 ```
 
-4. **Test for FMP**
+4. **Test for FMP:**
+
 To test is FMP, run:
-```
+``` bash
 fmp -c
 ```
 This will prompt you to create a vault for FMP.
