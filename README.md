@@ -1,4 +1,4 @@
-# FMP (Forgot My Password)aaaa
+# FMP (Forgot My Password)aaa
 
 A command line password manager written in rust for Linux.
 
