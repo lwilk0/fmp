@@ -1,4 +1,4 @@
-use serde_json;a
+use serde_json;
 use serde::Deserialize;
 use std::{fs::{self, File}, io::Write, path::Path, process::Command};
 use input_handle::get_string_input;
