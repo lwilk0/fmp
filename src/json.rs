@@ -30,6 +30,8 @@ pub fn read_json(vault: String, account: String) -> UserPass{
         let json: UserPass = load_json_as_userpass(&json_file_directory);
         return json;
     }
+
+    // If directory does not exits.
     println!("Invalid Input, username does not exist!");
     return error;
 }
@@ -50,6 +52,7 @@ pub fn new_json_account(vault: &String, name: &str, username: &str, password: &s
     // For user input
     let mut user_input: String = String::new();
     println!("Creating account...");
+
     // Handles account already existing
     if Path::new(&new_account_dir).exists() {
         // Gets user input
@@ -62,20 +65,23 @@ pub fn new_json_account(vault: &String, name: &str, username: &str, password: &s
             Command::new("rm")
                 .args(["-r", new_account_dir.as_str()]).output().expect("Failed to delete directory");
         }
+
         // Return with error to handle
         else if user_input == "n" || user_input == "no" {
             return "err".to_string();
         }
+
         // If input is e or exit, the program is exited
         else {
             println!("Exiting...");
             exit_vault(vault);
-        }
-        
+        }  
     }
+
     // Creates new account directory and data.json file containing "{}"
     Command::new("mkdir")
         .arg(new_account_dir.as_str()).output().expect("Failed to create directory");
+    
     Command::new("touch")
         .arg(new_account_file.as_str()).output().expect("Failed to create data.json file");
     fs::write(&new_account_file, "{}").expect("Could not save to data.json file");
@@ -120,17 +126,20 @@ pub fn save_json_file(json_file_directory: String, json: serde_json::Value) {
 pub fn remove_account(vault: &String, name: &str, mut account: Vec<String>) -> String{
     let location = format!("{}/{}", vault, name);
     println!("Removing account...\n");
+
     // Find if specified account exists
     if Path::new(&location).exists() {
         // Remove account folder
         Command::new("rm")
             .args(["-r", location.as_str()]).output().expect("Could not remove account folder");
+        
         // Remove account from accounts file
         account.retain(|account| *account != name);
         write_account(get_account_location(vault), &account);
         println!("\nSuccessfully removed account");
         return "ok".to_string();
     }
+
     else {
         println!("Account does not exist");
         return "err".to_string();

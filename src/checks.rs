@@ -28,5 +28,6 @@ pub fn vault_exists_check(vault_name: String) -> String{
     if Path::new(&directory).exists() == false {
         return "no".to_string();
     }
+    
     return "yes".to_string();
 }

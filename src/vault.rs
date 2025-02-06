@@ -14,12 +14,14 @@ pub fn vault_to_access()  -> String{
     let mut vault_to_be_accessed = get_string_input("What vault should be accessed? ");
     // Check if vault with that name exists
     let mut vault_exists = vault_exists_check(get_vault_location(&vault_to_be_accessed));
+    
     // If it does not
     while vault_exists == "no" {
         println!("\nNo vault with that name exists, it can be created with fmp -c\n");
         vault_to_be_accessed = get_string_input("What vault should be accessed? ");
         vault_exists = vault_exists_check(get_vault_location(&vault_to_be_accessed));
     }
+
     println!("");
     let vault_location = get_vault_location(&vault_to_be_accessed);
     return vault_location; 
@@ -50,25 +52,33 @@ pub fn encrypt_vault(vault: &String) {
     let vault_as_tar = format!("{}.tar.gz", vault);
     
     println!("Encrypting vault...\n");
+
+    // If encrypted vault already exists
     if Path::new(&vault_as_encrypted_tar).exists() {
         Command::new("rm")
             .arg(vault_as_encrypted_tar.as_str()).output().expect("Could not remove encrypted file");
     }
+
     // Turns .vault into tarball
     Command::new("tar")
         .args(["-czf", vault_as_tar.as_str(), vault.as_str()]).output().expect("Failed to execute command");
+    
     // Encrypts vault, handles incorect password
     Command::new("gpg")
         .args(["-c", "--no-symkey-cache", vault_as_tar.as_str()]).output().expect("Could not encrypt vault, please run fmp -E to encrypt");
+    
     // If pasword is incorrect, tarball is removed
     while Path::new(&vault_as_encrypted_tar).exists() == false {
         encrypt_dnc(&vault_as_tar);
     }
+
     // Cleanup
     Command::new("rm")
         .args(["-r", vault_as_tar.as_str()]).output().expect("Could not remove file");
+    
     Command::new("rm")
         .args(["-r", vault.as_str()]).output().expect("Could not remove file");
+    
     println!("Encrypted!");
 }
 
@@ -86,17 +96,21 @@ pub fn decrypt_vault(vault: &String){
     // Decrypts vault, handles incorrect password
     Command::new("gpg")
         .args(["-q", "--no-symkey-cache", vault_as_encrypted_tar.as_str()]).output().expect("Could not encrypt vault");
+    
     // If file has not been decrypted
     while Path::new(&vault_as_tar).exists() == false{
         println!("Incorrect credentials! Try again.\n");
         decrypt_dnc(&vault_as_encrypted_tar);
     }
+    
     // Decrypts tarball
     Command::new("tar")
         .args(["-xf", vault_as_tar.as_str(), "-C", "/"]).output().expect("Failed to execute command");
+    
     // Removes tarball
     Command::new("rm")
         .arg(vault_as_tar.as_str()).output().expect("Could not remove tarball vault");
+    
     println!("Decrypted\n");
  
 }
@@ -109,22 +123,28 @@ pub fn decrypt_vault(vault: &String){
 pub fn print_vault_entries(vault: &String) {
     // Gets list of accounts
     let accounts_list: Vec<String> = read_account(get_account_location(&vault));
-        // Loop for each entry in accounts_list
-        if accounts_list.len() == 0 {
-            println!("No accounts have been created! Use fmp -a to create an account.");
-            return;
-        }
-        // Create the table
-        let mut table = Table::new();
-        table.add_row(row!["Account", "Username", "Password"]);
-        for i in 0..accounts_list.len() {
-            // Find corrosponding json file and read
-            let account = accounts_list[i].clone();
-            let json = read_json(vault.clone(), account);
-            // Output
-            table.add_row(row![accounts_list[i], json.username, json.password]);
-        }
-        table.printstd();
+    
+    // Loop for each entry in accounts_list
+    if accounts_list.len() == 0 {
+        println!("No accounts have been created! Use fmp -a to create an account.");
+        return;
+    }
+
+    // Create the table
+    let mut table = Table::new();
+    table.add_row(row!["Account", "Username", "Password"]);
+    
+    // Loop for each account
+    for i in 0..accounts_list.len() {
+        // Find corrosponding json file and read
+        let account = accounts_list[i].clone();
+        let json = read_json(vault.clone(), account);
+        // Output
+        table.add_row(row![accounts_list[i], json.username, json.password]);
+    }
+
+    // Print table
+    table.printstd();
 }
 
 // Removes the vault folder
@@ -133,6 +153,7 @@ pub fn print_vault_entries(vault: &String) {
 //
 // delete_vault(&vault_location)
 pub fn delete_vault(vault: &String) {
+    // If vault exists
     if Path::new(&vault).exists() {
         Command::new("rm")
             .args(["-r", vault.as_str()]).output().expect("Could not remove .vault");
@@ -168,15 +189,19 @@ pub fn encrypt_and_exit(vault: &String) {
 pub fn delete_vault_full(vault: &String, vault_encrypted: &String) {
     // Decrypts vault
     decrypt_vault(&vault);
+
     // Remove all vault files
     Command::new("rm")
         .arg(vault_encrypted.as_str()).output().expect("Failed to remove old vault");
+    
     Command::new("rm")
         .args(["-r", vault.as_str()]).output().expect("Failed to remove old vault");
 }
 
 // DO NOT CALL
+//
 // REASON
+//
 // This function is a workaround to wierd behavior with gpg in while loops.
 fn decrypt_dnc(vault_as_encrypted_tar: &String) {
     // Decrypts vault, handling for incorrect password
@@ -185,7 +210,9 @@ fn decrypt_dnc(vault_as_encrypted_tar: &String) {
 }
 
 // DO NOT CALL
+//
 // REASON
+//
 // This function is a workaround to wierd behavior with gpg in while loops.
 fn encrypt_dnc(vault_as_tar: &String) {
     // Encrypts vault, handles incorect password

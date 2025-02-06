@@ -5,7 +5,7 @@ mod json;
 mod password;
 mod vault; use vault::{vault_to_access, encrypt_and_exit};
 mod checks; use checks::os_check;
-mod flags; use flags::{add, backup, change_account_password, change_account_username, change_vault_password, create, delete, entropy, gen_password, decrypt_vault_all_files, rename, no_flags};
+mod flags; use flags::{add, backup, change_account_password, change_account_username, change_vault_password, create, delete, entropy, gen_password, delete_vault_all_files, rename, no_flags};
 #[derive(Debug, Parser)]
 struct Options {
 
@@ -126,7 +126,7 @@ fn main() {
 
     // If flag -D or --delete-vault is used
     if opts.flag_dv == true {
-        decrypt_vault_all_files(&vault_location);
+        delete_vault_all_files(&vault_location);
     }
 
     // If flag -r or --rename-vault is used
