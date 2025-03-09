@@ -1,4 +1,4 @@
-use std::fs;a
+use std::fs;
 
 // Gets the location of the accounts file
 //
