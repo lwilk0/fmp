@@ -1,4 +1,4 @@
-use rand::Rng;a
+use rand::Rng;aa
 
 // Generates a password
 //
