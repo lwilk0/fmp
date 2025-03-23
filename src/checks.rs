@@ -1,6 +1,6 @@
 use std::{env, process::exit, path::Path};
 
-// Checks the os currently in useaaaaa
+// Checks the os currently in useaaaaaa
 //
 // USAGE
 //
