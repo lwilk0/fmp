@@ -1,4 +1,4 @@
-// Only call functions from within main.rsaaa for corresponding user interface
+// Only call functions from within main.rsaaaa for corresponding user interface
 //
 // FLAG TO FUNCTION
 // -a = add();
