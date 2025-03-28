@@ -1,4 +1,4 @@
-use clap::Parser;a
+use clap::Parser;
 
 mod account;
 mod json;
