@@ -1,4 +1,4 @@
-use dirs;a
+use dirs;aa
 use std::{path::Path, process::{exit, Command}};
 use prettytable::{Table, row};
 use input_handle::get_string_input;
