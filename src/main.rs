@@ -20,12 +20,12 @@ struct Options {
     flag_b: bool,
 
     /// Create vault.
-    /// used as -c --create-vault
+    /// used as -c, --create-vault
     #[clap(short = 'c', long = "create-vault")]
     flag_c: bool,
 
     /// Change vault password.
-    /// used as -C --change-vault-password
+    /// used as -C, --change-vault-password
     #[clap(short = 'C', long = "change-vault-password")]
     flag_cvp: bool,
 
@@ -40,7 +40,7 @@ struct Options {
     flag_dv: bool,
 
     /// Calculate password entropy.
-    /// used as -e --entropy
+    /// used as -e, --entropy
     #[clap(short = 'e', long = "entropy")]
     flag_e: bool,
 
@@ -50,23 +50,23 @@ struct Options {
     flag_en: bool,
 
     /// Generate new password.
-    /// used as -g --generate-password
+    /// used as -g, --generate-password
     #[clap(short = 'g', long = "generate-password")]
     flag_g: bool,
 
 
     /// Change password for an account.
-    /// used as: -p , --change-password 
+    /// used as: -p, --change-password 
     #[clap(short = 'p', long = "change-password")]
     flag_p: bool,
 
     /// Rename vault.
-    /// used as: -r , --rename-vault
+    /// used as: -r, --rename-vault
     #[clap(short = 'r', long = "rename-vault")]
     flag_r: bool,
 
     /// Change username for an account.
-    /// used as: -u , --change-username 
+    /// used as: -u  --change-username 
     #[clap(short = 'u', long = "change-username")]
     flag_u: bool,
 }
