@@ -15,7 +15,7 @@ struct Options {
     flag_a: bool,
 
     /// Backup vault or install backup
-    /// user as -b, --backup
+    /// used as -b, --backup
     #[clap(short = 'b', long = "backup")]
     flag_b: bool,
 
