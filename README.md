@@ -22,7 +22,6 @@ Forgot My Password (FMP) is a secure password manager that allows you to create,
    - [gpgme](https://gpgme.org/) (or [gpg4win](https://www.gpg4win.org/) on Windows)
    - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    - [rust](https://www.rust-lang.org/tools/install)
-   - [tar](https://www.gnu.org/software/tar/)
 
 2. **Clone the Repository**:
    ```bash
