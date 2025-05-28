@@ -1,9 +1,9 @@
 [package]
-name = "fmp"
+name = "forgot-my-password"
 description = "A simple command-line password manager written in Rust."
-repository = "https://github.com/TT1882/Forgot-My-Password.git"
+repository = "https://github.com/lwilk0/Forgot-My-Password.git"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
-version = "1.3.0"
+version = "1.3.1"
 edition = "2024"
 license = "GPL-3.0"
 keywords = ["password-manager", "cli", "crypto", "cryptography", "rust"]
