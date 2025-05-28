@@ -1,20 +1,26 @@
 use crate::crypto::*;
 use gpgme::{Context, Protocol};
+use std::fs::read_to_string;
 
-// TODO: Replace with a valid recipient in your keyring
-const VALID_RECIPIENT: &str = "wilkinsonluke@proton.me";
 const INVALID_RECIPIENT: &str = "invalid_recipient@invalid.recipient";
 
 const DATA: &'static [u8; 13] = b"test_password";
+
+fn get_valid_recipient() -> String {
+    read_to_string("tests/valid_recipient.txt")
+        .expect("Failed to read valid recipient from file")
+        .trim()
+        .to_string()
+}
 
 #[test]
 fn test_encrypt_variable_success() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = DATA.to_vec();
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).expect(
-            "Failed to encrypt variable. Have you changed `VALID_RECIPIENT` to a valid recipient in `src/tests/crypto_tests.rs`?",
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
         );
 
     assert!(encrypted_data.len() > 0);
@@ -34,10 +40,10 @@ fn test_encrypt_variable_invalid_recipient() {
 fn test_decrypt_variable_success() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = DATA.to_vec();
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).expect(
-            "Failed to encrypt variable. Have you changed `VALID_RECIPIENT` to a valid recipient in `src/tests/crypto_tests.rs`?",
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
         );
     let decrypted_data = decrypt_variable(&mut ctx, &encrypted_data);
 
@@ -58,10 +64,10 @@ fn test_decrypt_variable_invalid_data() {
 fn test_memory_safety() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = DATA.to_vec();
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     encrypt_variable(&mut ctx, &mut data, recipient).expect(
-            "Failed to encrypt variable. Have you changed `VALID_RECIPIENT` to a valid recipient in `src/tests/crypto_tests.rs`?",
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
         );
     assert!(data.iter().all(|&byte| byte == 0),);
 }
@@ -70,9 +76,12 @@ fn test_memory_safety() {
 fn test_encrypt_decrypt_empty_data() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = Vec::new();
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
-    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).unwrap();
+    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).expect(
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
+        );
+
     let decrypted_data = decrypt_variable(&mut ctx, &encrypted_data).unwrap();
 
     assert!(decrypted_data.is_empty());
@@ -82,9 +91,12 @@ fn test_encrypt_decrypt_empty_data() {
 fn test_encrypt_decrypt_large_data() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = vec![b'a'; 10_000];
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
-    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).unwrap();
+    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).expect(
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
+        );
+
     let decrypted_data = decrypt_variable(&mut ctx, &encrypted_data).unwrap();
 
     assert_eq!(decrypted_data, vec![b'a'; 10_000]);
@@ -103,9 +115,12 @@ fn test_decrypt_variable_corrupted_data() {
 fn test_encrypt_decrypt_utf8_password() {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp).unwrap();
     let mut data = "密码123".as_bytes().to_vec();
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
-    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).unwrap();
+    let encrypted_data = encrypt_variable(&mut ctx, &mut data, recipient).expect(
+            "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
+        );
+
     let decrypted_data = decrypt_variable(&mut ctx, &encrypted_data).unwrap();
 
     assert_eq!(decrypted_data, "密码123".as_bytes().to_vec());

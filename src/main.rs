@@ -2,6 +2,8 @@
 
 use anyhow::Error;
 use clap::Parser;
+use env_logger::{Builder, Env};
+use std::io::Write;
 use vault::print_vault_entries;
 
 mod crypto;
@@ -83,6 +85,10 @@ struct Flags {
 }
 
 fn main() -> Result<(), Error> {
+    Builder::from_env(Env::default().default_filter_or("info"))
+        .format(|buf, record| writeln!(buf, "[{}] - {}", record.level(), record.args()))
+        .init();
+
     let flags = Flags::parse();
 
     if flags.flag_c {

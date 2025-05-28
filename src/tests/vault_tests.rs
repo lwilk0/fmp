@@ -1,12 +1,17 @@
 use crate::vault::*;
 use std::fs::write;
+use std::fs::{create_dir, remove_dir};
 use tempfile::tempdir;
-
-// TODO: change to a valid recipient for testing
-const VALID_RECIPIENT: &str = "wilkinsonluke@proton.me";
 
 const VAULT_NAME: &str = "test_vault";
 const ACCOUNT_NAME: &str = "test_account";
+
+fn get_valid_recipient() -> String {
+    read_to_string("tests/valid_recipient.txt")
+        .expect("Failed to read valid recipient from file")
+        .trim()
+        .to_string()
+}
 
 #[test]
 fn test_initialize_vault() {
@@ -122,13 +127,13 @@ fn test_encrypt_to_file_and_decrypt_from_file() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
@@ -165,14 +170,14 @@ fn test_print_vault_entries() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
@@ -224,7 +229,7 @@ fn test_corrupted_encrypted_data() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
@@ -315,7 +320,7 @@ fn test_large_password() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
@@ -323,7 +328,7 @@ fn test_large_password() {
     let userpass = UserPass {
         username: "test_user".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut large_password.clone(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut large_password.clone(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
@@ -358,7 +363,7 @@ fn test_invalid_username_or_password() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
@@ -392,14 +397,14 @@ fn test_file_permissions() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
@@ -429,7 +434,7 @@ fn test_utf8_username_and_password() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
@@ -441,7 +446,7 @@ fn test_utf8_username_and_password() {
                 &mut "密码123".as_bytes().to_vec(),
                 recipient,
             )
-            .expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            .expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
@@ -553,7 +558,7 @@ fn test_invalid_data_format() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
@@ -582,20 +587,19 @@ fn test_change_account_username() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
         username: "old_username".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
     store.encrypt_to_file(userpass).unwrap();
 
-    // Change the username
     store.change_account_username("new_username").unwrap();
 
     let updated_userpass = store.decrypt_from_file().unwrap();
@@ -621,23 +625,23 @@ fn test_change_account_password() {
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let recipient = VALID_RECIPIENT;
+    let recipient = &get_valid_recipient();
 
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
         password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"old_password".to_vec(), recipient).expect("Failed to encrypt password. Have you changed VALID_RECIPIENT to a valid recipient in `src/tests/vault_tests.rs`?"),
+            encrypt_variable(&mut store.ctx, &mut b"old_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
         )),
     };
 
     store.encrypt_to_file(userpass).unwrap();
 
-    // Change the password
     let new_password = SecretBox::new(Box::new(
-        encrypt_variable(&mut store.ctx, &mut b"new_password".to_vec(), recipient).unwrap(),
+        encrypt_variable(&mut store.ctx, &mut b"new_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
     ));
+
     store.change_account_password(new_password).unwrap();
 
     let updated_userpass = store.decrypt_from_file().unwrap();
@@ -649,4 +653,31 @@ fn test_change_account_password() {
     .unwrap();
 
     assert_eq!(decrypted_password, b"new_password".to_vec());
+}
+
+#[test]
+fn test_rename_directory() {
+    let old_path = PathBuf::from("test_old_dir");
+    let new_path = PathBuf::from("test_new_dir");
+
+    // Create the old directory
+    create_dir(&old_path).expect("Failed to create test_old_dir");
+
+    // Test renaming the directory
+    assert!(rename_directory(&old_path, &new_path).is_ok());
+    assert!(!old_path.exists());
+    assert!(new_path.exists());
+
+    // Cleanup
+    remove_dir(&new_path).expect("Failed to remove test_new_dir");
+}
+
+#[test]
+fn test_rename_directory_nonexistent() {
+    let old_path = PathBuf::from("nonexistent_dir");
+    let new_path = PathBuf::from("new_dir");
+
+    // Test renaming a nonexistent directory
+    let result = rename_directory(&old_path, &new_path);
+    assert!(result.is_err());
 }

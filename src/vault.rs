@@ -3,18 +3,21 @@
 
 use crate::crypto::{decrypt_variable, encrypt_variable};
 use anyhow::Error;
-use dirs;
+use dirs::data_dir;
 use gpgme::{Context, Protocol};
 use libc::c_void;
+use log::warn;
 use prettytable::{Table, row};
 use secrecy::{ExposeSecret, SecretBox};
 use std::{
-    fs::{File, create_dir_all, read_dir, read_to_string},
+    fs::{File, create_dir_all, read_dir, read_to_string, rename},
     io::{Read, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
 };
 use zeroize::Zeroize;
+
+const NULL: &str = "null";
 
 /// Represents an accounts data with a username and a securely stored password.
 pub struct UserPass {
@@ -23,7 +26,6 @@ pub struct UserPass {
 }
 
 /// Represents the locations of various files and directories within a vault.
-
 pub struct Locations {
     pub vault_location: PathBuf,
     pub backup_location: PathBuf,
@@ -51,11 +53,9 @@ impl Locations {
             ));
         }
 
-        let fmp_location = PathBuf::from(
-            dirs::data_dir()
-                .expect("Failed to find data directory")
-                .join("fmp"),
-        );
+        let fmp_location = data_dir()
+            .expect("Failed to find data directory")
+            .join("fmp");
 
         let vault_location = fmp_location.join(vault_name);
         let backup_location = fmp_location.join("backup");
@@ -107,11 +107,11 @@ impl Locations {
     /// # Returns
     /// * `Result<Self, Error>` - Returns a `Locations` instance if the vault exists, or an error if it does not.
     pub fn does_vault_exist(vault_name: &str) -> Result<Self, Error> {
-        let locations = Self::new(vault_name, "null")?;
+        let locations = Self::new(vault_name, NULL)?;
 
-        while !locations.vault_location.exists() {
+        if !locations.vault_location.exists() {
             return Err(anyhow::anyhow!(
-                "Vault '{}' does not exist. Run `fmp -c` to create it.",
+                "Vault `{}` does not exist. Check for typos or run `fmp -c` to create it.",
                 vault_name
             ));
         }
@@ -148,7 +148,7 @@ pub struct Store {
     pub ctx: Context,
     pub locations: Locations,
 }
-// TODO: Find recipient function
+
 impl Store {
     /// Creates a new `Store` instance with a GPGME context and locations based on the provided vault and account names.
     ///
@@ -204,10 +204,13 @@ impl Store {
         }
 
         let recipient = read_to_string(&self.locations.recipient_location)?;
-        let recipient_key = &self
-            .ctx
-            .get_key(&recipient)
-            .map_err(|e| anyhow::anyhow!("Failed to find recipient {}. Error: {}", recipient, e))?;
+        let recipient_key = &self.ctx.get_key(&recipient).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to find recipient `{}` for encryption. Error: {}",
+                recipient,
+                e
+            )
+        })?;
 
         let mut file = File::create(&self.locations.data_location)?;
 
@@ -215,12 +218,46 @@ impl Store {
         file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
 
         #[cfg(windows)]
-        println!(
-            "Warning: File permissions are not set on Windows. Please ensure the file is secure."
-        );
+        {
+            use windows::Win32::Security::{
+                GetSecurityDescriptorDacl, InitializeSecurityDescriptor, SECURITY_DESCRIPTOR,
+                SetSecurityDescriptorDacl,
+            };
+            use windows::Win32::Storage::FileSystem::{
+                DACL_SECURITY_INFORMATION, SetFileSecurityW,
+            };
+
+            // Set file permissions to restrict access on Windows
+            let mut security_descriptor = SECURITY_DESCRIPTOR::default();
+            unsafe {
+                InitializeSecurityDescriptor(
+                    &mut security_descriptor as *mut _ as *mut c_void,
+                    1, // SECURITY_DESCRIPTOR_REVISION
+                )?;
+                SetSecurityDescriptorDacl(
+                    &mut security_descriptor as *mut _ as *mut c_void,
+                    true.into(),
+                    None,
+                    false.into(),
+                )?;
+                SetFileSecurityW(
+                    self.locations.data_location.as_os_str(),
+                    DACL_SECURITY_INFORMATION,
+                    &security_descriptor as *const _ as *const c_void,
+                )?;
+            }
+        }
 
         let mut output = Vec::new();
-        self.ctx.encrypt([recipient_key], &data, &mut output)?;
+        self.ctx
+            .encrypt([recipient_key], &data, &mut output)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to encrypt data for recipient `{}`. Error: {}",
+                    recipient,
+                    e
+                )
+            })?;
 
         file.write_all(&output)?;
 
@@ -245,7 +282,9 @@ impl Store {
         file.read_to_end(&mut encrypted_data)?;
 
         let mut output = Vec::new();
-        self.ctx.decrypt(&encrypted_data, &mut output)?;
+        self.ctx
+            .decrypt(&encrypted_data, &mut output)
+            .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
 
         let mut output_split: Vec<&[u8]> = output.split(|&b| b == b':').collect();
 
@@ -328,6 +367,29 @@ impl Store {
     }
 }
 
+/// Renames a directory from `old_path` to `new_path`.
+///
+/// # Arguments
+/// * `old_path` - The current path of the directory to be renamed.
+/// * `new_path` - The new path for the directory.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+/// # Errors
+/// * If the directory at `old_path` does not exist, or if the renaming operation fails, an error is returned.
+pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Error> {
+    if old_path.exists() {
+        rename(old_path, new_path)?;
+    } else {
+        return Err(anyhow::anyhow!(
+            "The directory `{}` does not exist.",
+            old_path.display()
+        ));
+    }
+
+    Ok(())
+}
+
 /// Prints all entries in the vault, including account names, usernames, and decrypted passwords.
 ///
 /// # Arguments
@@ -341,12 +403,12 @@ impl Store {
 pub fn print_vault_entries(vault_name: &str) -> Result<(), Error> {
     let mut userpass: UserPass;
 
-    let mut store = Store::new(vault_name, "null")?;
+    let mut store = Store::new(vault_name, NULL)?;
     let account_names = Locations::find_account_names(&store.locations)?;
 
     if account_names.is_empty() {
-        println!(
-            "\nNo accounts found in vault '{}'. You can create an account with `fmp -a`",
+        warn!(
+            "\nNo accounts found in vault `{}`. You can create an account with `fmp -a`",
             vault_name
         );
         return Ok(());
@@ -384,7 +446,7 @@ pub fn print_vault_entries(vault_name: &str) -> Result<(), Error> {
         table.add_row(row![
             s,
             userpass.username,
-            String::from_utf8_lossy(&decrypted_password.expose_secret())
+            String::from_utf8_lossy(decrypted_password.expose_secret())
         ]);
 
         decrypted_password.zeroize();

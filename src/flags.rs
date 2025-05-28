@@ -5,13 +5,17 @@ use crate::{
     crypto::securely_retrieve_password,
     input::{choice, input},
     password::{calculate_entropy, generate_password},
-    vault::{Locations, Store, UserPass},
+    vault::{Locations, Store, UserPass, rename_directory},
 };
 use anyhow::Error;
 use fs_extra::dir::{CopyOptions, copy};
 use gpgme::{Context, Protocol};
+use log::{info, warn};
 use secrecy::SecretBox;
-use std::fs::{create_dir_all, read_to_string, remove_dir_all, rename, write};
+use std::fs::{create_dir_all, read_to_string, remove_dir_all, write};
+
+const NULL: &str = "null";
+
 /// Creates a new vault with a specified name and associates it with a GPG key.
 ///
 /// # Returns
@@ -23,34 +27,35 @@ pub fn create_new_vault() -> Result<(), Error> {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
 
     let vault_name: String = input("What should the vault be called?")?;
-    let locations = Locations::new(&vault_name, "null")?;
+    let locations = Locations::new(&vault_name, NULL)?;
 
     if locations.vault_location.exists() {
         let user_choice_overwrite = choice(
-            "Vault already exists. Do you want to overwrite it? (y/n)",
+            "\nVault already exists. Do you want to overwrite it? (y/n)",
             &["y", "n"],
         )?;
 
         if user_choice_overwrite == "y" {
             remove_dir_all(&locations.vault_location)?;
+            info!("\nExisting vault `{}` was overwritten.", vault_name);
         } else {
-            println!("Vault creation cancelled.");
+            warn!("\nVault creation cancelled by the user.");
             return Ok(());
         }
     }
 
-    println!(
+    info!(
         "\nWhat email address should the vault be associated with? (This should be a public key you have imported into GPG)"
     );
 
     let mut recipient: String = input(
-        "You can use the command `gpg --list-keys` to see your keys. You can create a new key with `gpg --full-generate-key`.",
+        "\nYou can use the command `gpg --list-keys` to see your keys. You can create a new key with `gpg --full-generate-key`.",
     )?;
 
     // Check if the recipient exists in the GPG keyring
     while ctx.get_key(&recipient).is_err() {
         recipient = input(format!(
-            "The recipient '{}' does not exist in your GPG keyring. Please enter a valid email address.",
+            "\nThe recipient `{}` does not exist in your GPG keyring. Please enter a valid email address.",
             recipient
         ).as_str())?;
     }
@@ -59,14 +64,14 @@ pub fn create_new_vault() -> Result<(), Error> {
 
     write(locations.recipient_location, recipient).map_err(|e| anyhow::anyhow!("{}", e))?;
 
-    println!(
-        "\nVault '{}' created successfully at {:?}.",
+    info!(
+        "Vault `{}` created successfully at {:?}.",
         vault_name, locations.vault_location
     );
 
-    println!("\nYou can add accounts to the vault with the `fmp -a` command.");
-    println!(
-        "\nNOTE: By default, GPG caches your passphrase for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Passwords/GPGCACHE.md`.)"
+    info!("\nYou can add accounts to the vault with the `fmp -a` command.");
+    info!(
+        "NOTE: By default, GPG caches your passphrase for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Passwords/GPGCACHE.md`.)"
     );
 
     Ok(())
@@ -85,7 +90,7 @@ pub fn create_new_vault() -> Result<(), Error> {
 pub fn add_account(vault_name: &str) -> Result<(), Error> {
     let account_name: String = input("\nWhat should the account be called?")?;
 
-    let mut store = Store::new(&vault_name, &account_name)?;
+    let mut store = Store::new(vault_name, &account_name)?;
 
     if store.locations.account_location.exists() {
         let user_choice_overwrite = choice(
@@ -95,8 +100,9 @@ pub fn add_account(vault_name: &str) -> Result<(), Error> {
 
         if user_choice_overwrite == "y" {
             remove_dir_all(&store.locations.account_location)?;
+            info!("Existing account `{}` was overwritten.", account_name);
         } else {
-            println!("\nAccount creation cancelled.");
+            warn!("\nAccount creation cancelled by the user.");
             return Ok(());
         }
     } else {
@@ -124,7 +130,7 @@ pub fn add_account(vault_name: &str) -> Result<(), Error> {
     if repeat == "y" {
         add_account(vault_name)?;
     } else {
-        println!("\nDone!.");
+        info!("\nDone!");
     }
     Ok(())
 }
@@ -140,7 +146,7 @@ pub fn add_account(vault_name: &str) -> Result<(), Error> {
 /// # Errors
 /// * If the vault does not exist, or if there are issues with file operations.
 pub fn create_backup(vault_name: &str) -> Result<(), Error> {
-    let locations = Locations::new(vault_name, "null")?;
+    let locations = Locations::new(vault_name, NULL)?;
 
     create_dir_all(&locations.backup_location)?;
 
@@ -151,8 +157,8 @@ pub fn create_backup(vault_name: &str) -> Result<(), Error> {
         &options,
     )?;
 
-    println!(
-        "\nBackup created successfully at {:?}",
+    info!(
+        "Backup created successfully at {:?}",
         locations.backup_location
     );
 
@@ -170,11 +176,11 @@ pub fn create_backup(vault_name: &str) -> Result<(), Error> {
 /// # Errors
 /// * If the backup does not exist, or if there are issues with file operations.
 pub fn install_backup(vault_name: &str) -> Result<(), Error> {
-    let locations = Locations::new(vault_name, "null")?;
+    let locations = Locations::new(vault_name, NULL)?;
 
     if !locations.backup_location.exists() {
         return Err(anyhow::anyhow!(
-            "\nBackup does not exist at {:?}",
+            "Backup does not exist at {:?}",
             locations.backup_location
         ));
     }
@@ -186,8 +192,8 @@ pub fn install_backup(vault_name: &str) -> Result<(), Error> {
         &options,
     )?;
 
-    println!(
-        "\nBackup installed successfully from {:?} to {:?}",
+    info!(
+        "Backup installed successfully from {:?} to {:?}",
         locations.backup_location, locations.vault_location
     );
 
@@ -211,10 +217,10 @@ pub fn delete_account_from_vault(vault_name: &str) -> Result<(), Error> {
 
     if locations.account_location.exists() {
         remove_dir_all(&locations.account_location)?;
-        println!("\nAccount '{}' deleted successfully.", account_name);
+        info!("\nAccount `{}` deleted successfully.", account_name);
     } else {
         return Err(anyhow::anyhow!(
-            "Account '{}' does not exist in vault '{}'.",
+            "\nAccount `{}` does not exist in vault `{}`. Check for typos or run `fmp -a` to add it.",
             account_name,
             vault_name
         ));
@@ -234,13 +240,16 @@ pub fn delete_account_from_vault(vault_name: &str) -> Result<(), Error> {
 /// # Errors
 /// * If the vault does not exist, or if there are issues with file operations.
 pub fn delete_vault(vault_name: &str) -> Result<(), Error> {
-    let locations = Locations::new(vault_name, "null")?;
+    let locations = Locations::new(vault_name, NULL)?;
 
     if locations.vault_location.exists() {
         remove_dir_all(&locations.vault_location)?;
-        println!("\nVault '{}' deleted successfully.", vault_name);
+        info!("Vault `{}` deleted successfully.", vault_name);
     } else {
-        return Err(anyhow::anyhow!("Vault '{}' does not exist.", vault_name));
+        return Err(anyhow::anyhow!(
+            "Vault `{}` does not exist. Try checking for typos.",
+            vault_name
+        ));
     }
 
     Ok(())
@@ -259,28 +268,20 @@ pub fn delete_vault(vault_name: &str) -> Result<(), Error> {
 pub fn rename_vault(old_vault_name: &str) -> Result<(), Error> {
     let new_vault_name: String = input("\nEnter the new name for the vault:")?;
 
-    let old_locations = Locations::new(&old_vault_name, "null")?;
+    let old_locations = Locations::new(old_vault_name, NULL)?;
+    let new_locations = Locations::new(&new_vault_name, NULL)?;
 
-    if old_locations.vault_location.exists() {
-        let new_locations = Locations::new(&new_vault_name, "null")?;
+    rename_directory(&old_locations.vault_location, &new_locations.vault_location)?;
 
-        rename(&old_locations.vault_location, &new_locations.vault_location)?;
+    rename_directory(
+        &old_locations.backup_location,
+        &new_locations.backup_location,
+    )?;
 
-        rename(
-            &old_locations.backup_location,
-            &new_locations.backup_location,
-        )?;
-
-        println!(
-            "\nVault '{}' renamed to '{}' successfully.",
-            old_vault_name, new_vault_name
-        );
-    } else {
-        return Err(anyhow::anyhow!(
-            "Vault '{}' does not exist.",
-            old_vault_name
-        ));
-    }
+    info!(
+        "\nVault `{}` renamed to `{}` successfully.",
+        old_vault_name, new_vault_name
+    );
 
     Ok(())
 }
@@ -299,10 +300,10 @@ pub fn change_account_username(vault_name: &str) -> Result<(), Error> {
 
     let new_username: String = input("\nEnter the new username for the account:")?;
 
-    store.change_account_username(&new_username.as_str())?;
+    store.change_account_username(new_username.as_str())?;
 
-    println!(
-        "\nUsername for account '{}' changed successfully.",
+    info!(
+        "\nUsername for account `{}` changed successfully.",
         account_name
     );
 
@@ -331,8 +332,8 @@ pub fn change_account_password(vault_name: &str) -> Result<(), Error> {
 
     store.change_account_password(new_password)?;
 
-    println!(
-        "\nPassword for account '{}' changed successfully.",
+    info!(
+        "\nPassword for account `{}` changed successfully.",
         account_name
     );
 
@@ -350,24 +351,18 @@ pub fn change_account_name(vault_name: &str) -> Result<(), Error> {
     let old_account_name: String = input("\nEnter the name of the account you want to rename:")?;
     let new_account_name: String = input("\nEnter the new name for the account:")?;
 
-    let locations = Locations::new(vault_name, old_account_name.as_str())?;
+    let locations_old = Locations::new(vault_name, old_account_name.as_str())?;
+    let locations_new = Locations::new(vault_name, new_account_name.as_str())?;
 
-    if locations.account_location.exists() {
-        let new_locations = Locations::new(vault_name, &new_account_name)?;
+    rename_directory(
+        &locations_old.account_location,
+        &locations_new.account_location,
+    )?;
 
-        rename(&locations.account_location, &new_locations.account_location)?;
-
-        println!(
-            "\nAccount '{}' renamed to '{}' successfully.",
-            old_account_name, new_account_name
-        );
-    } else {
-        return Err(anyhow::anyhow!(
-            "Account '{}' does not exist in vault '{}'.",
-            old_account_name,
-            vault_name
-        ));
-    }
+    info!(
+        "\nAccount `{}` renamed to `{}` successfully.",
+        old_account_name, new_account_name
+    );
 
     Ok(())
 }
@@ -384,7 +379,7 @@ pub fn generate_new_password() -> Result<(), Error> {
 
     let password = generate_password(length);
 
-    println!("\nGenerated password: {}", password);
+    info!("\nGenerated password: {}", password);
 
     Ok(())
 }
@@ -401,8 +396,8 @@ pub fn calculate_entropy_from_input() -> Result<(), Error> {
 
     let (entropy, rating) = calculate_entropy(&password);
 
-    println!("\nPassword Entropy: {:.2} bits", entropy);
-    println!("Password Rating: {}", rating);
+    info!("\nPassword Entropy: {:.2} bits", entropy);
+    info!("Password Rating: {}", rating);
 
     Ok(())
 }

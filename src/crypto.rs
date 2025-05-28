@@ -74,10 +74,17 @@ pub fn securely_retrieve_password(
 ) -> Result<Vec<u8>, Error> {
     println!("{}", message);
 
-    let password =
-        read_password().map_err(|e| anyhow::anyhow!("Failed to read password: {}", e))?;
+    let password = read_password()
+        .map_err(|e| anyhow::anyhow!("Failed to read password from user input. Error: {}", e))?;
 
-    let encrypted_password = encrypt_variable(ctx, &mut password.into_bytes(), recipient)?;
+    let encrypted_password =
+        encrypt_variable(ctx, &mut password.into_bytes(), recipient).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to encrypt the password for recipient `{}`. Error: {}",
+                recipient,
+                e
+            )
+        })?;
 
     Ok(encrypted_password)
 }

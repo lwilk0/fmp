@@ -8,7 +8,7 @@ pub fn generate_password(length: usize) -> String {
         .collect()
 }
 
-pub fn calculate_entropy(password: &String) -> (f64, &str) {
+pub fn calculate_entropy(password: &str) -> (f64, &str) {
     let mut character_pool: u8 = 0;
 
     if password.chars().any(|c| c.is_ascii_lowercase()) {
@@ -41,8 +41,8 @@ pub fn calculate_entropy(password: &String) -> (f64, &str) {
     } else {
         rating = "Very Strong"
     }
-    // Return entropy and rating as tuple
-    return (entropy, rating);
+
+    (entropy, rating)
 }
 
 #[cfg(test)]
