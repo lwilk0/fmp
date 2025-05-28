@@ -63,8 +63,7 @@ pub fn create_new_vault() -> Result<(), Error> {
 
     println!("\nYou can add accounts to the vault with the `fmp -a` command.");
     println!(
-        // TODO: make a markdown file for this
-        "\nNOTE: By default, GPG caches your passphrase for 10 minutes. See `default-cache-ttl` and `max-cache-ttl` at https://www.gnupg.org/documentation/manuals/gnupg/Agent-Options.html alter `~/.gnupg/gpg-agent.conf` and run `gpgconf --kill gpg-agent` if you would like to change this. (Note, if you set a time of 0 you will have to enter your passphrase every time a password is decrypted.)"
+        "\nNOTE: By default, GPG caches your passphrase for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Passwords/GPGCACHE.md`.)"
     );
 
     Ok(())
