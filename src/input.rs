@@ -1,3 +1,5 @@
+//! This file provides functions to handle user input, including prompting for a value and validating choices against a list of options.
+
 use anyhow::Error;
 use std::str::FromStr;
 

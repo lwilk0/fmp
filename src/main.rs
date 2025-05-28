@@ -1,3 +1,5 @@
+//! Forgot-My-Password(FMP) - A simple password vault application.
+
 use anyhow::Error;
 use clap::Parser;
 use vault::print_vault_entries;

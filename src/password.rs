@@ -1,3 +1,5 @@
+//!// This file provides password generation and entropy calculation.
+
 use rand::random;
 
 pub fn generate_password(length: usize) -> String {

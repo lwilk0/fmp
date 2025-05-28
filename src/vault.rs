@@ -1,4 +1,4 @@
-//! This module provides functionality for managing a vault.
+//! This file provides functionality for managing a vault.
 //! It includes functions for creating a vault, adding accounts, printing entries in the vault and more.
 
 use crate::crypto::{decrypt_variable, encrypt_variable};

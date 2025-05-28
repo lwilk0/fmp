@@ -1,3 +1,6 @@
+//! This file preforms operations based on specified flags.
+//! These functions should only be called from the main function.
+
 use crate::{
     crypto::securely_retrieve_password,
     input::{choice, input},

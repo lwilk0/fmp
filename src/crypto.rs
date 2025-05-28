@@ -1,3 +1,5 @@
+//! This file provides functions for encrypting and decrypting variables using GPGME.
+
 use anyhow::Error;
 use gpgme::Context;
 use rpassword::read_password;
