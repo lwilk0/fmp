@@ -81,7 +81,7 @@ fn test_does_vault_exist_success() {
     let locations = Locations::new(&vault_name, "null").unwrap();
     locations.initialize_vault().unwrap();
 
-    let result = Locations::does_vault_exist(&vault_name);
+    let result = Locations::does_vault_exist(&locations);
 
     assert!(result.is_ok());
 }
@@ -96,7 +96,9 @@ fn test_does_vault_exist_failure() {
         .unwrap()
         .to_string();
 
-    let result = Locations::does_vault_exist(&vault_name);
+    let locations = Locations::new(&vault_name, "null").unwrap();
+
+    let result = Locations::does_vault_exist(&locations);
 
     assert!(result.is_err());
 }

@@ -212,7 +212,7 @@ pub fn install_backup(vault_name: &str) -> Result<(), Error> {
     let options = CopyOptions::new();
 
     copy(
-        &locations.backup_location.join(vault_name),
+        locations.backup_location.join(vault_name),
         &locations.fmp_location,
         &options,
     )?;

@@ -22,7 +22,7 @@ use std::fs::read_to_string;
 
 const INVALID_RECIPIENT: &str = "invalid_recipient@invalid.recipient";
 
-const DATA: &'static [u8; 13] = b"test_password";
+const DATA: &[u8; 13] = b"test_password";
 
 fn get_valid_recipient() -> String {
     read_to_string("tests/valid_recipient.txt")
@@ -41,7 +41,7 @@ fn test_encrypt_variable_success() {
             "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
         );
 
-    assert!(encrypted_data.len() > 0);
+    assert!(encrypted_data.is_empty());
 }
 
 #[test]
