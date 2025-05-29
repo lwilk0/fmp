@@ -1,0 +1,33 @@
+name: Rust Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+      - testing
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: linux
+
+    steps:
+      - name: Set up Rust
+        uses: actions/checkout@v2
+        
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: build
+        run: cargo build --verbose
+
+      - name: test
+        run: cargo test --verbose
+
+      - name: clippy
+        run: cargo clippy --verbose -D warnings
+
+      - name: audit
+        run: cargo audit
