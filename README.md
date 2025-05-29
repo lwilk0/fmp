@@ -98,7 +98,7 @@ cargo test --test vault_tests
 cargo test --test crypto_tests
 ```
 
-**Note**: Update the `VALID_RECIPIENT` constant in `vault_tests.rs` and `crypto_tests.rs` to match a valid recipient in your GPG keyring.
+**Note**: Update the file in `src/tests/recipient.txt` to match a valid recipient in your GPG keyring.
 
 ## Troubleshooting
 
