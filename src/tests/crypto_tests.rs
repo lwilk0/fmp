@@ -25,7 +25,7 @@ const INVALID_RECIPIENT: &str = "invalid_recipient@invalid.recipient";
 const DATA: &[u8; 13] = b"test_password";
 
 fn get_valid_recipient() -> String {
-    read_to_string("tests/valid_recipient.txt")
+    read_to_string("src/tests/recipient.txt")
         .expect("Failed to read valid recipient from file")
         .trim()
         .to_string()
@@ -41,7 +41,7 @@ fn test_encrypt_variable_success() {
             "Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?",
         );
 
-    assert!(encrypted_data.is_empty());
+    assert!(!encrypted_data.is_empty());
 }
 
 #[test]

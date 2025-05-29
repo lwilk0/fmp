@@ -122,6 +122,8 @@ Contributions are welcome! Please follow these steps:
 2. Create a new branch for your feature or bugfix.
 3. Submit a pull request with a detailed description of your changes.
 
+Please ensure you run `cargo test` before submitting a pull request, as the workflow cannot do this for you, as testing requires user interaction.
+
 ## License
 
 This project is licensed under the GPLv3 License. See the [LICENSE](LICENSE) file for details.

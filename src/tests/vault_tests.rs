@@ -25,7 +25,7 @@ const VAULT_NAME: &str = "test_vault";
 const ACCOUNT_NAME: &str = "test_account";
 
 fn get_valid_recipient() -> String {
-    read_to_string("tests/valid_recipient.txt")
+    read_to_string("src/tests/recipient.txt")
         .expect("Failed to read valid recipient from file")
         .trim()
         .to_string()
@@ -148,6 +148,7 @@ fn test_encrypt_to_file_and_decrypt_from_file() {
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
+
     write(&locations.recipient_location, recipient).unwrap();
 
     let userpass = UserPass {
