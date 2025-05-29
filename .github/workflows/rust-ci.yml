@@ -14,8 +14,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      -name: Dependences
+      - name: Dependences
         uses: sudo apt install libgpg-error
+      
       - name: Set up Rust
         uses: actions/checkout@v2
         
