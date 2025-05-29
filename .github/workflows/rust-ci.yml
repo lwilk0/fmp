@@ -1,4 +1,4 @@
-name: Rust Continuous Integration
+name: fmp
 
 on:
   push:
