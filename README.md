@@ -20,6 +20,7 @@ Forgot My Password (FMP) is a secure password manager that allows you to create,
 1. **Prerequisites**:
    Before installing FMP, make sure the following are installed on your system:
    - [gpgme](https://gpgme.org/) (or [gpg4win](https://www.gpg4win.org/) on Windows)
+   - [libgpg-error](https://www.gnupg.org/software/libgpg-error/index.html)
    - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    - [rust](https://www.rust-lang.org/tools/install)
 
