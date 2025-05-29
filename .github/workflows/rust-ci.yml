@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Dependences
-        run: sudo apt install libgpg-error-dev
+        run: sudo apt install gpgme libgpg-error-dev
       
       - name: Set up Rust
         uses: actions/checkout@v2
