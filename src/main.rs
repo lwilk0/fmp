@@ -39,6 +39,8 @@ use crate::{
     vault::Locations,
 };
 
+const NULL: &str = "null";
+
 #[derive(Debug, Parser)]
 struct Flags {
     /// Add an account to vault.
@@ -122,7 +124,14 @@ fn main() -> Result<(), Error> {
 
     let mut vault_name: String = input("What vault do you want to access?")?;
 
-    while Locations::does_vault_exist(vault_name.as_str()).is_err() {
+    if flags.flag_i {
+        install_backup(vault_name.as_str())?;
+        return Ok(());
+    }
+
+    let locations = Locations::new(&vault_name, NULL)?;
+
+    while Locations::does_vault_exist(&locations).is_err() {
         println!("Vault '{}' does not exist.", vault_name);
         vault_name = input("What vault do you want to access?")?;
     }
@@ -147,9 +156,6 @@ fn main() -> Result<(), Error> {
         Ok(())
     } else if flags.flag_u {
         change_account_username(vault_name.as_str())?;
-        Ok(())
-    } else if flags.flag_i {
-        install_backup(vault_name.as_str())?;
         Ok(())
     } else if flags.flag_p {
         change_account_password(vault_name.as_str())?;

@@ -45,6 +45,7 @@ pub struct UserPass {
 
 /// Represents the locations of various files and directories within a vault.
 pub struct Locations {
+    pub fmp_location: PathBuf,
     pub vault_location: PathBuf,
     pub backup_location: PathBuf,
     pub account_location: PathBuf,
@@ -82,6 +83,7 @@ impl Locations {
         let data_location = account_location.join("data.gpg");
 
         Ok(Self {
+            fmp_location,
             vault_location,
             backup_location,
             account_location,
@@ -123,18 +125,34 @@ impl Locations {
     /// * `vault_name` - The name of the vault to check.
     ///
     /// # Returns
-    /// * `Result<Self, Error>` - Returns a `Locations` instance if the vault exists, or an error if it does not.
-    pub fn does_vault_exist(vault_name: &str) -> Result<Self, Error> {
-        let locations = Self::new(vault_name, NULL)?;
-
-        if !locations.vault_location.exists() {
+    /// * `Result<(), Error>` - Returns a `OK(())` if the vault exists, or an error on failure.
+    pub fn does_vault_exist(&self) -> Result<(), Error> {
+        if !self.vault_location.exists() {
             return Err(anyhow::anyhow!(
-                "Vault `{}` does not exist. Check for typos or run `fmp -c` to create it.",
-                vault_name
+                "Vault `{:?}` does not exist. Check for typos or run `fmp -c` to create it.",
+                self.vault_location
             ));
         }
 
-        Ok(locations)
+        Ok(())
+    }
+
+    /// Checks if an account with the specified name exists within the vault.
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns `Ok(())` if the account exists, or an error on failure.
+    ///
+    /// # Errors
+    /// * If the account directory does not exist, an error is returned.
+    pub fn does_account_exist(&self) -> Result<(), Error> {
+        if !self.account_location.exists() {
+            Err(anyhow::anyhow!(
+                "Account `{:?}` does not exist. Check for typos or run `fmp -a` to create it.",
+                self.account_location
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     /// Finds all account names within a vault.

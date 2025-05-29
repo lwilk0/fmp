@@ -58,6 +58,8 @@ pub fn input<T: FromStr>(message: &str) -> Result<T, Error> {
         input = read_input()?;
     }
 
+    println!("\n");
+
     input
         .trim()
         .parse()
