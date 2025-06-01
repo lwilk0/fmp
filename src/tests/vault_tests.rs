@@ -122,7 +122,7 @@ fn test_find_account_names() {
     let account2 = Locations::new(&vault_name, "account2").unwrap();
     account2.create_account_directory().unwrap();
 
-    let account_names = locations.find_account_names().unwrap();
+    let account_names = read_directory(&locations.vault_location).unwrap();
 
     assert_eq!(account_names.len(), 2);
     assert!(account_names.contains(&"account1".to_string()));
@@ -153,60 +153,19 @@ fn test_encrypt_to_file_and_decrypt_from_file() {
 
     let userpass = UserPass {
         username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
+        password: SecretBox::new(Box::new(b"test_password".to_vec())),
     };
 
-    store.encrypt_to_file(userpass).unwrap();
+    store.encrypt_to_file(&userpass).unwrap();
 
     let decrypted_userpass = store.decrypt_from_file().unwrap();
 
     assert_eq!(decrypted_userpass.username, "test_user");
 
-    let decrypted_password = decrypt_variable(
-        &mut store.ctx,
-        decrypted_userpass.password.expose_secret().as_slice(),
-    )
-    .unwrap();
-
-    assert_eq!(decrypted_password, b"test_password".to_vec());
-}
-
-#[test]
-fn test_print_vault_entries() {
-    let temp_dir = tempdir().unwrap();
-    let vault_name = temp_dir
-        .path()
-        .join(VAULT_NAME)
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let account_name = ACCOUNT_NAME;
-    let mut store = Store::new(&vault_name, account_name).unwrap();
-
-    let locations = Locations::new(&vault_name, account_name).unwrap();
-
-    locations.initialize_vault().unwrap();
-    locations.create_account_directory().unwrap();
-
-    let recipient = &get_valid_recipient();
-
-    write(&locations.recipient_location, recipient).unwrap();
-
-    let userpass = UserPass {
-        username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
-    };
-
-    store.encrypt_to_file(userpass).unwrap();
-
-    let result = crate::vault::print_vault_entries(&vault_name);
-
-    assert!(result.is_ok());
+    assert_eq!(
+        *decrypted_userpass.password.expose_secret(),
+        b"test_password".to_vec()
+    );
 }
 
 #[test]
@@ -262,25 +221,6 @@ fn test_corrupted_encrypted_data() {
 }
 
 #[test]
-fn test_print_empty_vault() {
-    let temp_dir = tempdir().unwrap();
-    let vault_name = temp_dir
-        .path()
-        .join(VAULT_NAME)
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let locations = Locations::new(&vault_name, "null").unwrap();
-
-    locations.initialize_vault().unwrap();
-
-    let result = crate::vault::print_vault_entries(&vault_name);
-
-    assert!(result.is_ok());
-}
-
-#[test]
 fn test_missing_account_directory() {
     let temp_dir = tempdir().unwrap();
     let vault_name = temp_dir
@@ -318,7 +258,7 @@ fn test_large_number_of_accounts() {
         account_locations.create_account_directory().unwrap();
     }
 
-    let account_names = locations.find_account_names().unwrap();
+    let account_names = read_directory(&locations.vault_location).unwrap();
 
     assert_eq!(account_names.len(), 1000);
 }
@@ -348,22 +288,14 @@ fn test_large_password() {
     let large_password = vec![b'a'; 10_000];
     let userpass = UserPass {
         username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut large_password.clone(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
+        password: SecretBox::new(Box::new(large_password.clone())),
     };
 
-    store.encrypt_to_file(userpass).unwrap();
+    store.encrypt_to_file(&userpass).unwrap();
 
     let decrypted_userpass = store.decrypt_from_file().unwrap();
 
-    let decrypted_password = decrypt_variable(
-        &mut store.ctx,
-        decrypted_userpass.password.expose_secret().as_slice(),
-    )
-    .unwrap();
-
-    assert_eq!(decrypted_password, large_password);
+    assert_eq!(*decrypted_userpass.password.expose_secret(), large_password);
 }
 
 #[test]
@@ -424,12 +356,10 @@ fn test_file_permissions() {
 
     let userpass = UserPass {
         username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
+        password: SecretBox::new(Box::new(b"test_password".to_vec())),
     };
 
-    store.encrypt_to_file(userpass).unwrap();
+    store.encrypt_to_file(&userpass).unwrap();
 
     let metadata = std::fs::metadata(&locations.data_location).unwrap();
     let permissions = metadata.permissions();
@@ -461,29 +391,19 @@ fn test_utf8_username_and_password() {
 
     let userpass = UserPass {
         username: "用户名".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(
-                &mut store.ctx,
-                &mut "密码123".as_bytes().to_vec(),
-                recipient,
-            )
-            .expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
+        password: SecretBox::new(Box::new("密码123".as_bytes().to_vec())),
     };
 
-    store.encrypt_to_file(userpass).unwrap();
+    store.encrypt_to_file(&userpass).unwrap();
 
     let decrypted_userpass = store.decrypt_from_file().unwrap();
 
     assert_eq!(decrypted_userpass.username, "用户名");
 
-    let decrypted_password = decrypt_variable(
-        &mut store.ctx,
-        decrypted_userpass.password.expose_secret().as_slice(),
-    )
-    .unwrap();
-
-    assert_eq!(decrypted_password, "密码123".as_bytes().to_vec());
+    assert_eq!(
+        *decrypted_userpass.password.expose_secret(),
+        "密码123".as_bytes().to_vec()
+    );
 }
 
 #[test]
@@ -509,32 +429,10 @@ fn test_invalid_recipient() {
 
     let userpass = UserPass {
         username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(
-                &mut store.ctx,
-                &mut b"test_password".to_vec(),
-                invalid_recipient,
-            )
-            .unwrap_or_else(|_| vec![]),
-        )),
+        password: SecretBox::new(Box::new(b"test_password".to_vec())),
     };
 
-    let result = store.encrypt_to_file(userpass);
-
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_empty_account_name() {
-    let temp_dir = tempdir().unwrap();
-    let vault_name = temp_dir
-        .path()
-        .join(VAULT_NAME)
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let result = Locations::new(&vault_name, "");
+    let result = store.encrypt_to_file(&userpass);
 
     assert!(result.is_err());
 }
@@ -588,92 +486,6 @@ fn test_invalid_data_format() {
     let result = store.decrypt_from_file();
 
     assert!(result.is_err());
-}
-
-#[test]
-fn test_change_account_username() {
-    let temp_dir = tempdir().unwrap();
-    let vault_name = temp_dir
-        .path()
-        .join(VAULT_NAME)
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let account_name = ACCOUNT_NAME;
-    let mut store = Store::new(&vault_name, account_name).unwrap();
-
-    let locations = Locations::new(&vault_name, account_name).unwrap();
-
-    locations.initialize_vault().unwrap();
-    locations.create_account_directory().unwrap();
-
-    let recipient = &get_valid_recipient();
-
-    write(&locations.recipient_location, recipient).unwrap();
-
-    let userpass = UserPass {
-        username: "old_username".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"test_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
-    };
-
-    store.encrypt_to_file(userpass).unwrap();
-
-    store.change_account_username("new_username").unwrap();
-
-    let updated_userpass = store.decrypt_from_file().unwrap();
-
-    assert_eq!(updated_userpass.username, "new_username");
-}
-
-#[test]
-fn test_change_account_password() {
-    let temp_dir = tempdir().unwrap();
-    let vault_name = temp_dir
-        .path()
-        .join(VAULT_NAME)
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let account_name = ACCOUNT_NAME;
-    let mut store = Store::new(&vault_name, account_name).unwrap();
-
-    let locations = Locations::new(&vault_name, account_name).unwrap();
-
-    locations.initialize_vault().unwrap();
-    locations.create_account_directory().unwrap();
-
-    let recipient = &get_valid_recipient();
-
-    write(&locations.recipient_location, recipient).unwrap();
-
-    let userpass = UserPass {
-        username: "test_user".to_string(),
-        password: SecretBox::new(Box::new(
-            encrypt_variable(&mut store.ctx, &mut b"old_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-        )),
-    };
-
-    store.encrypt_to_file(userpass).unwrap();
-
-    let new_password = SecretBox::new(Box::new(
-        encrypt_variable(&mut store.ctx, &mut b"new_password".to_vec(), recipient).expect("Failed to encrypt variable. Have you changed `src/tests/valid_recipient.txt` to a valid recipient?"),
-    ));
-
-    store.change_account_password(new_password).unwrap();
-
-    let updated_userpass = store.decrypt_from_file().unwrap();
-
-    let decrypted_password = decrypt_variable(
-        &mut store.ctx,
-        updated_userpass.password.expose_secret().as_slice(),
-    )
-    .unwrap();
-
-    assert_eq!(decrypted_password, b"new_password".to_vec());
 }
 
 #[test]

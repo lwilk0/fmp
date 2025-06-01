@@ -1,4 +1,4 @@
-//! This file provides functionality for managing a vault.
+//! This module provides functionality for managing a vault.
 //! It includes functions for creating a vault, adding accounts, printing entries in the vault and more.
 
 /*
@@ -19,25 +19,21 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use crate::crypto::{decrypt_variable, encrypt_variable};
+use crate::crypto::lock_memory;
 use anyhow::Error;
 use dirs::data_dir;
 use gpgme::{Context, Protocol};
-use libc::c_void;
-use log::warn;
-use prettytable::{Table, row};
 use secrecy::{ExposeSecret, SecretBox};
 use std::{
     fs::{File, create_dir_all, read_dir, read_to_string, rename},
-    io::{Read, Write},
+    io::{BufReader, Read, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
 };
 use zeroize::Zeroize;
 
-const NULL: &str = "null";
-
 /// Represents an accounts data with a username and a securely stored password.
+#[derive(Default)]
 pub struct UserPass {
     pub username: String,
     pub password: SecretBox<Vec<u8>>,
@@ -66,18 +62,12 @@ impl Locations {
     /// # Errors
     /// * If the vault or account paths cannot be created, an error is returned.
     pub fn new(vault_name: &str, account_name: &str) -> Result<Self, Error> {
-        if vault_name.is_empty() || account_name.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Vault name and account name cannot be empty."
-            ));
-        }
-
         let fmp_location = data_dir()
             .expect("Failed to find data directory")
             .join("fmp");
 
-        let vault_location = fmp_location.join(vault_name);
-        let backup_location = fmp_location.join("backup");
+        let vault_location = fmp_location.join("vaults").join(vault_name);
+        let backup_location = fmp_location.join("backups");
         let account_location = vault_location.join(account_name);
         let recipient_location = vault_location.join("recipient");
         let data_location = account_location.join("data.gpg");
@@ -146,37 +136,13 @@ impl Locations {
     /// * If the account directory does not exist, an error is returned.
     pub fn does_account_exist(&self) -> Result<(), Error> {
         if !self.account_location.exists() {
-            Err(anyhow::anyhow!(
+            return Err(anyhow::anyhow!(
                 "Account `{:?}` does not exist. Check for typos or run `fmp -a` to create it.",
                 self.account_location
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Finds all account names within a vault.
-    ///
-    /// # Returns
-    /// * `Result<Vec<String>, Error>` - Returns a vector of account names on success, or an error on failure.
-    ///
-    /// # Errors
-    /// * If reading the directory fails or if the file names cannot be converted to strings, an error is returned.
-    pub fn find_account_names(&self) -> Result<Vec<String>, Error> {
-        let mut account_names = Vec::new();
-
-        for entry in read_dir(&self.vault_location)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                let account_name = entry
-                    .file_name()
-                    .into_string()
-                    .map_err(|_| anyhow::anyhow!("Failed to convert file name to string."))?;
-                account_names.push(account_name);
-            }
+            ));
         }
 
-        Ok(account_names)
+        Ok(())
     }
 }
 
@@ -215,29 +181,14 @@ impl Store {
     ///
     /// # Errors
     /// * If the recipient cannot be found, if the file cannot be created, or if encryption fails.
-    pub fn encrypt_to_file(&mut self, userpass: UserPass) -> Result<(), Error> {
+    pub fn encrypt_to_file(&mut self, userpass: &UserPass) -> Result<(), Error> {
         let mut data: Vec<u8> = Vec::new();
 
         data.extend_from_slice(userpass.username.as_bytes());
         data.push(b':');
+        data.extend_from_slice(userpass.password.expose_secret());
 
-        // Access the password securely
-        let mut decrypted_password =
-            decrypt_variable(&mut self.ctx, userpass.password.expose_secret().as_slice())?;
-        data.extend_from_slice(&decrypted_password);
-
-        decrypted_password.zeroize();
-
-        #[cfg(unix)]
-        unsafe {
-            libc::mlock(data.as_ptr() as *const c_void, data.len())
-        };
-
-        #[cfg(windows)]
-        unsafe {
-            use windows::Win32::System::Memory::VirtualLock;
-            VirtualLock(data.as_ptr() as *const c_void, data.len());
-        }
+        lock_memory(data.as_slice());
 
         let recipient = read_to_string(&self.locations.recipient_location)?;
         let recipient_key = &self.ctx.get_key(&recipient).map_err(|e| {
@@ -263,13 +214,9 @@ impl Store {
                 DACL_SECURITY_INFORMATION, SetFileSecurityW,
             };
 
-            // Set file permissions to restrict access on Windows
             let mut security_descriptor = SECURITY_DESCRIPTOR::default();
             unsafe {
-                InitializeSecurityDescriptor(
-                    &mut security_descriptor as *mut _ as *mut c_void,
-                    1, // SECURITY_DESCRIPTOR_REVISION
-                )?;
+                InitializeSecurityDescriptor(&mut security_descriptor as *mut _ as *mut c_void, 1)?;
                 SetSecurityDescriptorDacl(
                     &mut security_descriptor as *mut _ as *mut c_void,
                     true.into(),
@@ -310,96 +257,44 @@ impl Store {
     /// # Errors
     /// * If the recipient cannot be found, if the file cannot be opened, or if decryption fails.
     pub fn decrypt_from_file(&mut self) -> Result<UserPass, Error> {
-        let recipient = read_to_string(&self.locations.recipient_location)?;
-
-        let mut file = File::open(&self.locations.data_location)?;
         let mut encrypted_data = Vec::new();
+        let file = File::open(&self.locations.data_location)?;
 
-        file.read_to_end(&mut encrypted_data)?;
+        let mut reader = BufReader::new(file);
+        reader.read_to_end(&mut encrypted_data)?;
 
         let mut output = Vec::new();
+
+        lock_memory(&output);
+
         self.ctx
             .decrypt(&encrypted_data, &mut output)
             .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
 
-        let mut output_split: Vec<&[u8]> = output.split(|&b| b == b':').collect();
+        let mut output_split: Vec<Vec<u8>> =
+            output.split(|&b| b == b':').map(|s| s.to_vec()).collect();
 
-        let username = String::from_utf8(output_split[0].to_vec())?;
+        lock_memory(&output_split.concat());
 
-        let mut password_bytes = output_split[1].to_vec(); // NOTE: This is done to avoid converting the password to a string, which could expose sensitive data in memory
-        let encrypted_password = encrypt_variable(&mut self.ctx, &mut password_bytes, &recipient)?;
+        output.zeroize();
 
-        password_bytes.zeroize();
+        let username = String::from_utf8(output_split[0].clone())?;
 
         let output_as_userpass = UserPass {
             username,
-            password: SecretBox::new(Box::new(encrypted_password)),
+            password: SecretBox::new(Box::new(output_split[1].to_vec())),
         };
 
-        #[cfg(unix)]
-        unsafe {
-            libc::mlock(
-                output_as_userpass.password.expose_secret().as_ptr() as *const c_void,
-                output_as_userpass.password.expose_secret().len(),
-            )
-        };
-
-        #[cfg(windows)]
-        unsafe {
-            use windows::Win32::System::Memory::VirtualLock;
-            VirtualLock(
-                output_as_userpass.password.expose_secret().as_ptr() as *const c_void,
-                output_as_userpass.password.expose_secret().len(),
-            );
-        }
+        lock_memory(output_as_userpass.password.expose_secret());
 
         for slice in &mut output_split {
             let mut slice_vec = slice.to_vec();
             slice_vec.zeroize();
         }
 
+        output_split.zeroize();
+
         Ok(output_as_userpass)
-    }
-
-    /// Changes the username of the account in the vault by updating the username in the encrypted data file.
-    ///
-    /// # Arguments
-    /// * `new_username` - The new username to set for the account.
-    ///
-    /// # Returns
-    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
-    ///
-    /// # Errors
-    /// * If the vault does not exist, if the account data cannot be decrypted, or if the file cannot be written to.
-    pub fn change_account_username(&mut self, new_username: &str) -> Result<(), Error> {
-        let mut userpass = self.decrypt_from_file()?;
-        userpass.username = new_username.to_string();
-
-        self.encrypt_to_file(userpass)?;
-
-        Ok(())
-    }
-
-    /// Changes the password of the account in the vault by updating the password in the encrypted data file.
-    ///
-    /// # Arguments
-    /// * `new_password` - The new password to set for the account, wrapped in a `SecretBox`.
-    ///
-    /// # Returns
-    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
-    ///
-    /// # Errors
-    /// * If the vault does not exist, if the account data cannot be decrypted, or if the file cannot be written to.
-    pub fn change_account_password(
-        &mut self,
-        new_password: SecretBox<Vec<u8>>,
-    ) -> Result<(), Error> {
-        let mut userpass = self.decrypt_from_file()?;
-        userpass.password = new_password;
-
-        self.encrypt_to_file(userpass)?;
-
-        Ok(())
     }
 }
 
@@ -426,71 +321,55 @@ pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Er
     Ok(())
 }
 
-/// Prints all entries in the vault, including account names, usernames, and decrypted passwords.
+/// Reads all directories in the specified directory and returns their names as a vector of strings.
 ///
 /// # Arguments
-/// * `vault_name` - The name of the vault to print entries from.
+/// * `directory` - The path to the directory to read.
 ///
 /// # Returns
-/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+/// * `Result<Vec<String>, Error>` - Returns a vector of directory names on success, or an error on failure.
 ///
 /// # Errors
-/// * If the vault does not exist, if the account names cannot be found, or if decryption fails.
-pub fn print_vault_entries(vault_name: &str) -> Result<(), Error> {
-    let mut userpass: UserPass;
+/// * If reading the directory fails, or if the file type cannot be determined, an error is returned.
+pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
+    let mut directories = Vec::new();
 
-    let mut store = Store::new(vault_name, NULL)?;
-    let account_names = Locations::find_account_names(&store.locations)?;
-
-    if account_names.is_empty() {
-        warn!(
-            "\nNo accounts found in vault `{}`. You can create an account with `fmp -a`",
-            vault_name
-        );
-        return Ok(());
-    };
-
-    let mut table = Table::new();
-    table.add_row(row!["Account", "Username", "Password"]);
-
-    for s in account_names.iter() {
-        store = Store::new(vault_name, s)?;
-        userpass = Store::decrypt_from_file(&mut store)?;
-
-        let mut decrypted_password = SecretBox::new(Box::new(decrypt_variable(
-            &mut store.ctx,
-            userpass.password.expose_secret().as_slice(),
-        )?));
-
-        #[cfg(unix)]
-        unsafe {
-            libc::mlock(
-                decrypted_password.expose_secret().as_ptr() as *const c_void,
-                decrypted_password.expose_secret().len(),
-            )
-        };
-
-        #[cfg(windows)]
-        unsafe {
-            use windows::Win32::System::Memory::VirtualLock;
-            VirtualLock(
-                decrypted_password.expose_secret().as_ptr() as *const c_void,
-                decrypted_password.expose_secret().len(),
-            );
+    for entry in read_dir(directory)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            let account_name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| anyhow::anyhow!("Failed to convert file name to string."))?;
+            directories.push(account_name);
         }
-
-        table.add_row(row![
-            s,
-            userpass.username,
-            String::from_utf8_lossy(decrypted_password.expose_secret())
-        ]);
-
-        decrypted_password.zeroize();
     }
 
-    table.printstd();
+    Ok(directories)
+}
 
-    Ok(())
+/// Retrieves the account details for a specific account in a vault.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault containing the account.
+/// * `account_name` - The name of the account to retrieve details for.
+///
+/// # Returns
+/// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the username and decrypted password on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault does not exist, if the account does not exist, or if decryption fails.
+pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserPass, Error> {
+    let mut store = Store::new(vault_name, account_name)?;
+
+    let userpass = Store::decrypt_from_file(&mut store)?;
+
+    lock_memory(userpass.password.expose_secret());
+
+    Ok(UserPass {
+        username: userpass.username,
+        password: userpass.password,
+    })
 }
 
 #[cfg(test)]

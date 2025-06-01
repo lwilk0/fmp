@@ -1,4 +1,4 @@
-//! This file provides functions for encrypting and decrypting variables using GPGME.
+//! This module provides functions for encrypting and decrypting variables using GPGME.
 
 /*
 Copyright (C) 2025  Luke Wilkinson
@@ -18,95 +18,49 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use anyhow::Error;
-use gpgme::Context;
-use rpassword::read_password;
-use zeroize::Zeroize;
+use crate::{gui::FmpApp, password::calculate_entropy};
+use libc::c_void;
+use secrecy::{ExposeSecret, SecretBox};
 
-/// Takes a variable and encrypts it for a specific recipient.
-/// This is for securely passing around passwords or other sensitive data.
+/// Securely retrieves a password from the user interface.
 ///
 /// # Arguments
-/// * `ctx` - A mutable reference to the GPGME context.
-/// * `data` - A mutable reference to the data to be encrypted.
-/// * `recipient` - The recipient's identifier (e.g., email or key ID) for whom the data is encrypted.
-///
-/// # Returns
-/// * `Result<Vec<u8>, Error>` - Returns the encrypted data as a vector of bytes on success, or an error on failure.
-///
-/// # Errors
-/// * If the recipient cannot be found in the context, or if encryption fails, an error is returned.
-pub fn encrypt_variable(
-    ctx: &mut Context,
-    data: &mut Vec<u8>,
-    recipient: &str,
-) -> Result<Vec<u8>, Error> {
-    let recipient_key = ctx
-        .get_key(recipient)
-        .map_err(|e| anyhow::anyhow!("Failed to find recipient {}. Error: {}", recipient, e))?;
+/// * `app` - A mutable reference to the `FmpApp` instance containing user credentials.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the UI.
+/// * `text` - A string slice containing the label text to display alongside the password input field.
+pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &str) {
+    ui.horizontal(|ui| {
+        ui.label(text);
+        let mut password = // FIXME: Securely handle password input
+            String::from_utf8_lossy(app.userpass.password.expose_secret()).to_string();
 
-    let mut encrypted_data = Vec::new();
+        lock_memory(password.as_bytes());
 
-    ctx.encrypt(&[recipient_key], &mut *data, &mut encrypted_data)?;
+        ui.text_edit_singleline(&mut password);
 
-    data.zeroize();
+        let (entropy, rating) = calculate_entropy(password.as_str());
 
-    Ok(encrypted_data)
+        if !password.is_empty() {
+            ui.label(format!("Entropy: {:.2} bits, Rating: {}", entropy, rating)); // TODO: Cache
+        }
+
+        app.userpass.password = SecretBox::new(Box::new(password.as_bytes().to_vec()));
+    });
 }
 
-/// Takes encrypted data and decrypts it, returning the result as a string.
+/// Locks the memory of the provided data to prevent it from being swapped to disk.
 ///
 /// # Arguments
-/// * `ctx` - A mutable reference to the GPGME context.
-/// * `encrypted_data` - A slice of bytes containing the encrypted data.
-///
-/// # Returns
-/// * `Result<Vec<u8>, Error>` - Returns the decrypted data as a vector of bytes on success, or an error on failure.
-///
-/// # Errors
-/// * If decryption fails or if the decrypted data cannot be converted to a UTF-8 string, an error is returned.
-pub fn decrypt_variable(ctx: &mut Context, encrypted_data: &[u8]) -> Result<Vec<u8>, Error> {
-    let mut decrypted_data = Vec::new();
+/// * `data` - A slice of bytes representing the data to be locked in memory.
+pub fn lock_memory(data: &[u8]) {
+    #[cfg(unix)]
+    unsafe {
+        libc::mlock(data.as_ptr() as *const c_void, data.len());
+    }
 
-    ctx.decrypt(encrypted_data, &mut decrypted_data)?;
-
-    Ok(decrypted_data)
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Memory::VirtualLock;
+        VirtualLock(data.as_ptr() as *const c_void, data.len());
+    }
 }
-
-/// Prompts the user for a password and encrypts it for a specific recipient.
-///
-/// # Arguments
-/// * `message` - A message to display to the user when prompting for the password.
-/// * `ctx` - A mutable reference to the GPGME context.
-/// * `recipient` - The recipient's identifier (e.g., email or key ID) for whom the password is encrypted.
-///
-/// # Returns
-/// * `Result<Vec<u8>, Error>` - Returns the encrypted password as a vector of bytes on success, or an error on failure.
-///
-/// # Errors
-/// * If reading the password fails, or if encryption fails, an error is returned.
-pub fn securely_retrieve_password(
-    message: &str,
-    ctx: &mut Context,
-    recipient: &str,
-) -> Result<Vec<u8>, Error> {
-    println!("{}", message);
-
-    let password = read_password()
-        .map_err(|e| anyhow::anyhow!("Failed to read password from user input. Error: {}", e))?;
-
-    let encrypted_password =
-        encrypt_variable(ctx, &mut password.into_bytes(), recipient).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to encrypt the password for recipient `{}`. Error: {}",
-                recipient,
-                e
-            )
-        })?;
-
-    Ok(encrypted_password)
-}
-
-#[cfg(test)]
-#[path = "tests/crypto_tests.rs"]
-mod crypto_tests;

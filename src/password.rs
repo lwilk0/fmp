@@ -1,4 +1,4 @@
-//!// This file provides password generation and entropy calculation.
+//! This file provides password generation and entropy calculation.
 
 /*
 Copyright (C) 2025  Luke Wilkinson
@@ -17,15 +17,31 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
+/*
+use rand::{Rng, rng};
 
-use rand::random;
 
+/// Generates a random password of a specified length using ASCII characters.
+///
+/// # Arguments
+/// * `length` - The desired length of the password.
+///
+/// # Returns
+/// * `String` - Returns a randomly generated password as a string.
 pub fn generate_password(length: usize) -> String {
     (0..length)
-        .map(|_| (0x20u8 + (random::<f32>() * 96.0) as u8) as char)
+        .map(|_| (rng().random_range(33..128) as u8) as char)
         .collect()
 }
+*/
 
+/// Calculates the entropy of a given password based on its length and character pool.
+///
+/// # Arguments
+/// * `password` - The password for which to calculate entropy.
+///
+/// # Returns
+/// * `(f64, &str)` - Returns a tuple containing the calculated entropy as a `f64` and a rating as a string slice.
 pub fn calculate_entropy(password: &str) -> (f64, &str) {
     let mut character_pool: u8 = 0;
 
