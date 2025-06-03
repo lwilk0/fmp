@@ -26,7 +26,6 @@ use crate::{
 use anyhow::Error;
 use fs_extra::dir::{CopyOptions, copy};
 use gpgme::{Context, Protocol};
-use log::info;
 use std::fs::{create_dir_all, remove_dir_all, write};
 
 const NULL: &str = "null";

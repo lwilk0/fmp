@@ -1212,27 +1212,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fmp"
-version = "1.4.1"
-dependencies = [
- "anyhow",
- "dirs",
- "eframe",
- "egui",
- "env_logger",
- "fs_extra",
- "gpgme",
- "libc",
- "log",
- "rand 0.9.1",
- "secrecy",
- "tempfile",
- "tokio",
- "windows 0.61.1",
- "zeroize",
-]
-
-[[package]]
 name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1264,6 +1243,27 @@ name = "foreign-types-shared"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
+
+[[package]]
+name = "forgot-my-password"
+version = "1.4.1"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "eframe",
+ "egui",
+ "env_logger",
+ "fs_extra",
+ "gpgme",
+ "libc",
+ "log",
+ "rand 0.9.1",
+ "secrecy",
+ "tempfile",
+ "tokio",
+ "windows 0.61.1",
+ "zeroize",
+]
 
 [[package]]
 name = "form_urlencoded"
