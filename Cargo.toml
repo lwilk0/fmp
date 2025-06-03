@@ -3,7 +3,7 @@ name = "fmp"
 description = "A simple command-line password manager written in Rust."
 repository = "https://github.com/lwilk0/Forgot-My-Password.git"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
-version = "1.4.0"
+version = "1.4.1"
 edition = "2024"
 license = "GPL-3.0"
 keywords = ["password-manager", "cli", "crypto", "cryptography", "rust"]
@@ -21,5 +21,6 @@ log = "0.4.27"
 rand = "0.9.1"
 secrecy = "0.10.3"
 tempfile = "3.20.0"
+tokio = { version = "1.45.1", features = ["full"] }
 windows = { version = "0.61.1", optional = true }
 zeroize = "1.8.1"

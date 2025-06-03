@@ -64,11 +64,6 @@ pub fn create_new_vault(app: &mut FmpApp) -> Result<(), Error> {
 
     write(locations.recipient_location, &app.recipient).map_err(|e| anyhow::anyhow!("{}", e))?;
 
-    info!(
-        // TODO: make popup
-        "NOTE: By default, GPG caches your passphrase for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Password/blob/main/GPGCACHE.md`.)"
-    );
-
     Ok(())
 }
 

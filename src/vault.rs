@@ -119,7 +119,7 @@ impl Locations {
     pub fn does_vault_exist(&self) -> Result<(), Error> {
         if !self.vault_location.exists() {
             return Err(anyhow::anyhow!(
-                "Vault `{:?}` does not exist. Check for typos or run `fmp -c` to create it.",
+                "Vault `{:?}` does not exist. Check for typos or create it.",
                 self.vault_location
             ));
         }
@@ -137,7 +137,7 @@ impl Locations {
     pub fn does_account_exist(&self) -> Result<(), Error> {
         if !self.account_location.exists() {
             return Err(anyhow::anyhow!(
-                "Account `{:?}` does not exist. Check for typos or run `fmp -a` to create it.",
+                "Account `{:?}` does not exist. Check for typos or create it.",
                 self.account_location
             ));
         }

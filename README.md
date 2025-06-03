@@ -4,7 +4,7 @@
 [![Build Status](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml)
 [![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://github.com/lwilk0/Forgot-My-Password/blob/main/LICENSE)
 
-A command-line password manager written in Rust.
+A simple password manager written in Rust.
 
 Forgot My Password (FMP) is a secure password manager that allows you to create, store, and manage your passwords in encrypted vaults. It uses GPG to ensure that your sensitive data is protected.
 
@@ -38,12 +38,6 @@ Forgot My Password (FMP) is a secure password manager that allows you to create,
    ```bash
    cargo build --release
    cargo install --path .
-   ```
-
-4. **Test if FMP is Installed**:
-   Run the following command to create a vault:
-   ```bash
-   fmp -c
    ```
 
 ## Usage

@@ -18,15 +18,14 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use eframe::egui;
-use secrecy::ExposeSecret;
-use zeroize::Zeroize;
-
 use crate::{
     content::*,
-    crypto::lock_memory,
-    vault::{Locations, UserPass, get_account_details, read_directory}, // Ensure get_account_details accepts vault_name and account_name as parameters
+    vault::{Locations, UserPass, get_account_details, read_directory},
 };
+use eframe::egui;
+use log::error;
+use secrecy::SecretBox;
+use zeroize::Zeroize;
 
 /// Runs the Forgot-My-Password GUI application.
 ///
@@ -60,6 +59,7 @@ pub struct FmpApp {
     pub change_account_info: bool,
     pub change_vault_name: bool,
     pub quit: bool,
+    pub show_password: bool,
 }
 
 /// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
@@ -83,56 +83,57 @@ impl FmpApp {
             }
         }
     }
+
+    pub fn clear_account_data(&mut self) {
+        self.userpass.username.clear();
+        self.userpass.password = SecretBox::new(Box::new(vec![]));
+    }
 }
 
 /// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.quit {
-            self.userpass.password.zeroize();
-            std::process::exit(1);
-        }
-
         if self.vault_names.is_empty() {
             self.fetch_vault_names();
         }
 
-        if !self.vault_name.is_empty() {
+        if !self.vault_name.is_empty() && self.account_names.is_empty() {
             self.fetch_account_names();
         }
 
-        egui::SidePanel::left("vault_sidebar").show(ctx, |ui| {
-            ui.heading("Vaults");
-            for vault in &self.vault_names {
-                if ui.button(vault).clicked() {
-                    self.vault_name = vault.clone();
-                    self.output = format!("Selected vault: {}", vault);
-                }
-            }
-        });
-
-        egui::SidePanel::left("account_sidebar").show(ctx, |ui| {
-            ui.heading("Accounts");
-            if self.vault_name.is_empty() {
-                ui.label("Select a vault.");
-            } else {
-                for account in &self.account_names {
-                    if ui.button(account).clicked() {
-                        self.account_name = account.clone();
-
-                        self.userpass =
-                            match get_account_details(&self.vault_name, &self.account_name) {
-                                Ok(userpass) => userpass,
-                                Err(e) => {
-                                    self.output = format!("Error fetching account details: {}", e);
-                                    return;
-                                }
-                            };
-
-                        lock_memory(self.userpass.password.expose_secret());
+        egui::SidePanel::left("sidebar").show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Vaults section
+                ui.heading("Vaults");
+                for vault in &self.vault_names {
+                    if ui.button(vault).clicked() {
+                        self.vault_name = vault.clone();
                     }
                 }
-            }
+
+                ui.separator(); // Visual separation between sections
+
+                // Accounts section
+                ui.heading("Accounts");
+                if self.vault_name.is_empty() {
+                    ui.label("Select a vault.");
+                } else {
+                    for account in &self.account_names {
+                        if ui.button(account).clicked() {
+                            self.account_name = account.clone();
+
+                            self.userpass =
+                                match get_account_details(&self.vault_name, &self.account_name) {
+                                    Ok(userpass) => userpass,
+                                    Err(e) => {
+                                        error!("Failed to fetch account details. Error: {}", e);
+                                        return;
+                                    }
+                                };
+                        }
+                    }
+                }
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -150,5 +151,24 @@ impl eframe::App for FmpApp {
                 account_selected(self, ui);
             }
         });
+
+        if self.quit {
+            egui::Window::new("Confirm Exit")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.label("Are you sure you want to quit?");
+                    ui.horizontal(|ui| {
+                        if ui.button("Yes").clicked() {
+                            self.userpass.password.zeroize();
+                            std::process::exit(0);
+                        }
+                        if ui.button("No").clicked() {
+                            self.quit = false;
+                        }
+                    });
+                });
+        }
     }
 }
