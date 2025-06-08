@@ -55,6 +55,7 @@ pub struct FmpApp {
     pub recipient: String,
     pub vault_name_create: String,
     pub account_name_create: String,
+    pub password_length: u8,
 
     pub change_account_info: bool,
     pub change_vault_name: bool,
@@ -108,6 +109,7 @@ impl eframe::App for FmpApp {
                 for vault in &self.vault_names {
                     if ui.button(vault).clicked() {
                         self.vault_name = vault.clone();
+                        self.account_names.clear();
                     }
                 }
 

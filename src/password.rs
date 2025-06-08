@@ -17,10 +17,9 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
-/*
+use crate::gui::FmpApp;
 use rand::{Rng, rng};
-
-
+use secrecy::SecretBox;
 /// Generates a random password of a specified length using ASCII characters.
 ///
 /// # Arguments
@@ -28,12 +27,13 @@ use rand::{Rng, rng};
 ///
 /// # Returns
 /// * `String` - Returns a randomly generated password as a string.
-pub fn generate_password(length: usize) -> String {
-    (0..length)
-        .map(|_| (rng().random_range(33..128) as u8) as char)
-        .collect()
+pub fn generate_password(app: &mut FmpApp) {
+    app.userpass.password = SecretBox::new(Box::new(
+        (0..app.password_length)
+            .map(|_| (rng().random_range(33..128) as u8))
+            .collect(),
+    ));
 }
-*/
 
 /// Calculates the entropy of a given password based on its length and character pool.
 ///
@@ -70,6 +70,8 @@ pub fn calculate_entropy(password: &str) -> (f64, &str) {
         rating = "Very Weak"
     } else if entropy <= 59.0 {
         rating = "Weak"
+    } else if entropy <= 89.0 {
+        rating = "Okay"
     } else if entropy <= 119.0 {
         rating = "Strong"
     } else {
@@ -77,6 +79,35 @@ pub fn calculate_entropy(password: &str) -> (f64, &str) {
     }
 
     (entropy, rating)
+}
+
+/// Draws a password strength meter in the UI.
+///
+/// # Arguments
+/// * `ui` - The egui UI context.
+/// * `password` - The password string to evaluate.
+pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
+    let (entropy, rating) = calculate_entropy(password);
+
+    let length = (entropy / 150.0).clamp(0.0, 1.0) as f32;
+
+    let (color, progress) = match rating {
+        "Very Weak" => (egui::Color32::from_rgb(200, 0, 0), length),
+        "Weak" => (egui::Color32::from_rgb(255, 140, 0), length),
+        "Okay" => (egui::Color32::from_rgb(255, 215, 0), length),
+        "Strong" => (egui::Color32::from_rgb(0, 180, 0), length),
+        "Very Strong" => (egui::Color32::from_rgb(0, 220, 0), length),
+        _ => (egui::Color32::GRAY, 0.0),
+    };
+
+    ui.horizontal(|ui| {
+        ui.add(
+            egui::ProgressBar::new(progress)
+                .desired_width(120.0)
+                .fill(color),
+        );
+        ui.label(format!("{:.2} bits ({})", entropy, rating));
+    });
 }
 
 #[cfg(test)]

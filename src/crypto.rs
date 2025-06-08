@@ -18,7 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use crate::{gui::FmpApp, password::calculate_entropy};
+use crate::{gui::FmpApp, password::password_strength_meter};
 use libc::c_void;
 use secrecy::{ExposeSecret, SecretBox};
 
@@ -38,10 +38,8 @@ pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &st
 
         ui.text_edit_singleline(&mut password);
 
-        let (entropy, rating) = calculate_entropy(password.as_str());
-
         if !password.is_empty() {
-            ui.label(format!("Entropy: {:.2} bits, Rating: {}", entropy, rating)); // TODO: Cache
+            password_strength_meter(ui, password.as_str());
         }
 
         app.userpass.password = SecretBox::new(Box::new(password.as_bytes().to_vec()));

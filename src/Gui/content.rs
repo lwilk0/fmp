@@ -26,7 +26,7 @@ use crate::{
         delete_account_from_vault, delete_vault, install_backup, rename_vault,
     },
     gui::FmpApp,
-    password::calculate_entropy,
+    password::{generate_password, password_strength_meter},
 };
 
 /// Displays the content for the main window of the application when nothing is selected.
@@ -94,6 +94,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     labeled_text_input(ui, "Account Name:", &mut app.account_name_create, None);
     labeled_text_input(ui, "Username:", &mut app.userpass.username, None);
     securely_retrieve_password(app, ui, "Account Password:");
+    generate_password_slider(app, ui);
 
     if ui.button("Add Account").clicked() {
         if app.account_name_create.is_empty() {
@@ -191,13 +192,12 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         if app.show_password {
             let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
-            let (entropy, rating) = calculate_entropy(&password);
 
             ui.label(format!("Password: {}", password));
 
             app.show_password = show_password_button(app.show_password, ui, "Hide");
 
-            ui.label(format!("Entropy: {:.2} bits, Rating: {}", entropy, rating)); // TODO: cache
+            password_strength_meter(ui, &password); // TODO: cache
         } else {
             ui.label("Password:");
             app.show_password = show_password_button(app.show_password, ui, "Show");
@@ -255,6 +255,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
     labeled_text_input(ui, "Account Name:", &mut app.account_name_create, None);
     labeled_text_input(ui, "Username:", &mut app.userpass.username, None);
     securely_retrieve_password(app, ui, "New Password:");
+    generate_password_slider(app, ui);
 
     if ui.button("Change Information").clicked() {
         if app.account_name_create.is_empty() {
@@ -413,4 +414,13 @@ fn show_password_button(state: bool, ui: &mut egui::Ui, label: &str) -> bool {
         return !state;
     }
     state
+}
+
+fn generate_password_slider(app: &mut FmpApp, ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        if ui.button("Generate Password").clicked() {
+            generate_password(app);
+        }
+        ui.add(egui::Slider::new(&mut app.password_length, 8..=128).text("chars"));
+    });
 }
