@@ -61,6 +61,7 @@ pub struct FmpApp {
     pub change_vault_name: bool,
     pub quit: bool,
     pub show_password: bool,
+    pub show_welcome: String,
 }
 
 /// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
@@ -89,11 +90,28 @@ impl FmpApp {
         self.userpass.username.clear();
         self.userpass.password = SecretBox::new(Box::new(vec![]));
     }
+
+    pub fn check_first_run(&mut self) {
+        let config_path = dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("fmp_ran");
+
+        if config_path.exists() {
+            self.show_welcome = String::from("false");
+        } else {
+            let _ = std::fs::write(&config_path, "shown");
+            self.show_welcome = String::from("true");
+        }
+    }
 }
 
 /// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.show_welcome.is_empty() {
+            self.check_first_run();
+        }
+
         if self.vault_names.is_empty() {
             self.fetch_vault_names();
         }
@@ -104,7 +122,6 @@ impl eframe::App for FmpApp {
 
         egui::SidePanel::left("sidebar").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                // Vaults section
                 ui.heading("Vaults");
                 for vault in &self.vault_names {
                     if ui.button(vault).clicked() {
@@ -113,9 +130,8 @@ impl eframe::App for FmpApp {
                     }
                 }
 
-                ui.separator(); // Visual separation between sections
+                ui.separator();
 
-                // Accounts section
                 ui.heading("Accounts");
                 if self.vault_name.is_empty() {
                     ui.label("Select a vault.");
@@ -170,6 +186,20 @@ impl eframe::App for FmpApp {
                             self.quit = false;
                         }
                     });
+                });
+        }
+
+        if self.show_welcome == "true" {
+            egui::Window::new("Welcome to Forgot-My-Password!")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.heading("Welcome!");
+                    ui.label("Thank you for installing Forgot-My-Password.\n\nThis is a secure password manager. Get started by creating your first vault and adding an account to it.");
+                    if ui.button("Get Started").clicked() {
+                        self.show_welcome = String::from("false");
+                    }
                 });
         }
     }

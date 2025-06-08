@@ -1,4 +1,4 @@
-//! This file provides password generation and entropy calculation.
+//! This module provides password generation and rating.
 
 /*
 Copyright (C) 2025  Luke Wilkinson
