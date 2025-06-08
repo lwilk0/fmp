@@ -40,50 +40,6 @@ Forgot My Password (FMP) is a secure password manager that allows you to create,
    cargo install --path .
    ```
 
-## Usage
-
-### Common Commands
-
-- **Create a New Vault**:
-  ```bash
-  fmp -c
-  ```
-
-- **Add an Account**:
-  ```bash
-  fmp -a
-  ```
-
-- **Generate a Password**:
-  ```bash
-  fmp -g
-  ```
-
-- **Calculate Password Entropy**:
-  ```bash
-  fmp -e
-  ```
-
-- **Backup a Vault**:
-  ```bash
-  fmp -b
-  ```
-
-- **Restore a Backup**:
-  ```bash
-  fmp -i
-  ```
-
-- **Delete a Vault**:
-  ```bash
-  fmp -D
-  ```
-
-For a full list of commands, run:
-```bash
-fmp --help
-```
-
 ## Testing
 
 Run all tests:
