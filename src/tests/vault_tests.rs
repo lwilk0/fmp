@@ -17,8 +17,7 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::vault::*;
-use std::fs::write;
-use std::fs::{create_dir, remove_dir};
+use std::fs::{create_dir, remove_dir, write};
 use tempfile::tempdir;
 
 const VAULT_NAME: &str = "test_vault";
@@ -513,4 +512,210 @@ fn test_rename_directory_nonexistent() {
     // Test renaming a nonexistent directory
     let result = rename_directory(&old_path, &new_path);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_vault_creation_and_existence_check() {
+    let temp_dir = tempdir().unwrap();
+    let vault_path = temp_dir.path().join(VAULT_NAME);
+    let vault_name = vault_path.to_str().unwrap();
+    let locations = Locations::new(vault_name, "null").unwrap();
+
+    assert!(locations.initialize_vault().is_ok());
+    assert!(Locations::does_vault_exist(&locations).is_ok());
+
+    let nonexist_path = temp_dir.path().join("nonexistent_vault");
+    let nonexist_name = nonexist_path.to_str().unwrap();
+    let nonexist_locations = Locations::new(nonexist_name, "null").unwrap();
+
+    assert!(Locations::does_vault_exist(&nonexist_locations).is_err());
+}
+
+#[test]
+fn test_decrypt_with_corrupted_data_fails() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let account_name = ACCOUNT_NAME;
+    let mut store = Store::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name).unwrap();
+
+    locations.initialize_vault().unwrap();
+    locations.create_account_directory().unwrap();
+
+    let recipient = get_valid_recipient();
+
+    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.data_location, b"not a valid gpg file").unwrap();
+
+    let result = store.decrypt_from_file();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_rename_directory_success_and_failure() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let account_name = ACCOUNT_NAME;
+    let locations = Locations::new(&vault_name, account_name).unwrap();
+
+    locations.initialize_vault().unwrap();
+    locations.create_account_directory().unwrap();
+
+    let old_path = locations.account_location.clone();
+    let new_path = old_path.parent().unwrap().join("renamed_account");
+
+    assert!(rename_directory(&old_path, &new_path).is_ok());
+    assert!(new_path.exists());
+    assert!(!old_path.exists());
+
+    let fake_path = old_path.parent().unwrap().join("does_not_exist");
+    let another_new_path = old_path.parent().unwrap().join("should_not_exist");
+
+    assert!(rename_directory(&fake_path, &another_new_path).is_err());
+}
+
+#[test]
+fn test_read_directory_with_no_subdirs() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let locations = Locations::new(&vault_name, "null").unwrap();
+    locations.initialize_vault().unwrap();
+
+    let subdirs = read_directory(&locations.vault_location).unwrap();
+    assert!(subdirs.is_empty());
+}
+
+#[test]
+fn test_read_directory_with_multiple_subdirs() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let locations = Locations::new(&vault_name, "null").unwrap();
+
+    locations.initialize_vault().unwrap();
+
+    let sub1 = locations.vault_location.join("acc1");
+    let sub2 = locations.vault_location.join("acc2");
+
+    create_dir(&sub1).unwrap();
+    create_dir(&sub2).unwrap();
+
+    let mut subdirs = read_directory(&locations.vault_location).unwrap();
+    subdirs.sort();
+
+    let mut expected = vec!["acc1".to_string(), "acc2".to_string()];
+    expected.sort();
+
+    assert_eq!(subdirs, expected);
+}
+
+#[test]
+fn test_read_directory_with_non_utf8_names() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let locations = Locations::new(&vault_name, "null").unwrap();
+    locations.initialize_vault().unwrap();
+
+    // Create a directory with invalid UTF-8 (on Unix)
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let non_utf8 = locations
+            .vault_location
+            .join(std::ffi::OsStr::from_bytes(b"acc_\xFF"));
+        create_dir(&non_utf8).unwrap();
+        let result = read_directory(&locations.vault_location);
+        assert!(result.is_err());
+    }
+    #[cfg(not(unix))]
+    {
+        // On Windows, skip this test as non-UTF8 names are not supported
+        assert!(true);
+    }
+}
+
+#[test]
+fn test_multiple_accounts_isolation() {
+    let temp_dir = tempdir().unwrap();
+    let vault_name = temp_dir
+        .path()
+        .join(VAULT_NAME)
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let account1 = "account1";
+    let account2 = "account2";
+
+    let mut store1 = Store::new(&vault_name, account1).unwrap();
+    let mut store2 = Store::new(&vault_name, account2).unwrap();
+
+    let locations1 = Locations::new(&vault_name, account1).unwrap();
+    let locations2 = Locations::new(&vault_name, account2).unwrap();
+
+    locations1.initialize_vault().unwrap();
+    locations1.create_account_directory().unwrap();
+    locations2.create_account_directory().unwrap();
+
+    let recipient = get_valid_recipient();
+
+    write(&locations1.recipient_location, &recipient).unwrap();
+    write(&locations2.recipient_location, &recipient).unwrap();
+
+    let userpass1 = UserPass {
+        username: "user1".to_string(),
+        password: SecretBox::new(Box::new(b"pass1".to_vec())),
+    };
+
+    let userpass2 = UserPass {
+        username: "user2".to_string(),
+        password: SecretBox::new(Box::new(b"pass2".to_vec())),
+    };
+
+    store1.encrypt_to_file(&userpass1).unwrap();
+    store2.encrypt_to_file(&userpass2).unwrap();
+
+    let dec1 = store1.decrypt_from_file().unwrap();
+    let dec2 = store2.decrypt_from_file().unwrap();
+
+    assert_eq!(dec1.username, "user1");
+    assert_eq!(*dec1.password.expose_secret(), b"pass1".to_vec());
+    assert_eq!(dec2.username, "user2");
+    assert_eq!(*dec2.password.expose_secret(), b"pass2".to_vec());
+}
+
+#[test]
+fn test_invalid_utf8_in_username_password() {
+    let invalid_utf8 = vec![0xff, 0xfe, 0xfd];
+    let username = String::from_utf8(invalid_utf8.clone());
+    assert!(username.is_err());
 }

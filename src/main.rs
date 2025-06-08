@@ -26,9 +26,9 @@ mod flags;
 mod password;
 mod vault;
 
-#[path = "Gui/content.rs"]
+#[path = "gui/content.rs"]
 mod content;
-#[path = "Gui/gui.rs"]
+#[path = "gui/gui.rs"]
 mod gui;
 
 use crate::gui::run_gui;

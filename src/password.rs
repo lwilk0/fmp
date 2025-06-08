@@ -20,6 +20,7 @@ Copyright (C) 2025  Luke Wilkinson
 use crate::gui::FmpApp;
 use rand::{Rng, rng};
 use secrecy::SecretBox;
+
 /// Generates a random password of a specified length using ASCII characters.
 ///
 /// # Arguments
