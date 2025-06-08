@@ -66,6 +66,7 @@ pub struct FmpApp {
 
 /// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
 impl FmpApp {
+    /// Find all the vault names.
     pub fn fetch_vault_names(&mut self) {
         if let Ok(locations) = Locations::new("", "") {
             if let Ok(names) = read_directory(&locations.fmp_location.join("vaults")) {
@@ -76,6 +77,7 @@ impl FmpApp {
         }
     }
 
+    /// Find all the account names in a vault.
     pub fn fetch_account_names(&mut self) {
         if let Ok(locations) = Locations::new(&self.vault_name, "") {
             if let Ok(names) = read_directory(&locations.vault_location) {
@@ -86,11 +88,13 @@ impl FmpApp {
         }
     }
 
+    /// Clear the data in userpass
     pub fn clear_account_data(&mut self) {
         self.userpass.username.clear();
         self.userpass.password = SecretBox::new(Box::new(vec![]));
     }
 
+    /// Check if this is FMPs first run.
     pub fn check_first_run(&mut self) {
         let config_path = dirs::config_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."))

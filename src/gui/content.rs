@@ -218,9 +218,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 );
 
                 app.account_name.clear();
-
                 app.clear_account_data();
-
                 app.fetch_account_names();
             }
 
@@ -327,13 +325,9 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
         match rename_vault(app) {
             Ok(_) => {
                 app.output = format!("Vault renamed to `{}`.", app.vault_name_create);
-
                 app.vault_name = app.vault_name_create.clone();
-
                 app.vault_name_create.clear();
-
                 app.fetch_vault_names();
-
                 app.change_vault_name = false;
             }
             Err(e) => {

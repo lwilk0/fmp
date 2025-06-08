@@ -21,6 +21,7 @@ Copyright (C) 2025  Luke Wilkinson
 use crate::{gui::FmpApp, password::password_strength_meter};
 use libc::c_void;
 use secrecy::{ExposeSecret, SecretBox};
+use zeroize::Zeroize;
 
 /// Securely retrieves a password from the user interface.
 ///
@@ -29,20 +30,28 @@ use secrecy::{ExposeSecret, SecretBox};
 /// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the UI.
 /// * `text` - A string slice containing the label text to display alongside the password input field.
 pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &str) {
+    let mut password =
+        String::from_utf8(app.userpass.password.expose_secret().clone()).unwrap_or_default();
+
     ui.horizontal(|ui| {
         ui.label(text);
-        let mut password = // FIXME: Securely handle password input
-            String::from_utf8_lossy(app.userpass.password.expose_secret()).to_string();
-
-        lock_memory(password.as_bytes());
-
-        ui.text_edit_singleline(&mut password);
+        let response = ui.add(
+            egui::TextEdit::singleline(&mut password)
+                .password(true)
+                .desired_width(200.0),
+        );
 
         if !password.is_empty() {
-            password_strength_meter(ui, password.as_str());
+            password_strength_meter(ui, &password);
         }
 
-        app.userpass.password = SecretBox::new(Box::new(password.as_bytes().to_vec()));
+        if response.changed() {
+            let mut pw_bytes = password.as_bytes().to_vec();
+            app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
+            pw_bytes.zeroize();
+        }
+
+        password.zeroize();
     });
 }
 
