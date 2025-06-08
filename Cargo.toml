@@ -1,5 +1,5 @@
 [package]
-name = "forgot-my-password"
+name = "fmp"
 description = "A simple command-line password manager written in Rust."
 repository = "https://github.com/lwilk0/Forgot-My-Password.git"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
