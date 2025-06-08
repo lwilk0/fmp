@@ -4,18 +4,29 @@
 [![Build Status](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml)
 [![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://github.com/lwilk0/Forgot-My-Password/blob/main/LICENSE)
 
-A simple password manager written in Rust.
+A password manager written in memory-safe Rust.
 
-Forgot My Password (FMP) is a secure password manager that allows you to create, store, and manage your passwords in encrypted vaults. It uses GPG to ensure that your sensitive data is protected.
+Forgot My Password (FMP) is a password manager that safely allows you to generate, store, and manage your passwords in encrypted vaults. It uses GPG to protect your sensitive data.
 
 ## Features
+- **GUI:** Intuitive and fast GUI
+- **Create Vaults:** Create encrypted vaults to store your passwords.
+- **Modify Accounts:** Add, delete, and rename accounts within a vault.
+- **Passwords:** Generate strong passwords and estimate their entropy.
+- **Backups:** Backup and restore vaults securely.
+- **Modify Account Info:** Update account usernames and passwords.
+- **Cross-platform compatibility:** FMP is available on Unix and Windows
 
-- Create encrypted vaults to store your passwords.
-- Add, delete, and rename accounts within a vault.
-- Generate strong passwords and calculate their entropy.
-- Backup and restore vaults securely.
-- Change account usernames and passwords.
-- Cross-platform support with secure memory handling.
+## Security
+- **Encryption With GPG:** All data is encrypted using GPG. Only users with the correct GPG key can decrypt the vault contents.
+- **No Plaintext Passwords on Disk:** All sensitive information is encrypted before being saved.
+- **Sensitive Variables Cannot Be Written to Disk:** Sensitive variables are not written to disk in any form except encrypted.
+- **Sensitive Variables Are Obfuscated in Memory:** The program uses secure memory handling (Rust’s secrecy crate, memory locking) to prevent secrets from being easily read from RAM.
+- **Sensitive Variables Are Cleared from Memory:** The program zeroizes (overwrites) memory holding secrets when they are no longer needed.
+- **Memory Locking:** System calls (like mlock) prevent sensitive memory from being swapped to disk.
+- **File Permitions:** Strict file permissions are placed on sensitive files.
+- **Recipient Verification:** Encryption is tied to a specific GPG recipient.
+- **Cross-Platform Secure Handling:** Secure memory and file handling are implemented for both Unix and Windows.
 
 ## Installation
 
@@ -58,22 +69,22 @@ cargo test --test crypto_tests
 ## Troubleshooting
 
 **Problem**: `fmp` command not found after installation.  
-**Solution**: Ensure `~/.cargo/bin` is added to your PATH:
+**Solution**: Make sure `~/.cargo/bin` is added to your PATH:
 ```bash
 export PATH=$PATH:~/.cargo/bin/
 ```
 
-**Problem**: GPG key not found.  
-**Solution**: Ensure the recipient email matches a key in your GPG keyring. Use:
+**Problem**: GPG key not found in your keyring.  
+**Solution**: Make sure the recipient email matches a key in your GPG keyring. Use:
 ```bash
 gpg --list-keys
 ```
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are welcome! Please follow these steps to contribute:
 1. Fork this repository.
-2. Create a new branch for your feature or bugfix.
+2. Create a new branch for your feature or bug-fix.
 3. Submit a pull request with a detailed description of your changes.
 
 Please ensure you run `cargo test` before submitting a pull request, as the workflow cannot do this for you, as testing requires user interaction.
