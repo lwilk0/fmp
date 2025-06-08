@@ -249,7 +249,7 @@ impl Store {
         Ok(())
     }
 
-    /// Decrypts data from the data.gpg file in the vault and returns a `UserPass` struct.
+    /// Decrypts data from data.gpg file in the vault and returns a `UserPass` struct.
     ///
     /// # Returns
     /// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the decrypted username and password on success, or an error on failure.
