@@ -22,6 +22,7 @@ use tempfile::tempdir;
 
 const VAULT_NAME: &str = "test_vault";
 const ACCOUNT_NAME: &str = "test_account";
+const NULL: &str = "null";
 
 fn get_valid_recipient() -> String {
     read_to_string("src/tests/recipient.txt")
@@ -40,7 +41,7 @@ fn test_initialize_vault() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
 
     let result = locations.initialize_vault();
 
@@ -77,7 +78,7 @@ fn test_does_vault_exist_success() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
     locations.initialize_vault().unwrap();
 
     let result = Locations::does_vault_exist(&locations);
@@ -95,7 +96,7 @@ fn test_does_vault_exist_failure() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
 
     let result = Locations::does_vault_exist(&locations);
 
@@ -112,7 +113,7 @@ fn test_find_account_names() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
     locations.initialize_vault().unwrap();
 
     let account1 = Locations::new(&vault_name, "account1").unwrap();
@@ -247,7 +248,7 @@ fn test_large_number_of_accounts() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
 
     locations.initialize_vault().unwrap();
 
@@ -519,14 +520,14 @@ fn test_vault_creation_and_existence_check() {
     let temp_dir = tempdir().unwrap();
     let vault_path = temp_dir.path().join(VAULT_NAME);
     let vault_name = vault_path.to_str().unwrap();
-    let locations = Locations::new(vault_name, "null").unwrap();
+    let locations = Locations::new(vault_name, NULL).unwrap();
 
     assert!(locations.initialize_vault().is_ok());
     assert!(Locations::does_vault_exist(&locations).is_ok());
 
     let nonexist_path = temp_dir.path().join("nonexistent_vault");
     let nonexist_name = nonexist_path.to_str().unwrap();
-    let nonexist_locations = Locations::new(nonexist_name, "null").unwrap();
+    let nonexist_locations = Locations::new(nonexist_name, NULL).unwrap();
 
     assert!(Locations::does_vault_exist(&nonexist_locations).is_err());
 }
@@ -596,7 +597,7 @@ fn test_read_directory_with_no_subdirs() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
     locations.initialize_vault().unwrap();
 
     let subdirs = read_directory(&locations.vault_location).unwrap();
@@ -613,7 +614,7 @@ fn test_read_directory_with_multiple_subdirs() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
 
     locations.initialize_vault().unwrap();
 
@@ -642,7 +643,7 @@ fn test_read_directory_with_non_utf8_names() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, "null").unwrap();
+    let locations = Locations::new(&vault_name, NULL).unwrap();
     locations.initialize_vault().unwrap();
 
     // Create a directory with invalid UTF-8 (on Unix)

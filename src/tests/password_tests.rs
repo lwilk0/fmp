@@ -18,14 +18,6 @@ Copyright (C) 2025  Luke Wilkinson
 
 use crate::password::*;
 
-/*#[test]
-fn test_generate_password_length() {
-    let length = 12;
-    let password = generate_password(length);
-
-    assert_eq!(password.len(), length);
-}*/
-
 #[test]
 fn test_calculate_entropy() {
     let password = String::from("P@ssw0rd123");
@@ -69,4 +61,42 @@ fn test_calculate_entropy_only_punctuation() {
 
     assert!(entropy > 0.0);
     assert_eq!(rating, "Weak");
+}
+
+#[test]
+fn test_calculate_entropy_empty_password() {
+    let password = "";
+    let (entropy, rating) = calculate_entropy(password);
+
+    assert!(entropy.is_nan());
+    assert_eq!(rating, "Very Weak");
+}
+
+#[test]
+fn test_calculate_entropy_all_ascii_types() {
+    let password = "aA1!";
+    let (entropy, rating) = calculate_entropy(password);
+
+    let expected_entropy = 4.0 * (94f64).log2();
+
+    assert!((entropy - expected_entropy).abs() < 0.01);
+    assert_eq!(rating, "Very Weak");
+}
+
+#[test]
+fn test_calculate_entropy_long_strong_password() {
+    let password = "aA1!aA1!aA1!aA1!aA1!aA1!aA1!aA1!";
+    let (entropy, rating) = calculate_entropy(password);
+
+    assert!(entropy > 100.0);
+    assert_eq!(rating, "Very Strong");
+}
+
+#[test]
+fn test_calculate_entropy_unicode_ignored() {
+    let password = "密码";
+    let (entropy, rating) = calculate_entropy(password);
+
+    assert!(entropy.is_infinite());
+    assert_eq!(rating, "Very Weak");
 }

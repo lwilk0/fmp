@@ -67,7 +67,7 @@ pub fn calculate_entropy(password: &str) -> (f64, &str) {
     let entropy = password.len() as f64 * (character_pool as f64).log2();
     let rating: &str;
 
-    if entropy <= 35.0 {
+    if entropy <= 35.0 || entropy.is_nan() {
         rating = "Very Weak"
     } else if entropy <= 59.0 {
         rating = "Weak"
