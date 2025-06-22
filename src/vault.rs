@@ -362,7 +362,7 @@ pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
 pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserPass, Error> {
     let mut store = Store::new(vault_name, account_name)?;
 
-    let userpass = Store::decrypt_from_file(&mut store)?;
+    let userpass = store.decrypt_from_file()?;
 
     lock_memory(userpass.password.expose_secret());
 
