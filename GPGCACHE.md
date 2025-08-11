@@ -1,12 +1,12 @@
-# Managing GPG Passphrase Caching
+# Managing GPG Password Caching
 
-GPG (GNU Privacy Guard) caches your passphrase for a certain period by default. This caching behavior can be configured to suit your security needs. This document explains how to manage GPG passphrase caching.
+GPG (GNU Privacy Guard) caches your password for a certain period by default. This caching behavior can be configured to suit your security needs. This file explains how to manage GPG password caching.
 
 ---
 
 ## Default Behavior
 
-By default, GPG caches your passphrase for 10 minutes. This means you won't need to re-enter your passphrase for subsequent operations within this time frame.
+By default, GPG caches your password for 10 minutes. This means you won't need to re-enter your password for subsequent operations within this time frame.
 
 ---
 
@@ -34,8 +34,8 @@ You can configure the caching behavior by modifying the `gpg-agent` configuratio
    max-cache-ttl 7200
    ```
 
-   - `default-cache-ttl`: The time (in seconds) a passphrase is cached after the last use. In this example, it is set to 10 minutes (600 seconds).
-   - `max-cache-ttl`: The maximum time (in seconds) a passphrase is cached, even if it is used multiple times. In this example, it is set to 2 hours (7200 seconds).
+   - `default-cache-ttl`: The time (in seconds) a password is cached after the last use. In this example, it is set to 10 minutes (600 seconds).
+   - `max-cache-ttl`: The maximum time (in seconds) a password is cached, even if it is used multiple times. In this example, it is set to 2 hours (7200 seconds).
 
 3. **Apply the Changes**:
    Restart the GPG agent to apply the changes:
@@ -49,13 +49,13 @@ You can configure the caching behavior by modifying the `gpg-agent` configuratio
 
 ## Disabling Caching
 
-If you want to disable passphrase caching entirely, set the cache durations to `0`:
+If you want to disable password caching entirely, set the cache durations to `0`:
 ```
 default-cache-ttl 0
 max-cache-ttl 0
 ```
 
-This will require you to enter your passphrase every time a password is decrypted.
+This will require you to enter your password every time a password is decrypted.
 
 ---
 
@@ -72,7 +72,7 @@ gpgconf --list-options gpg-agent
 
 - **Shorter Cache Durations**: Use shorter cache durations for higher security, especially on shared or less secure systems.
 - **Disabling Caching**: Disabling caching entirely is the most secure option but may be inconvenient for frequent use, as you will need to enter your password on every password decrypt.
-- **Secure Your Environment**: Ensure your system is secure to prevent unauthorized access to cached passphrases.
+- **Secure Your Environment**: Ensure your system is secure to prevent unauthorized access to cached passwords.
 
 ---
 

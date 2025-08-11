@@ -18,7 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use crate::{gui::FmpApp, password::password_strength_meter};
+use crate::{content::show_password_button, gui::FmpApp, password::password_strength_meter};
 use libc::c_void;
 use secrecy::{ExposeSecret, SecretBox};
 use zeroize::Zeroize;
@@ -35,11 +35,22 @@ pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &st
 
     ui.horizontal(|ui| {
         ui.label(text);
-        let response = ui.add(
-            egui::TextEdit::singleline(&mut password)
-                .password(true)
-                .desired_width(200.0),
-        );
+
+        let response = if app.show_password {
+            ui.add(egui::TextEdit::singleline(&mut password).desired_width(200.0))
+        } else {
+            ui.add(
+                egui::TextEdit::singleline(&mut password)
+                    .password(true)
+                    .desired_width(200.0),
+            )
+        };
+
+        if app.show_password {
+            app.show_password = show_password_button(app.show_password, ui, "Hide");
+        } else {
+            app.show_password = show_password_button(app.show_password, ui, "Show");
+        }
 
         if !password.is_empty() {
             password_strength_meter(ui, &password);

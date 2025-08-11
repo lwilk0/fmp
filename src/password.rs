@@ -107,7 +107,7 @@ pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
                 .desired_width(120.0)
                 .fill(color),
         );
-        ui.label(format!("{:.2} bits ({})", entropy, rating));
+        ui.label(format!("{entropy:.2} bits ({rating})"));
     });
 }
 

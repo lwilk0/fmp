@@ -3,6 +3,10 @@
 ## Dependencies
 
 ### Arch Linux
+Install [fmp-git](https://aur.archlinux.org/packages/fmp-git) from the AUR
+
+OR
+
 ```
 sudo pacman -S rustup libgpg-error gpgme 
 rustup default stable

@@ -41,7 +41,7 @@ fn main() -> Result<(), Error> {
     match run_gui() {
         Ok(()) => Ok(()),
         Err(e) => {
-            eprintln!("Error running GUI: {}", e);
+            eprintln!("Error running GUI: {e}");
             Err(e)
         }
     }

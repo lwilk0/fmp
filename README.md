@@ -1,8 +1,8 @@
 # FMP (Forgot My Password)
 
-[![Latest Version](https://img.shields.io/crates/v/forgot-my-password.svg?logo=rust)](https://crates.io/crates/forgot-my-password)
-[![Build Status](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/lwilk0/Forgot-My-Password/actions/workflows/rust-ci.yml)
-[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://github.com/lwilk0/Forgot-My-Password/blob/main/LICENSE)
+[![Latest Version](https://img.shields.io/crates/v/fmp.svg?logo=rust)](https://crates.io/crates/fmp)
+[![Build Status](https://github.com/lwilk0/fmp/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/lwilk0/fmp/actions/workflows/rust-ci.yml)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://github.com/lwilk0/fmp/blob/main/LICENSE)
 
 A password manager written in memory-safe Rust.
 
@@ -37,12 +37,12 @@ Forgot My Password (FMP) is a password manager that safely allows you to generat
    - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    - [rust](https://www.rust-lang.org/tools/install)
 
-  See [INSTALLATION.md](https://github.com/lwilk0/Forgot-My-Password/blob/main/INSTALLATION.md) for OS specific installations.
+  See [INSTALLATION.md](https://github.com/lwilk0/fmp/blob/main/INSTALLATION.md) for OS specific installations.
   
 2. **Clone the Repository**:
    ```bash
-   git clone https://github.com/lwilk0/Forgot-My-Password.git
-   cd Forgot-My-Password
+   git clone https://github.com/lwilk0/fmp.git
+   cd fmp
    ```
 
 3. **Build and Install FMP**:

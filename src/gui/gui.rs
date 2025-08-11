@@ -1,23 +1,3 @@
-//! This module contains the GUI implementation for the Forgot-My-Password application.
-
-/*
-Copyright (C) 2025  Luke Wilkinson
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-*/
-
 use crate::{
     content::*,
     vault::{Locations, UserPass, get_account_details, read_directory},
@@ -44,7 +24,6 @@ pub fn run_gui() -> Result<(), eframe::Error> {
 }
 
 /// The main application state for the Forgot-My-Password GUI.
-#[derive(Default)]
 pub struct FmpApp {
     pub vault_name: String,
     pub account_name: String,
@@ -61,7 +40,51 @@ pub struct FmpApp {
     pub change_vault_name: bool,
     pub quit: bool,
     pub show_password: bool,
-    pub show_welcome: String,
+    pub show_welcome: bool,
+
+    pub needs_refresh_vaults: bool,
+    pub needs_refresh_accounts: bool,
+
+    pub initialized: bool,
+
+    pub vault_filter: String,
+    pub account_filter: String,
+    pub vault_sort_asc: bool,
+    pub account_sort_asc: bool,
+    pub sort_case_sensitive: bool,
+}
+
+impl Default for FmpApp {
+    fn default() -> Self {
+        Self {
+            vault_name: String::new(),
+            account_name: String::new(),
+            output: String::new(),
+            vault_names: Vec::new(),
+            account_names: Vec::new(),
+            userpass: UserPass::default(),
+            recipient: String::new(),
+            vault_name_create: String::new(),
+            account_name_create: String::new(),
+            password_length: 0,
+
+            change_account_info: false,
+            change_vault_name: false,
+            quit: false,
+            show_password: false,
+            show_welcome: false,
+
+            needs_refresh_vaults: true,
+            needs_refresh_accounts: false,
+            initialized: false,
+
+            vault_filter: String::new(),
+            account_filter: String::new(),
+            vault_sort_asc: true,
+            account_sort_asc: true,
+            sort_case_sensitive: false,
+        }
+    }
 }
 
 /// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
@@ -70,7 +93,9 @@ impl FmpApp {
     pub fn fetch_vault_names(&mut self) {
         if let Ok(locations) = Locations::new("", "") {
             if let Ok(names) = read_directory(&locations.fmp_location.join("vaults")) {
+                // Keep the raw list; view-level sorting/filtering is applied when drawing
                 self.vault_names = names;
+                self.output.clear();
             } else {
                 self.output = "Failed to fetch vault names.".to_string();
             }
@@ -81,7 +106,9 @@ impl FmpApp {
     pub fn fetch_account_names(&mut self) {
         if let Ok(locations) = Locations::new(&self.vault_name, "") {
             if let Ok(names) = read_directory(&locations.vault_location) {
+                // Keep the raw list; view-level sorting/filtering is applied when drawing
                 self.account_names = names;
+                self.output.clear();
             } else {
                 self.output = "Failed to fetch account names.".to_string();
             }
@@ -101,59 +128,273 @@ impl FmpApp {
             .join("fmp_ran");
 
         if config_path.exists() {
-            self.show_welcome = String::from("false");
+            self.show_welcome = false;
         } else {
             let _ = std::fs::write(&config_path, "shown");
-            self.show_welcome = String::from("true");
+            self.show_welcome = true;
         }
+    }
+
+    /// Make a filtered and sorted view of provided names without mutating the source.
+    fn make_view<'a>(
+        names: &'a [String],
+        filter: &str,
+        asc: bool,
+        case_sensitive: bool,
+    ) -> Vec<&'a str> {
+        let mut view: Vec<&str> = if filter.is_empty() {
+            names.iter().map(|s| s.as_str()).collect()
+        } else if case_sensitive {
+            names
+                .iter()
+                .filter_map(|s| {
+                    if s.contains(filter) {
+                        Some(s.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            let filter_lc = filter.to_ascii_lowercase();
+            names
+                .iter()
+                .filter_map(|s| {
+                    if s.to_ascii_lowercase().contains(&filter_lc) {
+                        Some(s.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+
+        if case_sensitive {
+            if asc {
+                view.sort_unstable();
+            } else {
+                view.sort_unstable_by(|a, b| b.cmp(a));
+            }
+        } else {
+            use std::cmp::Reverse;
+            if asc {
+                view.sort_by_cached_key(|s| s.to_ascii_lowercase());
+            } else {
+                view.sort_by_cached_key(|s| Reverse(s.to_ascii_lowercase()));
+            }
+        }
+
+        view
+    }
+}
+
+/// Clears sensitive info on exit
+impl Drop for FmpApp {
+    fn drop(&mut self) {
+        self.userpass.password.zeroize();
     }
 }
 
 /// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.show_welcome.is_empty() {
+        // One-time initialization
+        if !self.initialized {
             self.check_first_run();
+            self.needs_refresh_vaults = true;
+            self.initialized = true;
         }
 
-        if self.vault_names.is_empty() {
+        // Fetch on explicit triggers only (no per-frame automatic fetching)
+        if self.needs_refresh_vaults {
             self.fetch_vault_names();
+            self.needs_refresh_vaults = false;
         }
-
-        if !self.vault_name.is_empty() && self.account_names.is_empty() {
+        if self.needs_refresh_accounts && !self.vault_name.is_empty() {
             self.fetch_account_names();
+            self.needs_refresh_accounts = false;
         }
 
         egui::SidePanel::left("sidebar").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading("Vaults");
-                for vault in &self.vault_names {
-                    if ui.button(vault).clicked() {
-                        self.vault_name = vault.clone();
-                        self.account_names.clear();
+                // Vaults header row: title + Refresh + filters/sort
+                ui.horizontal(|ui| {
+                    ui.heading("Vaults");
+                    if ui.button("Refresh").clicked() {
+                        self.needs_refresh_vaults = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    let te = egui::TextEdit::singleline(&mut self.vault_filter)
+                        .hint_text("Filter vaults...");
+                    ui.add(te);
+                    if !self.vault_filter.is_empty()
+                        && ui.button("×").on_hover_text("Clear").clicked()
+                    {
+                        self.vault_filter.clear();
+                    }
+
+                    let sort_label = if self.vault_sort_asc {
+                        "A→Z"
+                    } else {
+                        "Z→A"
+                    };
+                    if ui
+                        .button(sort_label)
+                        .on_hover_text("Toggle sort order")
+                        .clicked()
+                    {
+                        self.vault_sort_asc = !self.vault_sort_asc;
+                    }
+
+                    let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
+                    if ui
+                        .button(cs_label)
+                        .on_hover_text("Toggle case sensitivity")
+                        .clicked()
+                    {
+                        self.sort_case_sensitive = !self.sort_case_sensitive;
+                    }
+                });
+
+                // Vault list (filtered + sorted view), with selection highlight
+                let vault_view = Self::make_view(
+                    &self.vault_names,
+                    &self.vault_filter,
+                    self.vault_sort_asc,
+                    self.sort_case_sensitive,
+                );
+
+                let mut clicked_vault: Option<String> = None;
+                for vault in vault_view {
+                    if ui
+                        .selectable_label(self.vault_name == vault, vault)
+                        .clicked()
+                    {
+                        clicked_vault = Some(vault.to_string());
+                        break;
                     }
                 }
 
+                if let Some(vault) = clicked_vault {
+                    self.clear_account_data();
+                    self.vault_name = vault;
+                    self.account_names.clear();
+                    self.account_name.clear();
+                    self.account_name_create.clear();
+                    self.change_account_info = false;
+                    self.change_vault_name = false;
+
+                    // Trigger accounts refresh only when vault changes
+                    self.needs_refresh_accounts = true;
+                }
+
+                ui.horizontal(|ui| {
+                    ui.label(format!("{} vault(s)", self.vault_names.len()));
+                    if !self.vault_filter.is_empty() {
+                        // Show how many after filter
+                        let filtered_count = Self::make_view(
+                            &self.vault_names,
+                            &self.vault_filter,
+                            true,
+                            self.sort_case_sensitive,
+                        )
+                        .len();
+                        ui.label(format!("• {filtered_count} matching"));
+                    }
+                });
+
                 ui.separator();
 
-                ui.heading("Accounts");
-                if self.vault_name.is_empty() {
-                    ui.label("Select a vault.");
-                } else {
-                    for account in &self.account_names {
-                        if ui.button(account).clicked() {
-                            self.account_name = account.clone();
-
-                            self.userpass =
-                                match get_account_details(&self.vault_name, &self.account_name) {
-                                    Ok(userpass) => userpass,
-                                    Err(e) => {
-                                        error!("Failed to fetch account details. Error: {}", e);
-                                        return;
-                                    }
-                                };
-                        }
+                // Accounts header with Refresh + filter/sort controls (enabled if vault selected)
+                ui.horizontal(|ui| {
+                    ui.heading("Accounts");
+                    let refresh_btn = egui::Button::new("Refresh");
+                    if ui
+                        .add_enabled(!self.vault_name.is_empty(), refresh_btn)
+                        .clicked()
+                    {
+                        self.needs_refresh_accounts = true;
                     }
+                });
+
+                ui.horizontal(|ui| {
+                    let te = egui::TextEdit::singleline(&mut self.account_filter)
+                        .hint_text("Filter accounts...");
+                    ui.add_enabled(!self.vault_name.is_empty(), te);
+
+                    if ui
+                        .add_enabled(!self.account_filter.is_empty(), egui::Button::new("×"))
+                        .on_hover_text("Clear")
+                        .clicked()
+                    {
+                        self.account_filter.clear();
+                    }
+
+                    let sort_label = if self.account_sort_asc {
+                        "A→Z"
+                    } else {
+                        "Z→A"
+                    };
+                    if ui
+                        .add_enabled(!self.vault_name.is_empty(), egui::Button::new(sort_label))
+                        .on_hover_text("Toggle sort order")
+                        .clicked()
+                    {
+                        self.account_sort_asc = !self.account_sort_asc;
+                    }
+
+                    let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
+                    if ui
+                        .add_enabled(!self.vault_name.is_empty(), egui::Button::new(cs_label))
+                        .on_hover_text("Toggle case sensitivity")
+                        .clicked()
+                    {
+                        self.sort_case_sensitive = !self.sort_case_sensitive;
+                    }
+                });
+
+                // Accounts list (filtered + sorted view), with selection highlight
+                let account_view = if self.vault_name.is_empty() {
+                    Vec::<&str>::new()
+                } else {
+                    Self::make_view(
+                        &self.account_names,
+                        &self.account_filter,
+                        self.account_sort_asc,
+                        self.sort_case_sensitive,
+                    )
+                };
+
+                let mut clicked_account: Option<String> = None;
+                for account in account_view {
+                    if ui
+                        .selectable_label(self.account_name == account, account)
+                        .clicked()
+                    {
+                        clicked_account = Some(account.to_string());
+                        break;
+                    }
+                }
+
+                if let Some(account) = clicked_account {
+                    self.change_vault_name = false;
+                    self.change_account_info = false;
+                    self.account_name = account.clone();
+                    self.userpass = match get_account_details(&self.vault_name, &account) {
+                        Ok(userpass) => userpass,
+                        Err(e) => {
+                            error!("Failed to fetch account details. Error: {e}");
+                            return;
+                        }
+                    };
+                }
+
+                // Optional: surface last error, if any
+                if !self.output.is_empty() {
+                    ui.separator();
+                    ui.colored_label(egui::Color32::RED, &self.output);
                 }
             });
         });
@@ -193,16 +434,16 @@ impl eframe::App for FmpApp {
                 });
         }
 
-        if self.show_welcome == "true" {
+        if self.show_welcome {
             egui::Window::new("Welcome to Forgot-My-Password!")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.heading("Welcome!");
-                    ui.label("Thank you for installing Forgot-My-Password.\n\nThis is a secure password manager. Get started by creating your first vault and adding an account to it.");
+                    ui.label("Thank you for installing Forgot-My-Password.\n\nGet started by creating your first vault and adding an account to it.");
                     if ui.button("Get Started").clicked() {
-                        self.show_welcome = String::from("false");
+                        self.show_welcome = false;
                     }
                 });
         }

@@ -55,7 +55,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         match create_new_vault(app) {
             Ok(_) => {
                 app.output = format!(
-                    "Vault `{}` created successfully! NOTE: By default, GPG caches your passphrase for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Password/blob/main/GPGCACHE.md`.",
+                    "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Password/blob/main/GPGCACHE.md`.",
                     app.vault_name_create
                 );
 
@@ -193,7 +193,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         if app.show_password {
             let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
 
-            ui.label(format!("Password: {}", password));
+            ui.label(format!("Password: {password}"));
 
             app.show_password = show_password_button(app.show_password, ui, "Hide");
 
@@ -237,6 +237,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Back").clicked() {
                 app.account_name.clear();
+                app.clear_account_data();
             }
 
             quit_button(app, ui);
@@ -271,7 +272,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                         }
 
                         Err(e) => {
-                            app.output = format!("Failed to change account name. Error: {}", e);
+                            app.output = format!("Failed to change account name. Error: {e}");
                             return;
                         }
                     }
@@ -403,13 +404,18 @@ fn display_output(app: &mut FmpApp, ui: &mut egui::Ui) {
 ///
 /// # Returns
 /// * A `bool` of the new state.
-fn show_password_button(state: bool, ui: &mut egui::Ui, label: &str) -> bool {
+pub fn show_password_button(state: bool, ui: &mut egui::Ui, label: &str) -> bool {
     if ui.button(label).clicked() {
         return !state;
     }
     state
 }
 
+/// Generates the slider for password generation
+///
+/// # Arguments
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 fn generate_password_slider(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         if ui.button("Generate Password").clicked() {
