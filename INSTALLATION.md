@@ -3,7 +3,7 @@
 ## Dependencies
 
 ### Arch Linux
-Install [fmp-git](https://aur.archlinux.org/packages/fmp-git) from the AUR
+Install [fmp-git](https://aur.archlinux.org/packages/fmp-git)/[fmp-bin](https://aur.archlinux.org/packages/fmp-bin) from the AUR
 
 OR
 

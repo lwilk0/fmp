@@ -253,7 +253,7 @@ fn test_large_number_of_accounts() {
     locations.initialize_vault().unwrap();
 
     for i in 0..1000 {
-        let account_name = format!("account_{}", i);
+        let account_name = format!("account_{i}");
         let account_locations = Locations::new(&vault_name, &account_name).unwrap();
         account_locations.create_account_directory().unwrap();
     }
