@@ -49,15 +49,17 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
     if ui.button("Create Vault").clicked() {
         if app.vault_name_create.is_empty() || app.recipient.is_empty() {
-            app.output = "Please fill in all fields before adding an account.".to_string();
+            app.output = Some(Err(
+                "Please fill in all fields before adding an account.".to_string()
+            ));
             return;
         }
         match create_new_vault(app) {
             Ok(_) => {
-                app.output = format!(
+                app.output = Some(Ok(format!(
                     "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://github.com/lwilk0/Forgot-My-Password/blob/main/GPGCACHE.md`.",
                     app.vault_name_create
-                );
+                )));
 
                 app.vault_name_create.clear();
                 app.recipient.clear();
@@ -66,15 +68,13 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             Err(e) => {
-                app.output = format!(
+                app.output = Some(Err(format!(
                     "Failed to create vault `{}`. Error: {}",
                     app.vault_name_create, e
-                )
+                )))
             }
         }
     }
-
-    display_output(app, ui);
 
     quit_button(app, ui);
 }
@@ -92,21 +92,22 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.label("Add a new account:");
 
     labeled_text_input(ui, "Account Name:", &mut app.account_name_create, None);
-    labeled_text_input(ui, "Username:", &mut app.userpass.username, None);
+    labeled_text_input(ui, "Account Username:", &mut app.userpass.username, None);
     securely_retrieve_password(app, ui, "Account Password:");
     generate_password_slider(app, ui);
 
     if ui.button("Add Account").clicked() {
         if app.account_name_create.is_empty() {
-            app.output = "Please fill in all fields before adding an account.".to_string();
-            return;
+            app.output = Some(Err(
+                "Please fill in all fields before adding an account.".to_string()
+            ))
         }
         match add_account(app) {
             Ok(_) => {
-                app.output = format!(
+                app.output = Some(Ok(format!(
                     "Account `{}` added to vault `{}`.",
                     app.account_name, app.vault_name
-                );
+                )));
 
                 app.clear_account_data();
                 app.account_name_create.clear();
@@ -115,10 +116,10 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             Err(e) => {
-                app.output = format!(
+                app.output = Some(Err(format!(
                     "Failed to add account `{}` to vault `{}`. Error: {}",
                     app.account_name, app.vault_name, e
-                )
+                )))
             }
         }
     }
@@ -134,13 +135,16 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     if ui.button("Delete Vault").clicked() {
         match delete_vault(app) {
             Ok(()) => {
-                app.output = format!("Vault `{}` deleted.", app.vault_name);
+                app.output = Some(Ok(format!("Vault `{}` deleted.", app.vault_name)));
 
                 app.vault_name.clear();
                 app.fetch_vault_names();
             }
             Err(e) => {
-                app.output = format!("Failed to delete vault `{}`. Error: {}", app.vault_name, e)
+                app.output = Some(Err(format!(
+                    "Failed to delete vault `{}`. Error: {}",
+                    app.vault_name, e
+                )))
             }
         }
     }
@@ -151,23 +155,37 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
     if ui.button("Backup Vault").clicked() {
         match create_backup(app) {
-            Ok(_) => app.output = format!("Vault `{}` backed up successfully.", app.vault_name),
+            Ok(_) => {
+                app.output = Some(Ok(format!(
+                    "Vault `{}` backed up successfully.",
+                    app.vault_name
+                )))
+            }
             Err(e) => {
-                app.output = format!("Failed to back up vault `{}`. Error: {}", app.vault_name, e)
+                app.output = Some(Err(format!(
+                    "Failed to back up vault `{}`. Error: {}",
+                    app.vault_name, e
+                )))
             }
         }
     }
 
     if ui.button("Restore Vault").clicked() {
         match install_backup(app) {
-            Ok(_) => app.output = format!("Vault `{}` restored successfully.", app.vault_name),
+            Ok(_) => {
+                app.output = Some(Ok(format!(
+                    "Vault `{}` restored successfully.",
+                    app.vault_name
+                )))
+            }
             Err(e) => {
-                app.output = format!("Failed to restore vault `{}`. Error: {}", app.vault_name, e)
+                app.output = Some(Err(format!(
+                    "Failed to restore vault `{}`. Error: {}",
+                    app.vault_name, e
+                )))
             }
         }
     }
-
-    display_output(app, ui);
 
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         ui.horizontal(|ui| {
@@ -212,10 +230,10 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     if ui.button("Delete Account").clicked() {
         match delete_account_from_vault(app) {
             Ok(_) => {
-                app.output = format!(
+                app.output = Some(Ok(format!(
                     "Account `{}` deleted from vault `{}`.",
                     app.account_name, app.vault_name
-                );
+                )));
 
                 app.account_name.clear();
                 app.clear_account_data();
@@ -223,15 +241,13 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             Err(e) => {
-                app.output = format!(
+                app.output = Some(Err(format!(
                     "Failed to delete account `{}` from vault {}. Error: {}",
                     app.account_name, app.vault_name, e
-                )
+                )))
             }
         }
     }
-
-    display_output(app, ui);
 
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         ui.horizontal(|ui| {
@@ -258,8 +274,9 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
 
     if ui.button("Change Information").clicked() {
         if app.account_name_create.is_empty() {
-            app.output =
-                "Please fill in all fields before changing an accounts information.".to_string();
+            app.output = Some(Err(
+                "Please fill in all fields before changing an accounts information.".to_string(),
+            ));
             return;
         }
         match change_account_data(app) {
@@ -272,31 +289,30 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                         }
 
                         Err(e) => {
-                            app.output = format!("Failed to change account name. Error: {e}");
+                            app.output =
+                                Some(Err(format!("Failed to change account name. Error: {e}")));
                             return;
                         }
                     }
                 }
 
-                app.output = format!(
+                app.output = Some(Ok(format!(
                     "Account `{}` updated successfully in vault `{}`.",
                     app.account_name, app.vault_name
-                );
+                )));
 
                 app.change_account_info = false;
                 app.fetch_account_names();
             }
 
             Err(e) => {
-                app.output = format!(
+                app.output = Some(Err(format!(
                     "Failed to change account name `{}`. Error: {}",
                     app.account_name, e
-                );
+                )));
             }
         }
     }
-
-    display_output(app, ui);
 
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         ui.horizontal(|ui| {
@@ -319,28 +335,28 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
 
     if ui.button("Rename Vault").clicked() {
         if app.vault_name_create.is_empty() {
-            app.output = "Please fill in all fields before changing vault name.".to_string();
+            app.output = Some(Err(
+                "Please fill in all fields before changing vault name.".to_string()
+            ));
             return;
         }
 
         match rename_vault(app) {
             Ok(_) => {
-                app.output = format!("Vault renamed to `{}`.", app.vault_name_create);
+                app.output = Some(Ok(format!("Vault renamed to `{}`.", app.vault_name_create)));
                 app.vault_name = app.vault_name_create.clone();
                 app.vault_name_create.clear();
                 app.fetch_vault_names();
                 app.change_vault_name = false;
             }
             Err(e) => {
-                app.output = format!(
+                app.output = Some(Err(format!(
                     "Failed to rename vault `{}`. Error: {}",
                     app.vault_name_create, e
-                );
+                )));
             }
         }
     }
-
-    display_output(app, ui);
 
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         ui.horizontal(|ui| {
@@ -383,16 +399,6 @@ fn labeled_text_input(ui: &mut egui::Ui, label: &str, value: &mut String, hover:
             text_edit.on_hover_text(hover_text);
         }
     });
-}
-
-/// Displays the output of the application.
-///
-/// # Arguments
-/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
-/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
-fn display_output(app: &mut FmpApp, ui: &mut egui::Ui) {
-    ui.separator();
-    ui.label(&app.output);
 }
 
 /// Displays a show/hide password button

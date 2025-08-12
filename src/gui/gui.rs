@@ -27,7 +27,13 @@ pub fn run_gui() -> Result<(), eframe::Error> {
 pub struct FmpApp {
     pub vault_name: String,
     pub account_name: String,
-    pub output: String,
+
+    /// Message to show to the user.
+    /// - None: show nothing
+    /// - Some(Ok(msg)): informational/success message
+    /// - Some(Err(msg)): error message (drawn in red)
+    pub output: Option<Result<String, String>>,
+
     pub vault_names: Vec<String>,
     pub account_names: Vec<String>,
     pub userpass: UserPass,
@@ -59,7 +65,7 @@ impl Default for FmpApp {
         Self {
             vault_name: String::new(),
             account_name: String::new(),
-            output: String::new(),
+            output: None,
             vault_names: Vec::new(),
             account_names: Vec::new(),
             userpass: UserPass::default(),
@@ -93,11 +99,10 @@ impl FmpApp {
     pub fn fetch_vault_names(&mut self) {
         if let Ok(locations) = Locations::new("", "") {
             if let Ok(names) = read_directory(&locations.fmp_location.join("vaults")) {
-                // Keep the raw list; view-level sorting/filtering is applied when drawing
                 self.vault_names = names;
-                self.output.clear();
+                self.output = None;
             } else {
-                self.output = "Failed to fetch vault names.".to_string();
+                self.output = Some(Err("Failed to fetch vault names.".to_string()));
             }
         }
     }
@@ -108,9 +113,9 @@ impl FmpApp {
             if let Ok(names) = read_directory(&locations.vault_location) {
                 // Keep the raw list; view-level sorting/filtering is applied when drawing
                 self.account_names = names;
-                self.output.clear();
+                self.output = None;
             } else {
-                self.output = "Failed to fetch account names.".to_string();
+                self.output = Some(Err("Failed to fetch account names.".to_string()));
             }
         }
     }
@@ -198,14 +203,12 @@ impl Drop for FmpApp {
 /// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // One-time initialization
         if !self.initialized {
             self.check_first_run();
             self.needs_refresh_vaults = true;
             self.initialized = true;
         }
 
-        // Fetch on explicit triggers only (no per-frame automatic fetching)
         if self.needs_refresh_vaults {
             self.fetch_vault_names();
             self.needs_refresh_vaults = false;
@@ -217,7 +220,6 @@ impl eframe::App for FmpApp {
 
         egui::SidePanel::left("sidebar").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                // Vaults header row: title + Refresh + filters/sort
                 ui.horizontal(|ui| {
                     ui.heading("Vaults");
                     if ui.button("Refresh").clicked() {
@@ -235,11 +237,7 @@ impl eframe::App for FmpApp {
                         self.vault_filter.clear();
                     }
 
-                    let sort_label = if self.vault_sort_asc {
-                        "A→Z"
-                    } else {
-                        "Z→A"
-                    };
+                    let sort_label = if self.vault_sort_asc { "A>Z" } else { "Z>A" };
                     if ui
                         .button(sort_label)
                         .on_hover_text("Toggle sort order")
@@ -332,11 +330,7 @@ impl eframe::App for FmpApp {
                         self.account_filter.clear();
                     }
 
-                    let sort_label = if self.account_sort_asc {
-                        "A→Z"
-                    } else {
-                        "Z→A"
-                    };
+                    let sort_label = if self.account_sort_asc { "A>Z" } else { "Z>A" };
                     if ui
                         .add_enabled(!self.vault_name.is_empty(), egui::Button::new(sort_label))
                         .on_hover_text("Toggle sort order")
@@ -391,10 +385,12 @@ impl eframe::App for FmpApp {
                     };
                 }
 
-                // Optional: surface last error, if any
-                if !self.output.is_empty() {
+                if let Some(msg) = &self.output {
                     ui.separator();
-                    ui.colored_label(egui::Color32::RED, &self.output);
+                    match msg {
+                        Ok(info) => ui.label(info),
+                        Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
+                    };
                 }
             });
         });

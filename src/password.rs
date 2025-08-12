@@ -31,7 +31,7 @@ use secrecy::SecretBox;
 pub fn generate_password(app: &mut FmpApp) {
     app.userpass.password = SecretBox::new(Box::new(
         (0..app.password_length)
-            .map(|_| (rng().random_range(33..128) as u8))
+            .map(|_| (rng().random_range(33..127) as u8))
             .collect(),
     ));
 }
