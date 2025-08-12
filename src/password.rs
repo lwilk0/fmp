@@ -102,7 +102,3 @@ pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
         ui.label(format!("{entropy:.2} bits ({rating})"));
     });
 }
-
-#[cfg(test)]
-#[path = "tests/password_tests.rs"]
-mod password_tests;

@@ -395,6 +395,7 @@ impl eframe::App for FmpApp {
             ui.vertical_centered(|ui| {
                 ui.label(egui::RichText::new("Forgot-My-Password").size(32.0));
             });
+
             ui.add_space(8.0);
 
             if self.change_vault_name {
