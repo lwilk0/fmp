@@ -20,6 +20,7 @@ Copyright (C) 2025  Luke Wilkinson
 use crate::gui::FmpApp;
 use rand::{Rng, rng};
 use secrecy::SecretBox;
+use std::collections::HashMap;
 
 /// Generates a random password of a specified length using ASCII characters.
 ///
@@ -43,41 +44,32 @@ pub fn generate_password(app: &mut FmpApp) {
 ///
 /// # Returns
 /// * `(f64, &str)` - Returns a tuple containing the calculated entropy as a `f64` and a rating as a string slice.
-pub fn calculate_entropy(password: &str) -> (f64, &str) {
-    let mut character_pool: u8 = 0;
+pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
+    let len = password.chars().count() as f64;
+    let mut freq = HashMap::new();
 
-    if password.chars().any(|c| c.is_ascii_lowercase()) {
-        character_pool += 26;
+    for c in password.chars() {
+        *freq.entry(c).or_insert(0) += 1;
     }
 
-    if password.chars().any(|c| c.is_ascii_uppercase()) {
-        character_pool += 26;
+    let mut entropy = 0.0;
+    for count in freq.values() {
+        let p = *count as f64 / len;
+        entropy -= p * p.log2();
     }
+    entropy *= len; // Total entropy in bits
 
-    if password.chars().any(|c| c.is_ascii_digit()) {
-        character_pool += 10;
-    }
-
-    if password.chars().any(|c| c.is_ascii_punctuation()) {
-        character_pool += 32;
-    }
-
-    // FORMULA
-    // L * log2(C), where L is the length of the password and C is the character pool
-    let entropy = password.len() as f64 * (character_pool as f64).log2();
-    let rating: &str;
-
-    if entropy <= 35.0 || entropy.is_nan() {
-        rating = "Very Weak"
+    let rating = if entropy <= 28.0 || entropy.is_nan() {
+        "Very Weak"
+    } else if entropy <= 35.0 {
+        "Weak"
     } else if entropy <= 59.0 {
-        rating = "Weak"
-    } else if entropy <= 89.0 {
-        rating = "Okay"
-    } else if entropy <= 119.0 {
-        rating = "Strong"
+        "Okay"
+    } else if entropy <= 127.0 {
+        "Strong"
     } else {
-        rating = "Very Strong"
-    }
+        "Very Strong"
+    };
 
     (entropy, rating)
 }
@@ -88,7 +80,7 @@ pub fn calculate_entropy(password: &str) -> (f64, &str) {
 /// * `ui` - The egui UI context.
 /// * `password` - The password string to evaluate.
 pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
-    let (entropy, rating) = calculate_entropy(password);
+    let (entropy, rating) = calculate_shannon_entropy(password);
 
     let length = (entropy / 150.0).clamp(0.0, 1.0) as f32;
 

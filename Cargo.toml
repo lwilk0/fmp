@@ -9,7 +9,7 @@ license = "GPL-3.0"
 keywords = ["password-manager", "cli", "crypto", "cryptography", "rust"]
 
 [dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 dirs = "6.0.0"
 eframe = "0.32.0"
 egui = "0.32.0"
@@ -23,3 +23,4 @@ secrecy = "0.10.3"
 tempfile = "3.20.0"
 windows = { version = "0.61.3", optional = true }
 zeroize = "1.8.1"
+zxcvbn = "3.1.0"
