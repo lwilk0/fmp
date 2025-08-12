@@ -111,7 +111,6 @@ impl FmpApp {
     pub fn fetch_account_names(&mut self) {
         if let Ok(locations) = Locations::new(&self.vault_name, "") {
             if let Ok(names) = read_directory(&locations.vault_location) {
-                // Keep the raw list; view-level sorting/filtering is applied when drawing
                 self.account_names = names;
                 self.output = None;
             } else {
@@ -231,8 +230,10 @@ impl eframe::App for FmpApp {
                     let te = egui::TextEdit::singleline(&mut self.vault_filter)
                         .hint_text("Filter vaults...");
                     ui.add(te);
-                    if !self.vault_filter.is_empty()
-                        && ui.button("×").on_hover_text("Clear").clicked()
+                    if ui
+                        .add_enabled(!self.vault_filter.is_empty(), egui::Button::new("×"))
+                        .on_hover_text("Clear")
+                        .clicked()
                     {
                         self.vault_filter.clear();
                     }
@@ -256,7 +257,6 @@ impl eframe::App for FmpApp {
                     }
                 });
 
-                // Vault list (filtered + sorted view), with selection highlight
                 let vault_view = Self::make_view(
                     &self.vault_names,
                     &self.vault_filter,
@@ -284,14 +284,12 @@ impl eframe::App for FmpApp {
                     self.change_account_info = false;
                     self.change_vault_name = false;
 
-                    // Trigger accounts refresh only when vault changes
                     self.needs_refresh_accounts = true;
                 }
 
                 ui.horizontal(|ui| {
                     ui.label(format!("{} vault(s)", self.vault_names.len()));
                     if !self.vault_filter.is_empty() {
-                        // Show how many after filter
                         let filtered_count = Self::make_view(
                             &self.vault_names,
                             &self.vault_filter,
@@ -305,7 +303,6 @@ impl eframe::App for FmpApp {
 
                 ui.separator();
 
-                // Accounts header with Refresh + filter/sort controls (enabled if vault selected)
                 ui.horizontal(|ui| {
                     ui.heading("Accounts");
                     let refresh_btn = egui::Button::new("Refresh");
@@ -349,7 +346,6 @@ impl eframe::App for FmpApp {
                     }
                 });
 
-                // Accounts list (filtered + sorted view), with selection highlight
                 let account_view = if self.vault_name.is_empty() {
                     Vec::<&str>::new()
                 } else {
@@ -396,7 +392,10 @@ impl eframe::App for FmpApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Forgot-My-Password");
+            ui.vertical_centered(|ui| {
+                ui.label(egui::RichText::new("Forgot-My-Password").size(32.0));
+            });
+            ui.add_space(8.0);
 
             if self.change_vault_name {
                 alter_vault_name(self, ui);

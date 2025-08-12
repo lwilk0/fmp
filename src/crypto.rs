@@ -52,18 +52,18 @@ pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &st
             app.show_password = show_password_button(app.show_password, ui, "Show");
         }
 
-        if !password.is_empty() {
-            password_strength_meter(ui, &password);
-        }
-
         if response.changed() {
             let mut pw_bytes = password.as_bytes().to_vec();
             app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
             pw_bytes.zeroize();
         }
-
-        password.zeroize();
     });
+
+    if !password.is_empty() && app.show_password {
+        password_strength_meter(ui, &password);
+    }
+
+    password.zeroize();
 }
 
 /// Locks the memory of the provided data to prevent it from being swapped to disk.
