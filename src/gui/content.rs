@@ -207,9 +207,9 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.label(format!("Account: {}", app.account_name));
     ui.label(format!("Username: {}", app.userpass.username));
 
-    ui.horizontal(|ui| {
-        let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
+    let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
 
+    ui.horizontal(|ui| {
         if app.show_password {
             ui.label(format!("Password: {password}"));
         } else {
@@ -226,11 +226,11 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             ui,
             if app.show_password { "Hide" } else { "Show" },
         );
-
-        if app.show_password {
-            password_strength_meter(ui, &password); // TODO: cache
-        }
     });
+
+    if app.show_password {
+        password_strength_meter(ui, &password); // TODO: cache
+    }
 
     if ui.button("Change Information").clicked() {
         app.account_name_create = app.account_name.clone();
