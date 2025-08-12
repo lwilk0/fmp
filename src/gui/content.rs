@@ -208,17 +208,27 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.label(format!("Username: {}", app.userpass.username));
 
     ui.horizontal(|ui| {
+        let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
+
         if app.show_password {
-            let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
-
             ui.label(format!("Password: {password}"));
-
-            app.show_password = show_password_button(app.show_password, ui, "Hide");
-
-            password_strength_meter(ui, &password); // TODO: cache
         } else {
-            ui.label("Password:");
-            app.show_password = show_password_button(app.show_password, ui, "Show");
+            ui.label("Password: ********");
+        }
+
+        if ui.button("Copy").clicked() {
+            ui.ctx().copy_text(password.to_string());
+            // Optionally, show feedback
+        }
+
+        app.show_password = show_password_button(
+            app.show_password,
+            ui,
+            if app.show_password { "Hide" } else { "Show" },
+        );
+
+        if app.show_password {
+            password_strength_meter(ui, &password); // TODO: cache
         }
     });
 
