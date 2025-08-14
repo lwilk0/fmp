@@ -25,10 +25,7 @@ use std::collections::HashMap;
 /// Generates a random password of a specified length using ASCII characters.
 ///
 /// # Arguments
-/// * `length` - The desired length of the password.
-///
-/// # Returns
-/// * `String` - Returns a randomly generated password as a string.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the vault name and recipient.
 pub fn generate_password(app: &mut FmpApp) {
     app.userpass.password = SecretBox::new(Box::new(
         (0..app.password_length)

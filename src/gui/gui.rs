@@ -212,204 +212,209 @@ impl eframe::App for FmpApp {
             self.fetch_vault_names();
             self.needs_refresh_vaults = false;
         }
+
         if self.needs_refresh_accounts && !self.vault_name.is_empty() {
             self.fetch_account_names();
             self.needs_refresh_accounts = false;
         }
 
-        egui::SidePanel::left("sidebar").show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.heading("Vaults");
-                    if ui.button("Refresh").clicked() {
-                        self.needs_refresh_vaults = true;
+        egui::SidePanel::left("sidebar")
+            .frame(egui::Frame::side_top_panel(&ctx.style()).inner_margin(egui::Margin::same(12)))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.heading("Vaults");
+                        if ui.button("Refresh").clicked() {
+                            self.needs_refresh_vaults = true;
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        let te = egui::TextEdit::singleline(&mut self.vault_filter)
+                            .hint_text("Filter vaults...");
+                        ui.add(te);
+                        if ui
+                            .add_enabled(!self.vault_filter.is_empty(), egui::Button::new("×"))
+                            .on_hover_text("Clear")
+                            .clicked()
+                        {
+                            self.vault_filter.clear();
+                        }
+
+                        let sort_label = if self.vault_sort_asc { "A>Z" } else { "Z>A" };
+                        if ui
+                            .button(sort_label)
+                            .on_hover_text("Toggle sort order")
+                            .clicked()
+                        {
+                            self.vault_sort_asc = !self.vault_sort_asc;
+                        }
+
+                        let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
+                        if ui
+                            .button(cs_label)
+                            .on_hover_text("Toggle case sensitivity")
+                            .clicked()
+                        {
+                            self.sort_case_sensitive = !self.sort_case_sensitive;
+                        }
+                    });
+
+                    let vault_view = Self::make_view(
+                        &self.vault_names,
+                        &self.vault_filter,
+                        self.vault_sort_asc,
+                        self.sort_case_sensitive,
+                    );
+
+                    let mut clicked_vault: Option<String> = None;
+                    for vault in vault_view {
+                        if ui
+                            .selectable_label(self.vault_name == vault, vault)
+                            .clicked()
+                        {
+                            clicked_vault = Some(vault.to_string());
+                            break;
+                        }
                     }
-                });
 
-                ui.horizontal(|ui| {
-                    let te = egui::TextEdit::singleline(&mut self.vault_filter)
-                        .hint_text("Filter vaults...");
-                    ui.add(te);
-                    if ui
-                        .add_enabled(!self.vault_filter.is_empty(), egui::Button::new("×"))
-                        .on_hover_text("Clear")
-                        .clicked()
-                    {
-                        self.vault_filter.clear();
-                    }
+                    if let Some(vault) = clicked_vault {
+                        self.clear_account_data();
+                        self.vault_name = vault;
+                        self.account_names.clear();
+                        self.account_name.clear();
+                        self.account_name_create.clear();
+                        self.change_account_info = false;
+                        self.change_vault_name = false;
 
-                    let sort_label = if self.vault_sort_asc { "A>Z" } else { "Z>A" };
-                    if ui
-                        .button(sort_label)
-                        .on_hover_text("Toggle sort order")
-                        .clicked()
-                    {
-                        self.vault_sort_asc = !self.vault_sort_asc;
-                    }
-
-                    let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
-                    if ui
-                        .button(cs_label)
-                        .on_hover_text("Toggle case sensitivity")
-                        .clicked()
-                    {
-                        self.sort_case_sensitive = !self.sort_case_sensitive;
-                    }
-                });
-
-                let vault_view = Self::make_view(
-                    &self.vault_names,
-                    &self.vault_filter,
-                    self.vault_sort_asc,
-                    self.sort_case_sensitive,
-                );
-
-                let mut clicked_vault: Option<String> = None;
-                for vault in vault_view {
-                    if ui
-                        .selectable_label(self.vault_name == vault, vault)
-                        .clicked()
-                    {
-                        clicked_vault = Some(vault.to_string());
-                        break;
-                    }
-                }
-
-                if let Some(vault) = clicked_vault {
-                    self.clear_account_data();
-                    self.vault_name = vault;
-                    self.account_names.clear();
-                    self.account_name.clear();
-                    self.account_name_create.clear();
-                    self.change_account_info = false;
-                    self.change_vault_name = false;
-
-                    self.needs_refresh_accounts = true;
-                }
-
-                ui.horizontal(|ui| {
-                    ui.label(format!("{} vault(s)", self.vault_names.len()));
-                    if !self.vault_filter.is_empty() {
-                        let filtered_count = Self::make_view(
-                            &self.vault_names,
-                            &self.vault_filter,
-                            true,
-                            self.sort_case_sensitive,
-                        )
-                        .len();
-                        ui.label(format!("• {filtered_count} matching"));
-                    }
-                });
-
-                ui.separator();
-
-                ui.horizontal(|ui| {
-                    ui.heading("Accounts");
-                    let refresh_btn = egui::Button::new("Refresh");
-                    if ui
-                        .add_enabled(!self.vault_name.is_empty(), refresh_btn)
-                        .clicked()
-                    {
                         self.needs_refresh_accounts = true;
                     }
-                });
 
-                ui.horizontal(|ui| {
-                    let te = egui::TextEdit::singleline(&mut self.account_filter)
-                        .hint_text("Filter accounts...");
-                    ui.add_enabled(!self.vault_name.is_empty(), te);
-
-                    if ui
-                        .add_enabled(!self.account_filter.is_empty(), egui::Button::new("×"))
-                        .on_hover_text("Clear")
-                        .clicked()
-                    {
-                        self.account_filter.clear();
-                    }
-
-                    let sort_label = if self.account_sort_asc { "A>Z" } else { "Z>A" };
-                    if ui
-                        .add_enabled(!self.vault_name.is_empty(), egui::Button::new(sort_label))
-                        .on_hover_text("Toggle sort order")
-                        .clicked()
-                    {
-                        self.account_sort_asc = !self.account_sort_asc;
-                    }
-
-                    let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
-                    if ui
-                        .add_enabled(!self.vault_name.is_empty(), egui::Button::new(cs_label))
-                        .on_hover_text("Toggle case sensitivity")
-                        .clicked()
-                    {
-                        self.sort_case_sensitive = !self.sort_case_sensitive;
-                    }
-                });
-
-                let account_view = if self.vault_name.is_empty() {
-                    Vec::<&str>::new()
-                } else {
-                    Self::make_view(
-                        &self.account_names,
-                        &self.account_filter,
-                        self.account_sort_asc,
-                        self.sort_case_sensitive,
-                    )
-                };
-
-                let mut clicked_account: Option<String> = None;
-                for account in account_view {
-                    if ui
-                        .selectable_label(self.account_name == account, account)
-                        .clicked()
-                    {
-                        clicked_account = Some(account.to_string());
-                        break;
-                    }
-                }
-
-                if let Some(account) = clicked_account {
-                    self.change_vault_name = false;
-                    self.change_account_info = false;
-                    self.account_name = account.clone();
-                    self.userpass = match get_account_details(&self.vault_name, &account) {
-                        Ok(userpass) => userpass,
-                        Err(e) => {
-                            error!("Failed to fetch account details. Error: {e}");
-                            return;
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{} vault(s)", self.vault_names.len()));
+                        if !self.vault_filter.is_empty() {
+                            let filtered_count = Self::make_view(
+                                &self.vault_names,
+                                &self.vault_filter,
+                                true,
+                                self.sort_case_sensitive,
+                            )
+                            .len();
+                            ui.label(format!("• {filtered_count} matching"));
                         }
-                    };
-                }
+                    });
 
-                if let Some(msg) = &self.output {
                     ui.separator();
-                    match msg {
-                        Ok(info) => ui.label(info),
-                        Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
+
+                    ui.horizontal(|ui| {
+                        ui.heading("Accounts");
+                        let refresh_btn = egui::Button::new("Refresh");
+                        if ui
+                            .add_enabled(!self.vault_name.is_empty(), refresh_btn)
+                            .clicked()
+                        {
+                            self.needs_refresh_accounts = true;
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        let te = egui::TextEdit::singleline(&mut self.account_filter)
+                            .hint_text("Filter accounts...");
+                        ui.add_enabled(!self.vault_name.is_empty(), te);
+
+                        if ui
+                            .add_enabled(!self.account_filter.is_empty(), egui::Button::new("×"))
+                            .on_hover_text("Clear")
+                            .clicked()
+                        {
+                            self.account_filter.clear();
+                        }
+
+                        let sort_label = if self.account_sort_asc { "A>Z" } else { "Z>A" };
+                        if ui
+                            .add_enabled(!self.vault_name.is_empty(), egui::Button::new(sort_label))
+                            .on_hover_text("Toggle sort order")
+                            .clicked()
+                        {
+                            self.account_sort_asc = !self.account_sort_asc;
+                        }
+
+                        let cs_label = if self.sort_case_sensitive { "Aa" } else { "aA" };
+                        if ui
+                            .add_enabled(!self.vault_name.is_empty(), egui::Button::new(cs_label))
+                            .on_hover_text("Toggle case sensitivity")
+                            .clicked()
+                        {
+                            self.sort_case_sensitive = !self.sort_case_sensitive;
+                        }
+                    });
+
+                    let account_view = if self.vault_name.is_empty() {
+                        Vec::<&str>::new()
+                    } else {
+                        Self::make_view(
+                            &self.account_names,
+                            &self.account_filter,
+                            self.account_sort_asc,
+                            self.sort_case_sensitive,
+                        )
                     };
+
+                    let mut clicked_account: Option<String> = None;
+                    for account in account_view {
+                        if ui
+                            .selectable_label(self.account_name == account, account)
+                            .clicked()
+                        {
+                            clicked_account = Some(account.to_string());
+                            break;
+                        }
+                    }
+
+                    if let Some(account) = clicked_account {
+                        self.change_vault_name = false;
+                        self.change_account_info = false;
+                        self.account_name = account.clone();
+                        self.userpass = match get_account_details(&self.vault_name, &account) {
+                            Ok(userpass) => userpass,
+                            Err(e) => {
+                                error!("Failed to fetch account details. Error: {e}");
+                                return;
+                            }
+                        };
+                    }
+
+                    if let Some(msg) = &self.output {
+                        ui.separator();
+                        match msg {
+                            Ok(info) => ui.label(info),
+                            Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
+                        };
+                    }
+                });
+            });
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(12)))
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.label(egui::RichText::new("Forgot-My-Password").size(32.0));
+                });
+
+                ui.add_space(8.0);
+
+                if self.change_vault_name {
+                    alter_vault_name(self, ui);
+                } else if self.change_account_info {
+                    alter_account_information(self, ui);
+                } else if self.vault_name.is_empty() {
+                    nothing_selected(self, ui);
+                } else if self.account_name.is_empty() {
+                    vault_selected(self, ui);
+                } else {
+                    account_selected(self, ui);
                 }
             });
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.label(egui::RichText::new("Forgot-My-Password").size(32.0));
-            });
-
-            ui.add_space(8.0);
-
-            if self.change_vault_name {
-                alter_vault_name(self, ui);
-            } else if self.change_account_info {
-                alter_account_information(self, ui);
-            } else if self.vault_name.is_empty() {
-                nothing_selected(self, ui);
-            } else if self.account_name.is_empty() {
-                vault_selected(self, ui);
-            } else {
-                account_selected(self, ui);
-            }
-        });
 
         if self.quit {
             egui::Window::new("Confirm Exit")
