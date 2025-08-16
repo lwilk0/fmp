@@ -18,30 +18,30 @@ You can configure the caching behavior by modifying the "gpg-agent" configuratio
 
 1. **Locate the Configuration File**:
    The configuration file is typically located at:
-   '''
+   ```
    ~/.gnupg/gpg-agent.conf
-   '''
+   ```
 
    If the file does not exist, create it:
-   '''bash
+   ```bash
    touch ~/.gnupg/gpg-agent.conf
-   '''
+   ```
 
 2. **Set Cache Durations**:
    Add or modify the following lines in the file:
-   '''
+   ```
    default-cache-ttl 600
    max-cache-ttl 7200
-   '''
+   ```
 
    - "default-cache-ttl": The time (in seconds) a password is cached after the last use. In this example, it is set to 10 minutes (600 seconds).
    - "max-cache-ttl": The maximum time (in seconds) a password is cached, even if it is used multiple times. In this example, it is set to 2 hours (7200 seconds).
 
 3. **Apply the Changes**:
    Restart the GPG agent to apply the changes:
-   '''bash
+   ```bash
    gpgconf --kill gpg-agent
-   '''
+   ```
 
    The agent will automatically restart the next time it is needed.
 
@@ -50,10 +50,10 @@ You can configure the caching behavior by modifying the "gpg-agent" configuratio
 ## Disabling Caching
 
 If you want to disable password caching entirely, set the cache durations to "0":
-'''
+```
 default-cache-ttl 0
 max-cache-ttl 0
-'''
+```
 
 This will require you to enter your password every time a password is decrypted.
 
@@ -62,9 +62,9 @@ This will require you to enter your password every time a password is decrypted.
 ## Checking the Current Configuration
 
 To check the current caching settings, run:
-'''bash
+```bash
 gpgconf --list-options gpg-agent
-'''
+```
 
 ---
 
