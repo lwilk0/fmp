@@ -1,0 +1,39 @@
+workflow:
+    rules:
+      - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      - if: '$CI_COMMIT_BRANCH == "main"'
+      - if: '$CI_COMMIT_BRANCH == "testing"'
+
+  image: rust:1.78-slim-bullseye
+
+  stages:
+    - build
+
+  variables:
+    CARGO_HOME: "/cache/cargo"
+    CARGO_TERM_COLOR: "always"
+
+  cache:
+    key: "$CI_JOB_IMAGE-$CI_COMMIT_REF_SLUG"
+    policy: pull-push
+    paths:
+      - /cache/cargo/bin/
+      - /cache/cargo/registry/
+      - /cache/cargo/git/
+      - target/
+
+  build:
+    stage: build
+    before_script:
+      - apt-get update
+      - apt-get install -y --no-install-recommends build-essential pkg-config libgpgme-dev libgpg-error-dev ca-certificates
+      - update-ca-certificates
+      - rustc --version
+      - cargo --version
+      - rustup component add clippy
+      - export PATH="$CARGO_HOME/bin:$PATH"
+      - if ! command -v cargo-audit >/dev/null 2>&1; then cargo install cargo-audit; fi
+    script:
+      - cargo build --verbose
+      - cargo clippy --verbose -- -D warnings
+      - cargo audit
