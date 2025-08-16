@@ -1,6 +1,8 @@
 run_test:
   image: rust:latest
   before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends libgpg-error-dev libgpgme-dev
     - rustup --version
     - rustc -vV
     - rustup component add clippy
