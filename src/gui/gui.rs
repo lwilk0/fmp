@@ -7,23 +7,23 @@ use log::error;
 use secrecy::SecretBox;
 use zeroize::Zeroize;
 
-/// Runs the Forgot-My-Password GUI application.
+/// Runs the FMP GUI application.
 ///
 /// # Returns
-/// * `Result<(), eframe::Error>` - Returns `Ok(())` on success, or an error on failure.
+/// * "Result<(), eframe::Error>" - Returns "Ok(())" on success, or an error on failure.
 ///
 /// # Errors
-/// * If there is an error initializing the GUI, it will return an `eframe::Error`.
+/// * If there is an error initializing the GUI, it will return an "eframe::Error".
 pub fn run_gui() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "Forgot-My-Password",
+        "fmp",
         options,
         Box::new(|_cc| Ok(Box::new(FmpApp::default()))),
     )
 }
 
-/// The main application state for the Forgot-My-Password GUI.
+/// The main application state for the FMP GUI.
 pub struct FmpApp {
     pub vault_name: String,
     pub account_name: String,
@@ -42,8 +42,21 @@ pub struct FmpApp {
     pub account_name_create: String,
     pub password_length: u8,
 
+    /// Selections for password generation
+    /// 0 - characters (lower)
+    /// 1 - characters (upper)
+    /// 2 - numbers
+    /// 3 - symbols
+    /// 4 - space
+    /// 5 - accented characters
+    pub selections: [bool; 6],
+    pub consider_characters: String,
+    pub ignore_characters: String,
+    pub generated_password: SecretBox<Vec<u8>>,
+
     pub change_account_info: bool,
     pub change_vault_name: bool,
+    pub random_password: bool,
     pub quit: bool,
     pub show_password: bool,
     pub show_welcome: bool,
@@ -74,8 +87,14 @@ impl Default for FmpApp {
             account_name_create: String::new(),
             password_length: 0,
 
+            selections: [true, true, true, true, false, false],
+            consider_characters: String::new(),
+            ignore_characters: String::new(),
+            generated_password: SecretBox::new(Box::new(Vec::new())),
+
             change_account_info: false,
             change_vault_name: false,
+            random_password: false,
             quit: false,
             show_password: false,
             show_welcome: false,
@@ -93,7 +112,7 @@ impl Default for FmpApp {
     }
 }
 
-/// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
+/// Implementation of methods for the "FmpApp" struct to handle fetching vault and account names.
 impl FmpApp {
     /// Find all the vault names.
     pub fn fetch_vault_names(&mut self) {
@@ -199,7 +218,7 @@ impl Drop for FmpApp {
     }
 }
 
-/// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
+/// Implementation of the "eframe::App" trait for the "FmpApp" struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.initialized {
@@ -398,13 +417,15 @@ impl eframe::App for FmpApp {
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(12)))
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
-                    ui.label(egui::RichText::new("Forgot-My-Password").size(32.0));
+                    ui.label(egui::RichText::new("Forgot My Password").size(32.0));
                 });
 
                 ui.add_space(8.0);
 
                 if self.change_vault_name {
                     alter_vault_name(self, ui);
+                } else if self.random_password {
+                    random_password(self, ui);
                 } else if self.change_account_info {
                     alter_account_information(self, ui);
                 } else if self.vault_name.is_empty() {
@@ -436,13 +457,13 @@ impl eframe::App for FmpApp {
         }
 
         if self.show_welcome {
-            egui::Window::new("Welcome to Forgot-My-Password!")
+            egui::Window::new("Welcome to FMP!")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.heading("Welcome!");
-                    ui.label("Thank you for installing Forgot-My-Password.\n\nGet started by creating your first vault and adding an account to it.");
+                    ui.label("Thank you for installing FMP.\n\nGet started by creating your first vault and adding an account to it.");
                     if ui.button("Get Started").clicked() {
                         self.show_welcome = false;
                     }

@@ -26,12 +26,21 @@ use zeroize::Zeroize;
 /// Securely retrieves a password from the user interface.
 ///
 /// # Arguments
-/// * `app` - A mutable reference to the `FmpApp` instance containing user credentials.
-/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the UI.
-/// * `text` - A string slice containing the label text to display alongside the password input field.
-pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &str) {
-    let mut password =
-        String::from_utf8(app.userpass.password.expose_secret().clone()).unwrap_or_default();
+/// * "app" - A mutable reference to the "FmpApp" instance containing user credentials.
+/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the UI.
+/// * "text" - A string slice containing the label text to display alongside the password input field.
+/// * "generating" - Bool representing if the password being retrieved if from the password generation menu
+pub fn securely_retrieve_password(
+    app: &mut FmpApp,
+    ui: &mut egui::Ui,
+    text: &str,
+    generating: bool,
+) {
+    let mut password = if !generating {
+        String::from_utf8(app.userpass.password.expose_secret().clone()).unwrap_or_default()
+    } else {
+        String::from_utf8(app.generated_password.expose_secret().clone()).unwrap_or_default()
+    };
 
     ui.horizontal(|ui| {
         ui.label(text);
@@ -54,7 +63,13 @@ pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &st
 
         if response.changed() {
             let mut pw_bytes = password.as_bytes().to_vec();
-            app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
+
+            if !generating {
+                app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
+            } else {
+                app.generated_password = SecretBox::new(Box::new(pw_bytes.clone()));
+            }
+
             pw_bytes.zeroize();
         }
     });
@@ -69,7 +84,7 @@ pub fn securely_retrieve_password(app: &mut FmpApp, ui: &mut egui::Ui, text: &st
 /// Locks the memory of the provided data to prevent it from being swapped to disk.
 ///
 /// # Arguments
-/// * `data` - A slice of bytes representing the data to be locked in memory.
+/// * "data" - A slice of bytes representing the data to be locked in memory.
 pub fn lock_memory(data: &[u8]) {
     #[cfg(unix)]
     unsafe {

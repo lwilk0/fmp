@@ -18,29 +18,70 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 use crate::gui::FmpApp;
-use rand::{Rng, rng};
+use rand::prelude::IndexedRandom;
+use rand::rng;
 use secrecy::SecretBox;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Generates a random password of a specified length using ASCII characters.
 ///
 /// # Arguments
-/// * `app` - A mutable reference to the `FmpApp` instance containing the vault name and recipient.
+/// * "app" - A mutable reference to the "FmpApp" instance containing the vault name and recipient.
 pub fn generate_password(app: &mut FmpApp) {
-    app.userpass.password = SecretBox::new(Box::new(
-        (0..app.password_length)
-            .map(|_| (rng().random_range(33..127) as u8))
-            .collect(),
-    ));
+    let mut pool = String::new();
+    if app.selections[0] {
+        pool.push_str("abcdefghijklmnopqrstuvwxyz");
+    }
+    if app.selections[1] {
+        pool.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    }
+    if app.selections[2] {
+        pool.push_str("0123456789");
+    }
+    if app.selections[3] {
+        pool.push_str("!\"#%&'()*+,-./:;<=>?@[\\]^_`{|}-");
+    }
+    if app.selections[4] {
+        pool.push(' ');
+    }
+    if app.selections[5] {
+        pool.push_str("áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ");
+    }
+
+    // HashSet is faster for dedupe/exclude/add ops
+    let mut base: HashSet<char> = pool.chars().collect();
+    let add_set: HashSet<char> = app.consider_characters.chars().collect();
+    let retain_set: HashSet<char> = app.ignore_characters.chars().collect();
+
+    for ch in &retain_set {
+        base.remove(ch);
+    }
+    // ...then ensure all "consider" chars are present (overrides ignore).
+    for ch in &add_set {
+        base.insert(*ch);
+    }
+
+    base.extend(add_set.iter());
+
+    let pool_vec: Vec<char> = base.into_iter().collect();
+
+    if !pool_vec.is_empty() {
+        app.generated_password = SecretBox::new(Box::new(
+            (0..app.password_length)
+                .map(|_| *pool_vec.choose(&mut rng()).unwrap())
+                .collect::<String>()
+                .into_bytes(),
+        ));
+    }
 }
 
 /// Calculates the entropy of a given password based on its length and character pool.
 ///
 /// # Arguments
-/// * `password` - The password for which to calculate entropy.
+/// * "password" - The password for which to calculate entropy.
 ///
 /// # Returns
-/// * `(f64, &str)` - Returns a tuple containing the calculated entropy as a `f64` and a rating as a string slice.
+/// * "(f64, &str)" - Returns a tuple containing the calculated entropy as a "f64" and a rating as a string slice.
 pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
     let len = password.chars().count() as f64;
     let mut freq = HashMap::new();
@@ -74,8 +115,8 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
 /// Draws a password strength meter in the UI.
 ///
 /// # Arguments
-/// * `ui` - The egui UI context.
-/// * `password` - The password string to evaluate.
+/// * "ui" - The egui UI context.
+/// * "password" - The password string to evaluate.
 pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
     let (entropy, rating) = calculate_shannon_entropy(password);
 
