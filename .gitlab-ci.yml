@@ -4,7 +4,7 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH == "testing"'
 
-image: rust:1.78-slim-bullseye
+image: rust:1.82-slim-bullseye
 
 stages:
   - build
