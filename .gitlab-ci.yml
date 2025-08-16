@@ -20,6 +20,7 @@ cache:
     - /cache/cargo/bin/
     - /cache/cargo/registry/
     - /cache/cargo/git/
+    - /cache/cargo-audit-target/
     - target/
 
 build:
@@ -32,7 +33,9 @@ build:
     - cargo --version
     - rustup component add clippy
     - export PATH="$CARGO_HOME/bin:$PATH"
-    - if ! command -v cargo-audit >/dev/null 2>&1; then cargo install cargo-audit; fi
+      if ! command -v cargo-audit >/dev/null 2>&1; then
+        CARGO_TARGET_DIR=/cache/cargo-audit-target cargo install --locked cargo-audit@0.21.2
+      fi
   script:
     - cargo build --verbose
     - cargo clippy --verbose -- -D warnings
