@@ -27,15 +27,26 @@ build:
   stage: build
   before_script:
     - apt-get update
-    - apt-get install -y --no-install-recommends build-essential pkg-config libgpgme-dev libgpg-error-dev ca-certificates
+    - apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates
     - update-ca-certificates
     - rustc --version
     - cargo --version
     - rustup component add clippy
     - export PATH="$CARGO_HOME/bin:$PATH"
+    # Preferred: install prebuilt cargo-audit to avoid compiling deps that require edition2024
     - |
       if ! command -v cargo-audit >/dev/null 2>&1; then
-        CARGO_TARGET_DIR=/cache/cargo-audit-target cargo install --locked cargo-audit@0.21.2
+        if ! command -v cargo-binstall >/dev/null 2>&1; then
+          curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install.sh | bash
+        end_if_binstall
+        # Try to fetch a prebuilt cargo-audit; avoids building tame-index etc.
+        cargo binstall -y cargo-audit@0.21.2 || cargo binstall -y cargo-audit || true
+      fi
+    # Fallback: if binstall fails or no prebuilt is available, compile an older version that works on stable
+    - |
+      if ! command -v cargo-audit >/dev/null 2>&1; then
+        echo "Falling back to building cargo-audit 0.20.0 with --locked..."
+        CARGO_TARGET_DIR=/cache/cargo-audit-target cargo install --locked cargo-audit@0.20.0
       fi
   script:
     - cargo build --verbose
