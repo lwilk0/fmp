@@ -242,6 +242,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Back").clicked() {
                 app.vault_name.clear();
+                app.show_password_retrieve = false;
             }
             quit_button(app, ui);
         });
@@ -281,7 +282,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
-            if app.show_password {
+            if app.show_password_account {
                 ui.label(egui::RichText::new(format!("Password: {password}")));
             } else {
                 ui.label(egui::RichText::new("Password: ********"));
@@ -291,14 +292,18 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 ui.ctx().copy_text(password.to_string());
             }
 
-            app.show_password = show_password_button(
-                app.show_password,
+            app.show_password_account = show_password_button(
+                app.show_password_account,
                 ui,
-                if app.show_password { "Hide" } else { "Show" },
+                if app.show_password_account {
+                    "Hide"
+                } else {
+                    "Show"
+                },
             );
         });
 
-        if app.show_password {
+        if app.show_password_account {
             password_strength_meter(ui, &password); // TODO: cache
         }
     });
@@ -342,6 +347,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             if ui.button("Back").clicked() {
                 app.account_name.clear();
                 app.clear_account_data();
+                app.show_password_account = false;
             }
 
             quit_button(app, ui);
@@ -419,6 +425,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
             if ui.button("Cancel").clicked() {
                 app.change_account_info = false;
+                app.show_password_retrieve = false;
             }
         });
     });
@@ -429,6 +436,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Back").clicked() {
                 app.change_account_info = false;
+                app.show_password_retrieve = false;
             }
 
             quit_button(app, ui);
@@ -442,6 +450,8 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
 /// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
 pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
+    ui.add_space(12.0);
+
     ui.group(|ui| {
         ui.vertical_centered(|ui| {
             ui.heading("Change Vault Name");
@@ -485,6 +495,7 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
         });
     });
+
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         ui.horizontal(|ui| {
             if ui.button("Back").clicked() {
@@ -497,10 +508,15 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
 }
 
 pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
+    ui.add_space(12.0);
+
     ui.group(|ui| {
         ui.vertical_centered(|ui| {
             ui.heading("Password Generator");
         });
+
+        ui.separator();
+        ui.add_space(8.0);
 
         ui.group(|ui| {
             ui.heading("Pool");
@@ -542,6 +558,9 @@ pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
             generate_password(app);
         }
 
+        ui.add_space(6.0);
+        ui.separator();
+
         securely_retrieve_password(app, ui, "Generated Password:", true);
 
         ui.horizontal(|ui| {
@@ -557,7 +576,20 @@ pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
             if ui.button("Cancel").clicked() {
                 app.generated_password.zeroize();
                 app.random_password = false;
+                app.show_password_retrieve = false;
             }
+        });
+    });
+
+    ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
+        ui.horizontal(|ui| {
+            if ui.button("Back").clicked() {
+                app.generated_password.zeroize();
+                app.random_password = false;
+                app.show_password_retrieve = false;
+            }
+
+            quit_button(app, ui);
         });
     });
 }

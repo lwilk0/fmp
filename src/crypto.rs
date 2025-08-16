@@ -45,7 +45,7 @@ pub fn securely_retrieve_password(
     ui.horizontal(|ui| {
         ui.label(text);
 
-        let response = if app.show_password {
+        let response = if app.show_password_retrieve {
             ui.add(egui::TextEdit::singleline(&mut password).desired_width(200.0))
         } else {
             ui.add(
@@ -55,10 +55,12 @@ pub fn securely_retrieve_password(
             )
         };
 
-        if app.show_password {
-            app.show_password = show_password_button(app.show_password, ui, "Hide");
+        if app.show_password_retrieve {
+            app.show_password_retrieve =
+                show_password_button(app.show_password_retrieve, ui, "Hide");
         } else {
-            app.show_password = show_password_button(app.show_password, ui, "Show");
+            app.show_password_retrieve =
+                show_password_button(app.show_password_retrieve, ui, "Show");
         }
 
         if response.changed() {
@@ -74,7 +76,7 @@ pub fn securely_retrieve_password(
         }
     });
 
-    if !password.is_empty() && app.show_password {
+    if !password.is_empty() && app.show_password_retrieve {
         password_strength_meter(ui, &password);
     }
 

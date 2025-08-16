@@ -58,7 +58,8 @@ pub struct FmpApp {
     pub change_vault_name: bool,
     pub random_password: bool,
     pub quit: bool,
-    pub show_password: bool,
+    pub show_password_account: bool,
+    pub show_password_retrieve: bool,
     pub show_welcome: bool,
 
     pub needs_refresh_vaults: bool,
@@ -96,7 +97,8 @@ impl Default for FmpApp {
             change_vault_name: false,
             random_password: false,
             quit: false,
-            show_password: false,
+            show_password_account: false,
+            show_password_retrieve: false,
             show_welcome: false,
 
             needs_refresh_vaults: true,
@@ -305,6 +307,7 @@ impl eframe::App for FmpApp {
                         self.account_name_create.clear();
                         self.change_account_info = false;
                         self.change_vault_name = false;
+                        self.random_password = false;
 
                         self.needs_refresh_accounts = true;
                     }
@@ -393,6 +396,7 @@ impl eframe::App for FmpApp {
                     if let Some(account) = clicked_account {
                         self.change_vault_name = false;
                         self.change_account_info = false;
+                        self.random_password = false;
                         self.account_name = account.clone();
                         self.userpass = match get_account_details(&self.vault_name, &account) {
                             Ok(userpass) => userpass,
