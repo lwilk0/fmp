@@ -28,6 +28,7 @@ use crate::{
 };
 use core::mem;
 use secrecy::ExposeSecret;
+use std::time::Duration;
 use zeroize::Zeroize;
 
 /// Displays the content for the main window of the application when nothing is selected.
@@ -168,7 +169,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             if ui
-                .button(egui::RichText::new("Delete Vault").color(egui::Color32::RED))
+                .button(egui::RichText::new("Delete Vault").color(egui::Color32::LIGHT_RED))
                 .clicked()
             {
                 match delete_vault(app) {
@@ -289,6 +290,14 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             if ui.button("Copy").clicked() {
+                app.toasts
+                    .success("Password copied to clipboard.")
+                    .duration(Some(Duration::from_secs(2)));
+
+                app.toasts
+                    .warning("Clipboard may be read by other apps.")
+                    .duration(Some(Duration::from_secs(3)));
+
                 ui.ctx().copy_text(password.to_string());
             }
 
@@ -317,7 +326,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         }
 
         if ui
-            .button(egui::RichText::new("Delete Account").color(egui::Color32::RED))
+            .button(egui::RichText::new("Delete Account").color(egui::Color32::LIGHT_RED))
             .clicked()
         {
             match delete_account_from_vault(app) {

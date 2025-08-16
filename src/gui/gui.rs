@@ -3,10 +3,10 @@ use crate::{
     vault::{Locations, UserPass, get_account_details, read_directory},
 };
 use eframe::egui;
+use egui_notify::Toasts;
 use log::error;
 use secrecy::SecretBox;
 use zeroize::Zeroize;
-
 /// Runs the FMP GUI application.
 ///
 /// # Returns
@@ -72,6 +72,8 @@ pub struct FmpApp {
     pub vault_sort_asc: bool,
     pub account_sort_asc: bool,
     pub sort_case_sensitive: bool,
+
+    pub toasts: Toasts,
 }
 
 impl Default for FmpApp {
@@ -110,6 +112,8 @@ impl Default for FmpApp {
             vault_sort_asc: true,
             account_sort_asc: true,
             sort_case_sensitive: false,
+
+            toasts: Toasts::default(),
         }
     }
 }
@@ -223,6 +227,8 @@ impl Drop for FmpApp {
 /// Implementation of the "eframe::App" trait for the "FmpApp" struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
+
         if !self.initialized {
             self.check_first_run();
             self.needs_refresh_vaults = true;
@@ -243,6 +249,9 @@ impl eframe::App for FmpApp {
             .frame(egui::Frame::side_top_panel(&ctx.style()).inner_margin(egui::Margin::same(12)))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.add_space(40.0);
+                    ui.separator();
+
                     ui.horizontal(|ui| {
                         ui.heading("Vaults");
                         if ui.button("Refresh").clicked() {
@@ -252,7 +261,9 @@ impl eframe::App for FmpApp {
 
                     ui.horizontal(|ui| {
                         let te = egui::TextEdit::singleline(&mut self.vault_filter)
-                            .hint_text("Filter vaults...");
+                            .hint_text("Filter vaults...")
+                            .desired_width(160.0);
+
                         ui.add(te);
                         if ui
                             .add_enabled(!self.vault_filter.is_empty(), egui::Button::new("×"))
@@ -341,7 +352,9 @@ impl eframe::App for FmpApp {
 
                     ui.horizontal(|ui| {
                         let te = egui::TextEdit::singleline(&mut self.account_filter)
-                            .hint_text("Filter accounts...");
+                            .hint_text("Filter accounts...")
+                            .desired_width(160.0);
+
                         ui.add_enabled(!self.vault_name.is_empty(), te);
 
                         if ui
@@ -424,6 +437,7 @@ impl eframe::App for FmpApp {
                     ui.label(egui::RichText::new("Forgot My Password").size(32.0));
                 });
 
+                ui.separator();
                 ui.add_space(8.0);
 
                 if self.change_vault_name {
@@ -473,5 +487,7 @@ impl eframe::App for FmpApp {
                     }
                 });
         }
+
+        self.toasts.show(ctx);
     }
 }
