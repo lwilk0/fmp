@@ -1,54 +1,11 @@
-workflow:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_COMMIT_BRANCH == "testing"'
-
-image: rust:1.82-slim-bullseye
-
-stages:
-  - build
-
-variables:
-  CARGO_HOME: "/cache/cargo"
-  CARGO_TERM_COLOR: "always"
-
-cache:
-  key: "$CI_JOB_IMAGE-$CI_COMMIT_REF_SLUG"
-  policy: pull-push
-  paths:
-    - /cache/cargo/bin/
-    - /cache/cargo/registry/
-    - /cache/cargo/git/
-    - /cache/cargo-audit-target/
-    - target/
-
-build:
-  stage: build
+run_test:
+  image: rust:latest
   before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates
-    - update-ca-certificates
-    - rustc --version
-    - cargo --version
+    - rustup --version
+    - rustc -vV
     - rustup component add clippy
-    - export PATH="$CARGO_HOME/bin:$PATH"
-    # Preferred: install prebuilt cargo-audit to avoid compiling deps that require edition2024
-    - |
-      if ! command -v cargo-audit >/dev/null 2>&1; then
-        if ! command -v cargo-binstall >/dev/null 2>&1; then
-          curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install.sh | bash
-        end_if_binstall
-        # Try to fetch a prebuilt cargo-audit; avoids building tame-index etc.
-        cargo binstall -y cargo-audit@0.21.2 || cargo binstall -y cargo-audit || true
-      fi
-    # Fallback: if binstall fails or no prebuilt is available, compile an older version that works on stable
-    - |
-      if ! command -v cargo-audit >/dev/null 2>&1; then
-        echo "Falling back to building cargo-audit 0.20.0 with --locked..."
-        CARGO_TARGET_DIR=/cache/cargo-audit-target cargo install --locked cargo-audit@0.20.0
-      fi
+    - rustup component add rustfmt
   script:
-    - cargo build --verbose
-    - cargo clippy --verbose -- -D warnings
-    - cargo audit
+    - cargo clippy -- --deny clippy::pedantic
+    - cargo fmt --all -- --check
+    - cargo test
