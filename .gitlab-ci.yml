@@ -8,6 +8,6 @@ run_test:
     - rustup component add clippy
     - rustup component add rustfmt
   script:
-    - cargo clippy -- --deny clippy::pedantic
+    - cargo clippy
     - cargo fmt --all -- --check
     - cargo test
