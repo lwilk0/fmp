@@ -56,7 +56,7 @@ pub fn generate_password(app: &mut FmpApp) {
     for ch in &retain_set {
         base.remove(ch);
     }
-    // ...then ensure all "consider" chars are present (overrides ignore).
+
     for ch in &add_set {
         base.insert(*ch);
     }
