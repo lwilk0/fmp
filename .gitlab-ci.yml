@@ -33,6 +33,7 @@ build:
     - cargo --version
     - rustup component add clippy
     - export PATH="$CARGO_HOME/bin:$PATH"
+    - |
       if ! command -v cargo-audit >/dev/null 2>&1; then
         CARGO_TARGET_DIR=/cache/cargo-audit-target cargo install --locked cargo-audit@0.21.2
       fi
