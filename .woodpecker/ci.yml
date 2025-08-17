@@ -1,0 +1,15 @@
+pipeline:
+  run_test:
+    image: rust:latest
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends libgpg-error-dev libgpgme-dev
+      - rustup --version
+      - rustc -vV
+      - rustup component add clippy rustfmt
+      - cargo clippy
+      - cargo fmt --all -- --check
+    when:
+      event:
+        - push
+        - pull_request
