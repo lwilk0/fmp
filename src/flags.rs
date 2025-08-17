@@ -47,14 +47,14 @@ pub fn create_new_vault(app: &mut FmpApp) -> Result<(), Error> {
 
     if locations.vault_location.exists() {
         Err(anyhow::anyhow!(
-            "Vault \"{}\" already exists. Please choose a different name or delete the existing vault.",
+            "Vault `{}` already exists. Please choose a different name or delete the existing vault.",
             app.vault_name_create
         ))?;
     }
 
     if ctx.get_key(&app.recipient).is_err() {
         Err(anyhow::anyhow!(
-            "Recipient \"{}\" does not exist. Please ensure you have imported the public key into GPG.",
+            "Recipient `{}` does not exist. Please ensure you have imported the public key into GPG.",
             app.recipient
         ))?;
     }
@@ -81,7 +81,7 @@ pub fn add_account(app: &mut FmpApp) -> Result<(), Error> {
 
     if store.locations.account_location.exists() {
         Err(anyhow::anyhow!(
-            "Account \"{}\" already exists. Please choose a different name or delete the existing account.",
+            "Account `{}` already exists. Please choose a different name or delete the existing account.",
             app.account_name_create
         ))?;
     } else {
@@ -172,7 +172,7 @@ pub fn delete_account_from_vault(app: &mut FmpApp) -> Result<(), Error> {
         remove_dir_all(&locations.account_location)?;
     } else {
         return Err(anyhow::anyhow!(
-            "Account \"{}\" does not exist in vault \"{}\". Check for typos or run \"fmp -a\" to add it.",
+            "Account `{}` does not exist in vault `{}`. Check for typos or run `fmp -a` to add it.",
             app.account_name,
             app.vault_name
         ));

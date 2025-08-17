@@ -52,7 +52,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             "Email:",
             &mut app.recipient,
             Some(
-                "What email address should the vault be associated with? (This should be a public key you have imported into GPG). You can create a public key using the command \"gpg --full-generate-key\", or import an existing one using \"gpg --import <keyfile>\".",
+                "What email address should the vault be associated with? (This should be a public key you have imported into GPG). You can create a public key using the command `gpg --full-generate-key`, or import an existing one using `gpg --import <keyfile>`.",
             ),
         );
 
@@ -69,7 +69,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 match create_new_vault(app) {
                     Ok(_) => {
                         app.output = Some(Ok(format!(
-                            "Vault \"{}\" created successfully! NOTE: By default, GPG caches your password for 10 minutes. See \"https://github.com/lwilk0/fmp/blob/main/GPGCACHE.md\".",
+                            "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://gitlab.com/lwilk01/fmp/-/blob/main/GPGCACHE.md?ref_type=heads`.",
                             app.vault_name_create
                         )));
 
@@ -81,7 +81,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to create vault \"{}\". Error: {}",
+                            "Failed to create vault `{}`. Error: {}",
                             app.vault_name_create, e
                         )))
                     }
@@ -134,7 +134,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 match add_account(app) {
                     Ok(_) => {
                         app.output = Some(Ok(format!(
-                            "Account \"{}\" added to vault \"{}\".",
+                            "Account `{}` added to vault `{}`.",
                             app.account_name, app.vault_name
                         )));
                         app.clear_account_data();
@@ -143,7 +143,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to add account \"{}\" to vault \"{}\". Error: {}",
+                            "Failed to add account `{}` to vault `{}`. Error: {}",
                             app.account_name, app.vault_name, e
                         )));
                     }
@@ -174,13 +174,13 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             {
                 match delete_vault(app) {
                     Ok(()) => {
-                        app.output = Some(Ok(format!("Vault \"{}\" deleted.", app.vault_name)));
+                        app.output = Some(Ok(format!("Vault `{}` deleted.", app.vault_name)));
                         app.vault_name.clear();
                         app.fetch_vault_names();
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to delete vault \"{}\". Error: {}",
+                            "Failed to delete vault `{}`. Error: {}",
                             app.vault_name, e
                         )));
                     }
@@ -205,13 +205,13 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 match create_backup(app) {
                     Ok(_) => {
                         app.output = Some(Ok(format!(
-                            "Vault \"{}\" backed up successfully.",
+                            "Vault `{}` backed up successfully.",
                             app.vault_name
                         )));
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to back up vault \"{}\". Error: {}",
+                            "Failed to back up vault `{}`. Error: {}",
                             app.vault_name, e
                         )));
                     }
@@ -222,13 +222,13 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 match install_backup(app) {
                     Ok(_) => {
                         app.output = Some(Ok(format!(
-                            "Vault \"{}\" restored successfully.",
+                            "Vault `{}` restored successfully.",
                             app.vault_name
                         )));
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to restore vault \"{}\". Error: {}",
+                            "Failed to restore vault `{}`. Error: {}",
                             app.vault_name, e
                         )));
                     }
@@ -332,7 +332,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             match delete_account_from_vault(app) {
                 Ok(_) => {
                     app.output = Some(Ok(format!(
-                        "Account \"{}\" deleted from vault \"{}\".",
+                        "Account `{}` deleted from vault `{}`.",
                         app.account_name, app.vault_name
                     )));
 
@@ -343,7 +343,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
                 Err(e) => {
                     app.output = Some(Err(format!(
-                        "Failed to delete account \"{}\" from vault {}. Error: {}",
+                        "Failed to delete account `{}` from vault {}. Error: {}",
                         app.account_name, app.vault_name, e
                     )))
                 }
@@ -417,7 +417,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                         }
 
                         app.output = Some(Ok(format!(
-                            "Account \"{}\" updated successfully in vault \"{}\".",
+                            "Account `{}` updated successfully in vault `{}`.",
                             app.account_name, app.vault_name
                         )));
 
@@ -426,7 +426,7 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to change account name \"{}\". Error: {}",
+                            "Failed to change account name `{}`. Error: {}",
                             app.account_name, e
                         )));
                     }
@@ -482,10 +482,8 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
 
                 match rename_vault(app) {
                     Ok(_) => {
-                        app.output = Some(Ok(format!(
-                            "Vault renamed to \"{}\".",
-                            app.vault_name_create
-                        )));
+                        app.output =
+                            Some(Ok(format!("Vault renamed to `{}`.", app.vault_name_create)));
                         app.vault_name = app.vault_name_create.clone();
                         app.vault_name_create.clear();
                         app.fetch_vault_names();
@@ -493,7 +491,7 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
                     }
                     Err(e) => {
                         app.output = Some(Err(format!(
-                            "Failed to rename vault \"{}\". Error: {}",
+                            "Failed to rename vault `{}`. Error: {}",
                             app.vault_name_create, e
                         )));
                     }

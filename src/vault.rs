@@ -119,7 +119,7 @@ impl Locations {
     pub fn does_vault_exist(&self) -> Result<(), Error> {
         if !self.vault_location.exists() {
             return Err(anyhow::anyhow!(
-                "Vault \"{:?}\" does not exist. Check for typos or create it.",
+                "Vault `{:?}` does not exist. Check for typos or create it.",
                 self.vault_location
             ));
         }
@@ -137,7 +137,7 @@ impl Locations {
     pub fn does_account_exist(&self) -> Result<(), Error> {
         if !self.account_location.exists() {
             return Err(anyhow::anyhow!(
-                "Account \"{:?}\" does not exist. Check for typos or create it.",
+                "Account `{:?}` does not exist. Check for typos or create it.",
                 self.account_location
             ));
         }
@@ -193,7 +193,7 @@ impl Store {
         let recipient = read_to_string(&self.locations.recipient_location)?;
         let recipient_key = &self.ctx.get_key(&recipient).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to find recipient \"{}\" for encryption. Error: {}",
+                "Failed to find recipient `{}` for encryption. Error: {}",
                 recipient,
                 e
             )
@@ -236,7 +236,7 @@ impl Store {
             .encrypt([recipient_key], &data, &mut output)
             .map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to encrypt data for recipient \"{}\". Error: {}",
+                    "Failed to encrypt data for recipient `{}`. Error: {}",
                     recipient,
                     e
                 )
@@ -313,7 +313,7 @@ pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Er
         rename(old_path, new_path)?;
     } else {
         return Err(anyhow::anyhow!(
-            "The directory \"{}\" does not exist.",
+            "The directory `{}` does not exist.",
             old_path.display()
         ));
     }
