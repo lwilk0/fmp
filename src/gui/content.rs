@@ -69,7 +69,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 match create_new_vault(app) {
                     Ok(_) => {
                         app.output = Some(Ok(format!(
-                            "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://gitlab.com/lwilko/fmp/-/blob/main/GPGCACHE.md?ref_type=heads`.",
+                            "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://codeberg.org/lwilko/fmp/-/blob/main/GPGCACHE.md?ref_type=heads`.",
                             app.vault_name_create
                         )));
 
