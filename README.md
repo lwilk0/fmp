@@ -1,3 +1,5 @@
+## Due to Microsoft making GitHub part of CoreAI, I have moved to [Codeberg](https://codeberg.org/lwilko).
+
 # FMP (Forgot My Password)
 
 [![Latest Version](https://img.shields.io/crates/v/forgot-my-password.svg?logo=rust)](https://crates.io/crates/forgot-my-password)
