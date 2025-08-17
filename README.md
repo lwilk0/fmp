@@ -1,7 +1,6 @@
 # FMP (Forgot My Password)
 
 [![Latest Version](https://img.shields.io/crates/v/forgot-my-password.svg?logo=rust)](https://crates.io/crates/forgot-my-password)
-[![CI status](https://ci.codeberg.org/api/badges/lwilko/fmp/status.svg?branch=main)](https://ci.codeberg.org/repos/lwilko/fmp)
 [![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://codeberg.org/lwilko/fmp/-/blob/main/LICENSE?ref_type=heads)
 
 A password manager written in memory-safe Rust.
