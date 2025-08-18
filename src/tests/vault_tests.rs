@@ -41,13 +41,13 @@ fn test_initialize_vault() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
 
     let result = locations.initialize_vault();
 
     assert!(result.is_ok());
-    assert!(locations.vault_location.exists());
-    assert!(locations.recipient_location.exists());
+    assert!(locations.vault.exists());
+    assert!(locations.recipient.exists());
 }
 
 #[test]
@@ -60,12 +60,12 @@ fn test_create_account_directory() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, ACCOUNT_NAME).unwrap();
+    let locations = Locations::new(&vault_name, ACCOUNT_NAME);
 
     let result = locations.create_account_directory();
 
     assert!(result.is_ok());
-    assert!(locations.account_location.exists());
+    assert!(locations.account.exists());
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_does_vault_exist_success() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
     locations.initialize_vault().unwrap();
 
     let result = Locations::does_vault_exist(&locations);
@@ -96,7 +96,7 @@ fn test_does_vault_exist_failure() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
 
     let result = Locations::does_vault_exist(&locations);
 
@@ -113,16 +113,16 @@ fn test_find_account_names() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
     locations.initialize_vault().unwrap();
 
-    let account1 = Locations::new(&vault_name, "account1").unwrap();
+    let account1 = Locations::new(&vault_name, "account1");
     account1.create_account_directory().unwrap();
 
-    let account2 = Locations::new(&vault_name, "account2").unwrap();
+    let account2 = Locations::new(&vault_name, "account2");
     account2.create_account_directory().unwrap();
 
-    let account_names = read_directory(&locations.vault_location).unwrap();
+    let account_names = read_directory(&locations.vault).unwrap();
 
     assert_eq!(account_names.len(), 2);
     assert!(account_names.contains(&"account1".to_string()));
@@ -142,14 +142,14 @@ fn test_encrypt_to_file_and_decrypt_from_file() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
@@ -181,7 +181,7 @@ fn test_missing_recipient_file() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
@@ -204,16 +204,16 @@ fn test_corrupted_encrypted_data() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
-    write(&locations.data_location, b"corrupted_data").unwrap();
+    write(&locations.data, b"corrupted_data").unwrap();
 
     let result = store.decrypt_from_file();
 
@@ -248,17 +248,17 @@ fn test_large_number_of_accounts() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
 
     locations.initialize_vault().unwrap();
 
     for i in 0..1000 {
         let account_name = format!("account_{i}");
-        let account_locations = Locations::new(&vault_name, &account_name).unwrap();
-        account_locations.create_account_directory().unwrap();
+        let accounts = Locations::new(&vault_name, &account_name);
+        accounts.create_account_directory().unwrap();
     }
 
-    let account_names = read_directory(&locations.vault_location).unwrap();
+    let account_names = read_directory(&locations.vault).unwrap();
 
     assert_eq!(account_names.len(), 1000);
 }
@@ -276,14 +276,14 @@ fn test_large_password() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
     let large_password = vec![b'a'; 10_000];
     let userpass = UserPass {
@@ -311,20 +311,16 @@ fn test_invalid_username_or_password() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
-    write(
-        &locations.data_location,
-        b"invalid_username:invalid_password",
-    )
-    .unwrap();
+    write(&locations.data, b"invalid_username:invalid_password").unwrap();
 
     let result = store.decrypt_from_file();
 
@@ -345,14 +341,14 @@ fn test_file_permissions() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
@@ -361,7 +357,7 @@ fn test_file_permissions() {
 
     store.encrypt_to_file(&userpass).unwrap();
 
-    let metadata = std::fs::metadata(&locations.data_location).unwrap();
+    let metadata = std::fs::metadata(&locations.data).unwrap();
     let permissions = metadata.permissions();
 
     assert_eq!(permissions.mode() & 0o777, 0o600);
@@ -380,14 +376,14 @@ fn test_utf8_username_and_password() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
     let userpass = UserPass {
         username: "用户名".to_string(),
@@ -419,13 +415,13 @@ fn test_invalid_recipient() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let invalid_recipient = "invalid@recipient.com";
-    write(&locations.recipient_location, invalid_recipient).unwrap();
+    write(&locations.recipient, invalid_recipient).unwrap();
 
     let userpass = UserPass {
         username: "test_user".to_string(),
@@ -448,7 +444,7 @@ fn test_duplicate_account_creation() {
         .to_string();
 
     let account_name = ACCOUNT_NAME;
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
@@ -456,7 +452,7 @@ fn test_duplicate_account_creation() {
     let result = locations.create_account_directory();
 
     assert!(result.is_ok());
-    assert!(locations.account_location.exists());
+    assert!(locations.account.exists());
 }
 
 #[test]
@@ -472,16 +468,16 @@ fn test_invalid_data_format() {
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
 
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = &get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
+    write(&locations.recipient, recipient).unwrap();
 
-    write(&locations.data_location, b"invalid:data:format").unwrap();
+    write(&locations.data, b"invalid:data:format").unwrap();
 
     let result = store.decrypt_from_file();
 
@@ -520,14 +516,14 @@ fn test_vault_creation_and_existence_check() {
     let temp_dir = tempdir().unwrap();
     let vault_path = temp_dir.path().join(VAULT_NAME);
     let vault_name = vault_path.to_str().unwrap();
-    let locations = Locations::new(vault_name, NULL).unwrap();
+    let locations = Locations::new(vault_name, NULL);
 
     assert!(locations.initialize_vault().is_ok());
     assert!(Locations::does_vault_exist(&locations).is_ok());
 
     let nonexist_path = temp_dir.path().join("nonexistent_vault");
     let nonexist_name = nonexist_path.to_str().unwrap();
-    let nonexist_locations = Locations::new(nonexist_name, NULL).unwrap();
+    let nonexist_locations = Locations::new(nonexist_name, NULL);
 
     assert!(Locations::does_vault_exist(&nonexist_locations).is_err());
 }
@@ -544,15 +540,15 @@ fn test_decrypt_with_corrupted_data_fails() {
 
     let account_name = ACCOUNT_NAME;
     let mut store = Store::new(&vault_name, account_name).unwrap();
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
     let recipient = get_valid_recipient();
 
-    write(&locations.recipient_location, recipient).unwrap();
-    write(&locations.data_location, b"not a valid gpg file").unwrap();
+    write(&locations.recipient, recipient).unwrap();
+    write(&locations.data, b"not a valid gpg file").unwrap();
 
     let result = store.decrypt_from_file();
     assert!(result.is_err());
@@ -569,12 +565,12 @@ fn test_rename_directory_success_and_failure() {
         .to_string();
 
     let account_name = ACCOUNT_NAME;
-    let locations = Locations::new(&vault_name, account_name).unwrap();
+    let locations = Locations::new(&vault_name, account_name);
 
     locations.initialize_vault().unwrap();
     locations.create_account_directory().unwrap();
 
-    let old_path = locations.account_location.clone();
+    let old_path = locations.account.clone();
     let new_path = old_path.parent().unwrap().join("renamed_account");
 
     assert!(rename_directory(&old_path, &new_path).is_ok());
@@ -597,10 +593,10 @@ fn test_read_directory_with_no_subdirs() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
     locations.initialize_vault().unwrap();
 
-    let subdirs = read_directory(&locations.vault_location).unwrap();
+    let subdirs = read_directory(&locations.vault).unwrap();
     assert!(subdirs.is_empty());
 }
 
@@ -614,17 +610,17 @@ fn test_read_directory_with_multiple_subdirs() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
 
     locations.initialize_vault().unwrap();
 
-    let sub1 = locations.vault_location.join("acc1");
-    let sub2 = locations.vault_location.join("acc2");
+    let sub1 = locations.vault.join("acc1");
+    let sub2 = locations.vault.join("acc2");
 
     create_dir(&sub1).unwrap();
     create_dir(&sub2).unwrap();
 
-    let mut subdirs = read_directory(&locations.vault_location).unwrap();
+    let mut subdirs = read_directory(&locations.vault).unwrap();
     subdirs.sort();
 
     let mut expected = vec!["acc1".to_string(), "acc2".to_string()];
@@ -643,7 +639,7 @@ fn test_read_directory_with_non_utf8_names() {
         .unwrap()
         .to_string();
 
-    let locations = Locations::new(&vault_name, NULL).unwrap();
+    let locations = Locations::new(&vault_name, NULL);
     locations.initialize_vault().unwrap();
 
     // Create a directory with invalid UTF-8 (on Unix)
@@ -651,10 +647,10 @@ fn test_read_directory_with_non_utf8_names() {
     {
         use std::os::unix::ffi::OsStrExt;
         let non_utf8 = locations
-            .vault_location
+            .vault
             .join(std::ffi::OsStr::from_bytes(b"acc_\xFF"));
         create_dir(&non_utf8).unwrap();
-        let result = read_directory(&locations.vault_location);
+        let result = read_directory(&locations.vault);
         assert!(result.is_err());
     }
     #[cfg(not(unix))]
@@ -680,8 +676,8 @@ fn test_multiple_accounts_isolation() {
     let mut store1 = Store::new(&vault_name, account1).unwrap();
     let mut store2 = Store::new(&vault_name, account2).unwrap();
 
-    let locations1 = Locations::new(&vault_name, account1).unwrap();
-    let locations2 = Locations::new(&vault_name, account2).unwrap();
+    let locations1 = Locations::new(&vault_name, account1);
+    let locations2 = Locations::new(&vault_name, account2);
 
     locations1.initialize_vault().unwrap();
     locations1.create_account_directory().unwrap();
@@ -689,8 +685,8 @@ fn test_multiple_accounts_isolation() {
 
     let recipient = get_valid_recipient();
 
-    write(&locations1.recipient_location, &recipient).unwrap();
-    write(&locations2.recipient_location, &recipient).unwrap();
+    write(&locations1.recipient, &recipient).unwrap();
+    write(&locations2.recipient, &recipient).unwrap();
 
     let userpass1 = UserPass {
         username: "user1".to_string(),

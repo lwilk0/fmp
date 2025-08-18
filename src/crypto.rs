@@ -26,8 +26,8 @@ use zeroize::Zeroize;
 /// Securely retrieves a password from the user interface.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing user credentials.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the UI.
+/// * `app` - A mutable reference to the `FmpApp` instance containing user credentials.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the UI.
 /// * "text" - A string slice containing the label text to display alongside the password input field.
 /// * "generating" - Bool representing if the password being retrieved if from the password generation menu
 pub fn securely_retrieve_password(
@@ -36,10 +36,10 @@ pub fn securely_retrieve_password(
     text: &str,
     generating: bool,
 ) {
-    let mut password = if !generating {
-        String::from_utf8(app.userpass.password.expose_secret().clone()).unwrap_or_default()
-    } else {
+    let mut password = if generating {
         String::from_utf8(app.generated_password.expose_secret().clone()).unwrap_or_default()
+    } else {
+        String::from_utf8(app.userpass.password.expose_secret().clone()).unwrap_or_default()
     };
 
     ui.horizontal(|ui| {
@@ -57,19 +57,19 @@ pub fn securely_retrieve_password(
 
         if app.show_password_retrieve {
             app.show_password_retrieve =
-                show_password_button(app.show_password_retrieve, ui, "Hide");
+                show_password_button(ui, app.show_password_retrieve, "Hide");
         } else {
             app.show_password_retrieve =
-                show_password_button(app.show_password_retrieve, ui, "Show");
+                show_password_button(ui, app.show_password_retrieve, "Show");
         }
 
         if response.changed() {
             let mut pw_bytes = password.as_bytes().to_vec();
 
-            if !generating {
-                app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
-            } else {
+            if generating {
                 app.generated_password = SecretBox::new(Box::new(pw_bytes.clone()));
+            } else {
+                app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
             }
 
             pw_bytes.zeroize();
@@ -90,12 +90,12 @@ pub fn securely_retrieve_password(
 pub fn lock_memory(data: &[u8]) {
     #[cfg(unix)]
     unsafe {
-        libc::mlock(data.as_ptr() as *const c_void, data.len());
+        libc::mlock(data.as_ptr().cast::<c_void>(), data.len());
     }
 
     #[cfg(windows)]
     unsafe {
         use windows::Win32::System::Memory::VirtualLock;
-        VirtualLock(data.as_ptr() as *const c_void, data.len());
+        VirtualLock(data.as_ptr().cast::<c_void>(), data.len());
     }
 }

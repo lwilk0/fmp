@@ -27,3 +27,6 @@ secrecy = "0.10.3"
 tempfile = "3.20.0"
 windows = { version = "0.61.3", optional = true }
 zeroize = "1.8.1"
+
+[lints.clippy]
+pedantic = "warn"

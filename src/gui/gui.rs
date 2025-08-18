@@ -1,5 +1,8 @@
 use crate::{
-    content::*,
+    content::{
+        account_selected, alter_account_information, alter_vault_name, nothing_selected,
+        random_password, vault_selected,
+    },
     sidebar::sidebar,
     vault::{Locations, UserPass, read_directory},
 };
@@ -10,10 +13,10 @@ use zeroize::Zeroize;
 /// Runs the FMP GUI application.
 ///
 /// # Returns
-/// * "Result<(), eframe::Error>" - Returns "Ok(())" on success, or an error on failure.
+/// * `Result<(), eframe::Error>` - Returns 'Ok(())' on success, or an error on failure.
 ///
 /// # Errors
-/// * If there is an error initializing the GUI, it will return an "eframe::Error".
+/// * If there is an error initializing the GUI, it will return an `eframe::Error`.
 pub fn run_gui() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
@@ -23,6 +26,7 @@ pub fn run_gui() -> Result<(), eframe::Error> {
     )
 }
 
+#[allow(clippy::struct_excessive_bools)]
 /// The main application state for the FMP GUI.
 pub struct FmpApp {
     pub vault_name: String,
@@ -118,29 +122,27 @@ impl Default for FmpApp {
     }
 }
 
-/// Implementation of methods for the "FmpApp" struct to handle fetching vault and account names.
+/// Implementation of methods for the `FmpApp` struct to handle fetching vault and account names.
 impl FmpApp {
     /// Find all the vault names.
     pub fn fetch_vault_names(&mut self) {
-        if let Ok(locations) = Locations::new("", "") {
-            if let Ok(names) = read_directory(&locations.fmp_location.join("vaults")) {
-                self.vault_names = names;
-                self.output = None;
-            } else {
-                self.output = Some(Err("Failed to fetch vault names.".to_string()));
-            }
+        let locations = Locations::new("", "");
+        if let Ok(names) = read_directory(&locations.fmp.join("vaults")) {
+            self.vault_names = names;
+            self.output = None;
+        } else {
+            self.output = Some(Err("Failed to fetch vault names.".to_string()));
         }
     }
 
     /// Find all the account names in a vault.
     pub fn fetch_account_names(&mut self) {
-        if let Ok(locations) = Locations::new(&self.vault_name, "") {
-            if let Ok(names) = read_directory(&locations.vault_location) {
-                self.account_names = names;
-                self.output = None;
-            } else {
-                self.output = Some(Err("Failed to fetch account names.".to_string()));
-            }
+        let locations = Locations::new(&self.vault_name, "");
+        if let Ok(names) = read_directory(&locations.vault) {
+            self.account_names = names;
+            self.output = None;
+        } else {
+            self.output = Some(Err("Failed to fetch account names.".to_string()));
         }
     }
 
@@ -172,7 +174,7 @@ impl FmpApp {
         case_sensitive: bool,
     ) -> Vec<&'a str> {
         let mut view: Vec<&str> = if filter.is_empty() {
-            names.iter().map(|s| s.as_str()).collect()
+            names.iter().map(std::string::String::as_str).collect()
         } else if case_sensitive {
             names
                 .iter()
@@ -217,7 +219,7 @@ impl FmpApp {
     }
 }
 
-/// Implementation of the "eframe::App" trait for the "FmpApp" struct to handle GUI updates.
+/// Implementation of the `eframe::App` trait for the `FmpApp` struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);

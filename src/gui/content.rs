@@ -34,8 +34,8 @@ use zeroize::Zeroize;
 /// Displays the content for the main window of the application when nothing is selected.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.group(|ui| {
         ui.vertical_centered(|ui| {
@@ -67,7 +67,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     return;
                 }
                 match create_new_vault(app) {
-                    Ok(_) => {
+                    Ok(_o) => {
                         app.output = Some(Ok(format!(
                             "Vault `{}` created successfully! NOTE: By default, GPG caches your password for 10 minutes. See `https://codeberg.org/lwilko/fmp/-/blob/main/GPGCACHE.md?ref_type=heads`.",
                             app.vault_name_create
@@ -83,7 +83,7 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                         app.output = Some(Err(format!(
                             "Failed to create vault `{}`. Error: {}",
                             app.vault_name_create, e
-                        )))
+                        )));
                     }
                 }
             }
@@ -100,8 +100,8 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Displays the content for the main window of the application when a vault is selected.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state., pa
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.add_space(12.0);
 
@@ -132,7 +132,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     return;
                 }
                 match add_account(app) {
-                    Ok(_) => {
+                    Ok(_o) => {
                         app.output = Some(Ok(format!(
                             "Account `{}` added to vault `{}`.",
                             app.account_name, app.vault_name
@@ -200,41 +200,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
         ui.add_space(8.0);
 
-        ui.horizontal(|ui| {
-            if ui.button("Backup Vault").clicked() {
-                match create_backup(app) {
-                    Ok(_) => {
-                        app.output = Some(Ok(format!(
-                            "Vault `{}` backed up successfully.",
-                            app.vault_name
-                        )));
-                    }
-                    Err(e) => {
-                        app.output = Some(Err(format!(
-                            "Failed to back up vault `{}`. Error: {}",
-                            app.vault_name, e
-                        )));
-                    }
-                }
-            }
-
-            if ui.button("Restore Vault").clicked() {
-                match install_backup(app) {
-                    Ok(_) => {
-                        app.output = Some(Ok(format!(
-                            "Vault `{}` restored successfully.",
-                            app.vault_name
-                        )));
-                    }
-                    Err(e) => {
-                        app.output = Some(Err(format!(
-                            "Failed to restore vault `{}`. Error: {}",
-                            app.vault_name, e
-                        )));
-                    }
-                }
-            }
-        });
+        backup(app, ui);
     });
 
     ui.add_space(16.0);
@@ -253,8 +219,8 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Displays the content for the main window of the application when an account is selected.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.add_space(12.0);
 
@@ -302,8 +268,8 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             }
 
             app.show_password_account = show_password_button(
-                app.show_password_account,
                 ui,
+                app.show_password_account,
                 if app.show_password_account {
                     "Hide"
                 } else {
@@ -321,7 +287,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
     ui.horizontal(|ui| {
         if ui.button("Change Information").clicked() {
-            app.account_name_create = app.account_name.clone();
+            app.account_name_create.clone_from(&app.account_name);
             app.change_account_info = true;
         }
 
@@ -330,7 +296,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             .clicked()
         {
             match delete_account_from_vault(app) {
-                Ok(_) => {
+                Ok(_o) => {
                     app.output = Some(Ok(format!(
                         "Account `{}` deleted from vault `{}`.",
                         app.account_name, app.vault_name
@@ -345,7 +311,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     app.output = Some(Err(format!(
                         "Failed to delete account `{}` from vault {}. Error: {}",
                         app.account_name, app.vault_name, e
-                    )))
+                    )));
                 }
             }
         }
@@ -367,8 +333,8 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Displays the content for altering account information.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.add_space(12.0);
 
@@ -400,11 +366,11 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                     return;
                 }
                 match change_account_data(app) {
-                    Ok(_) => {
+                    Ok(_o) => {
                         if app.account_name != app.account_name_create {
                             match change_account_name(app) {
-                                Ok(_) => {
-                                    app.account_name = app.account_name_create.clone();
+                                Ok(_o) => {
+                                    app.account_name.clone_from(&app.account_name_create);
                                     app.account_name_create.clear();
                                 }
                                 Err(e) => {
@@ -456,8 +422,8 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Displays the content for altering the vault name.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.add_space(12.0);
 
@@ -481,10 +447,10 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
                 }
 
                 match rename_vault(app) {
-                    Ok(_) => {
+                    Ok(_o) => {
                         app.output =
                             Some(Ok(format!("Vault renamed to `{}`.", app.vault_name_create)));
-                        app.vault_name = app.vault_name_create.clone();
+                        app.vault_name.clone_from(&app.vault_name_create);
                         app.vault_name_create.clear();
                         app.fetch_vault_names();
                         app.change_vault_name = false;
@@ -604,8 +570,8 @@ pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Creates a quit button
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the application state.
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn quit_button(app: &mut FmpApp, ui: &mut egui::Ui) {
     ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
         if ui.button("Quit").clicked() {
@@ -617,10 +583,10 @@ pub fn quit_button(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// Creates labeled text input field.
 ///
 /// # Arguments
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
-/// * "label" - The label for the text input field.
-/// * "value" - A mutable reference to the value of the text input field.
-/// * "hover" - An optional string to display as a hover text for the text input field.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
+/// * `label` - The label for the text input field.
+/// * `value` - A mutable reference to the value of the text input field.
+/// * `hover` - An optional string to display as a hover text for the text input field.
 fn labeled_text_input(ui: &mut egui::Ui, label: &str, value: &mut String, hover: Option<&str>) {
     ui.horizontal(|ui| {
         ui.label(label);
@@ -636,15 +602,58 @@ fn labeled_text_input(ui: &mut egui::Ui, label: &str, value: &mut String, hover:
 /// Displays a show/hide password button
 ///
 /// # Arguments
-/// * "state" - The current state of the password(True - Show, False - Hide)
-/// * "ui" - A mutable reference to the "egui::Ui" instance for rendering the user interface.
-/// * "label" - The label for the text input field.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
+/// * `state` - The current state of the password(True - Show, False - Hide)
+/// * `label` - The label for the text input field.
 ///
 /// # Returns
-/// * A "bool" of the new state.
-pub fn show_password_button(state: bool, ui: &mut egui::Ui, label: &str) -> bool {
+/// * A `bool` of the new state.
+pub fn show_password_button(ui: &mut egui::Ui, state: bool, label: &str) -> bool {
     if ui.button(label).clicked() {
         return !state;
     }
     state
+}
+
+/// Creates buttons for installing/making a backup
+///
+/// # Arguments
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
+fn backup(app: &mut FmpApp, ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        if ui.button("Backup Vault").clicked() {
+            match create_backup(app) {
+                Ok(_o) => {
+                    app.output = Some(Ok(format!(
+                        "Vault `{}` backed up successfully.",
+                        app.vault_name
+                    )));
+                }
+                Err(e) => {
+                    app.output = Some(Err(format!(
+                        "Failed to back up vault `{}`. Error: {}",
+                        app.vault_name, e
+                    )));
+                }
+            }
+        }
+
+        if ui.button("Restore Vault").clicked() {
+            match install_backup(app) {
+                Ok(_o) => {
+                    app.output = Some(Ok(format!(
+                        "Vault `{}` restored successfully.",
+                        app.vault_name
+                    )));
+                }
+                Err(e) => {
+                    app.output = Some(Err(format!(
+                        "Failed to restore vault `{}`. Error: {}",
+                        app.vault_name, e
+                    )));
+                }
+            }
+        }
+    });
 }

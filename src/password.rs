@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 /// Generates a random password of a specified length using ASCII characters.
 ///
 /// # Arguments
-/// * "app" - A mutable reference to the "FmpApp" instance containing the vault name and recipient.
+/// * `app` - A mutable reference to the `FmpApp` instance containing the vault name and recipient.
 pub fn generate_password(app: &mut FmpApp) {
     let mut pool = String::new();
     if app.selections[0] {
@@ -78,11 +78,12 @@ pub fn generate_password(app: &mut FmpApp) {
 /// Calculates the entropy of a given password based on its length and character pool.
 ///
 /// # Arguments
-/// * "password" - The password for which to calculate entropy.
+/// * `password` - The password for which to calculate entropy.
 ///
 /// # Returns
-/// * "(f64, &str)" - Returns a tuple containing the calculated entropy as a "f64" and a rating as a string slice.
+/// * A tuple containing the calculated entropy as a `f64` and a rating as a string slice.
 pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
+    #[allow(clippy::cast_precision_loss)]
     let len = password.chars().count() as f64;
     let mut freq = HashMap::new();
 
@@ -92,7 +93,7 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
 
     let mut entropy = 0.0;
     for count in freq.values() {
-        let p = *count as f64 / len;
+        let p = f64::from(*count) / len;
         entropy -= p * p.log2();
     }
     entropy *= len; // Total entropy in bits
@@ -115,11 +116,12 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
 /// Draws a password strength meter in the UI.
 ///
 /// # Arguments
-/// * "ui" - The egui UI context.
-/// * "password" - The password string to evaluate.
+/// * `ui` - The egui UI context.
+/// * `password` - The password string to evaluate.
 pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
     let (entropy, rating) = calculate_shannon_entropy(password);
 
+    #[allow(clippy::cast_possible_truncation)]
     let length = (entropy / 150.0).clamp(0.0, 1.0) as f32;
 
     let (color, progress) = match rating {

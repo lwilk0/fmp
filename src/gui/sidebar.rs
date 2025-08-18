@@ -51,144 +51,178 @@ fn filter_bar(
     });
 }
 
-///
-/// # Arguments
-/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
-/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
+/// Draw a section header with title and a Refresh button.
+/// Returns true if the Refresh button was clicked.
+fn header_with_refresh(ui: &mut egui::Ui, title: &str, refresh_enabled: bool) -> bool {
+    ui.horizontal(|ui| {
+        ui.heading(title);
+        let refresh_btn = egui::Button::new("Refresh");
+        ui.add_enabled(refresh_enabled, refresh_btn).clicked()
+    })
+    .inner
+}
+
+/// Generic selectable list. Highlights the `selected` value and returns the
+/// clicked item (owned `String`) if any.
+fn selectable_list<'a, I>(ui: &mut egui::Ui, items: I, selected: &str) -> Option<String>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut clicked: Option<String> = None;
+    for item in items {
+        if ui.selectable_label(selected == item, item).clicked() {
+            clicked = Some(item.to_string());
+            break;
+        }
+    }
+    clicked
+}
+
+/// Optional "X matching" summary next to a total label.
+fn render_count_row(ui: &mut egui::Ui, total_label: String, matching: Option<usize>) {
+    ui.horizontal(|ui| {
+        ui.label(total_label);
+        if let Some(m) = matching {
+            ui.label(format!("• {m} matching"));
+        }
+    });
+}
+
+/// Compute how many entries match a filter (using the same `make_view` as lists).
+fn compute_filtered_len(names: &[String], filter: &str, case_sensitive: bool) -> usize {
+    FmpApp::make_view(names, filter, true, case_sensitive).len()
+}
+
+/// Apply all side effects when a vault is selected (resets state and flags).
+fn select_vault(app: &mut FmpApp, vault: String) {
+    app.clear_account_data();
+    app.vault_name = vault;
+    app.account_names.clear();
+    app.account_name.clear();
+    app.account_name_create.clear();
+    app.change_account_info = false;
+    app.change_vault_name = false;
+    app.random_password = false;
+
+    app.needs_refresh_accounts = true;
+}
+
+/// Apply side effects when an account is selected and load its details.
+/// Returns Ok(()) on success, Err(()) on failure (already logged).
+fn select_account(app: &mut FmpApp, account: &str) -> Result<(), ()> {
+    app.change_vault_name = false;
+    app.change_account_info = false;
+    app.random_password = false;
+    app.account_name = account.to_string();
+
+    match get_account_details(&app.vault_name, account) {
+        Ok(userpass) => {
+            app.userpass = userpass;
+            Ok(())
+        }
+        Err(e) => {
+            error!("Failed to fetch account details. Error: {e}");
+            Err(())
+        }
+    }
+}
+
+/// Render the `Vaults` section.
+fn render_vaults_section(app: &mut FmpApp, ui: &mut egui::Ui) {
+    if header_with_refresh(ui, "Vaults", true) {
+        app.needs_refresh_vaults = true;
+    }
+
+    filter_bar(
+        ui,
+        &mut app.vault_filter,
+        &mut app.vault_sort_asc,
+        &mut app.sort_case_sensitive,
+        "Filter vaults...",
+        true,
+        true,
+    );
+
+    let vault_view = FmpApp::make_view(
+        &app.vault_names,
+        &app.vault_filter,
+        app.vault_sort_asc,
+        app.sort_case_sensitive,
+    );
+
+    if let Some(vault) = selectable_list(ui, vault_view, &app.vault_name) {
+        select_vault(app, vault);
+    }
+
+    let matching = if app.vault_filter.is_empty() {
+        None
+    } else {
+        Some(compute_filtered_len(
+            &app.vault_names,
+            &app.vault_filter,
+            app.sort_case_sensitive,
+        ))
+    };
+    render_count_row(ui, format!("{} vault(s)", app.vault_names.len()), matching);
+}
+
+/// Render the `Accounts` section.
+fn render_accounts_section(app: &mut FmpApp, ui: &mut egui::Ui) {
+    let accounts_enabled = !app.vault_name.is_empty();
+
+    if header_with_refresh(ui, "Accounts", accounts_enabled) {
+        app.needs_refresh_accounts = true;
+    }
+
+    filter_bar(
+        ui,
+        &mut app.account_filter,
+        &mut app.account_sort_asc,
+        &mut app.sort_case_sensitive,
+        "Filter accounts...",
+        accounts_enabled,
+        accounts_enabled,
+    );
+
+    let account_view = if app.vault_name.is_empty() {
+        Vec::<&str>::new()
+    } else {
+        FmpApp::make_view(
+            &app.account_names,
+            &app.account_filter,
+            app.account_sort_asc,
+            app.sort_case_sensitive,
+        )
+    };
+
+    if let Some(account) = selectable_list(ui, account_view, &app.account_name) {
+        if select_account(app, account.as_str()).is_err() {}
+    }
+}
+
+/// Render the optional output/status message.
+fn render_output_message(app: &FmpApp, ui: &mut egui::Ui) {
+    if let Some(msg) = &app.output {
+        ui.separator();
+        match msg {
+            Ok(info) => ui.label(info),
+            Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
+        };
+    }
+}
+
+/// Sidebar entry point: now very small, delegates to section helpers.
 pub fn sidebar(app: &mut FmpApp, ui: &mut egui::Ui) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.add_space(40.0);
         ui.separator();
 
-        ui.horizontal(|ui| {
-            ui.heading("Vaults");
-            if ui.button("Refresh").clicked() {
-                app.needs_refresh_vaults = true;
-            }
-        });
-
-        filter_bar(
-            ui,
-            &mut app.vault_filter,
-            &mut app.vault_sort_asc,
-            &mut app.sort_case_sensitive,
-            "Filter vaults...",
-            true,
-            true,
-        );
-
-        let vault_view = FmpApp::make_view(
-            &app.vault_names,
-            &app.vault_filter,
-            app.vault_sort_asc,
-            app.sort_case_sensitive,
-        );
-
-        let mut clicked_vault: Option<String> = None;
-        for vault in vault_view {
-            if ui
-                .selectable_label(app.vault_name == vault, vault)
-                .clicked()
-            {
-                clicked_vault = Some(vault.to_string());
-                break;
-            }
-        }
-
-        if let Some(vault) = clicked_vault {
-            app.clear_account_data();
-            app.vault_name = vault;
-            app.account_names.clear();
-            app.account_name.clear();
-            app.account_name_create.clear();
-            app.change_account_info = false;
-            app.change_vault_name = false;
-            app.random_password = false;
-
-            app.needs_refresh_accounts = true;
-        }
-
-        ui.horizontal(|ui| {
-            ui.label(format!("{} vault(s)", app.vault_names.len()));
-            if !app.vault_filter.is_empty() {
-                let filtered_count = FmpApp::make_view(
-                    &app.vault_names,
-                    &app.vault_filter,
-                    true,
-                    app.sort_case_sensitive,
-                )
-                .len();
-                ui.label(format!("• {filtered_count} matching"));
-            }
-        });
+        render_vaults_section(app, ui);
 
         ui.separator();
 
-        ui.horizontal(|ui| {
-            ui.heading("Accounts");
-            let refresh_btn = egui::Button::new("Refresh");
-            if ui
-                .add_enabled(!app.vault_name.is_empty(), refresh_btn)
-                .clicked()
-            {
-                app.needs_refresh_accounts = true;
-            }
-        });
+        render_accounts_section(app, ui);
 
-        // Replaces the previous accounts filter UI block
-        let accounts_enabled = !app.vault_name.is_empty();
-        filter_bar(
-            ui,
-            &mut app.account_filter,
-            &mut app.account_sort_asc,
-            &mut app.sort_case_sensitive,
-            "Filter accounts...",
-            accounts_enabled, // input_enabled
-            accounts_enabled, // controls_enabled
-        );
-
-        let account_view = if app.vault_name.is_empty() {
-            Vec::<&str>::new()
-        } else {
-            FmpApp::make_view(
-                &app.account_names,
-                &app.account_filter,
-                app.account_sort_asc,
-                app.sort_case_sensitive,
-            )
-        };
-
-        let mut clicked_account: Option<String> = None;
-        for account in account_view {
-            if ui
-                .selectable_label(app.account_name == account, account)
-                .clicked()
-            {
-                clicked_account = Some(account.to_string());
-                break;
-            }
-        }
-
-        if let Some(account) = clicked_account {
-            app.change_vault_name = false;
-            app.change_account_info = false;
-            app.random_password = false;
-            app.account_name = account.clone();
-            app.userpass = match get_account_details(&app.vault_name, &account) {
-                Ok(userpass) => userpass,
-                Err(e) => {
-                    error!("Failed to fetch account details. Error: {e}");
-                    return;
-                }
-            };
-        }
-
-        if let Some(msg) = &app.output {
-            ui.separator();
-            match msg {
-                Ok(info) => ui.label(info),
-                Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
-            };
-        }
+        render_output_message(app, ui);
     });
 }
