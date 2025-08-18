@@ -217,13 +217,6 @@ impl FmpApp {
     }
 }
 
-/// Clears sensitive info on exit
-impl Drop for FmpApp {
-    fn drop(&mut self) {
-        self.userpass.password.zeroize();
-    }
-}
-
 /// Implementation of the "eframe::App" trait for the "FmpApp" struct to handle GUI updates.
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -286,8 +279,9 @@ impl eframe::App for FmpApp {
                     ui.horizontal(|ui| {
                         if ui.button("Yes").clicked() {
                             self.userpass.password.zeroize();
-                            std::process::exit(0);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
+
                         if ui.button("No").clicked() {
                             self.quit = false;
                         }
