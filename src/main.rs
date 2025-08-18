@@ -30,6 +30,8 @@ mod vault;
 mod content;
 #[path = "gui/gui.rs"]
 mod gui;
+#[path = "gui/sidebar.rs"]
+mod sidebar;
 
 use crate::gui::run_gui;
 
