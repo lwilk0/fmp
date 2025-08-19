@@ -9,7 +9,9 @@ use crate::{
 use eframe::egui;
 use egui_notify::Toasts;
 use secrecy::SecretBox;
+use std::time::Duration;
 use zeroize::Zeroize;
+
 /// Runs the FMP GUI application.
 ///
 /// # Returns
@@ -36,8 +38,7 @@ pub struct FmpApp {
     /// - None: show nothing
     /// - Some(Ok(msg)): informational/success message
     /// - Some(Err(msg)): error message (drawn in red)
-    pub output: Option<Result<String, String>>,
-
+    //pub output: Option<Result<String, String>>,
     pub vault_names: Vec<String>,
     pub account_names: Vec<String>,
     pub userpass: UserPass,
@@ -85,7 +86,7 @@ impl Default for FmpApp {
         Self {
             vault_name: String::new(),
             account_name: String::new(),
-            output: None,
+            //output: None,
             vault_names: Vec::new(),
             account_names: Vec::new(),
             userpass: UserPass::default(),
@@ -129,9 +130,10 @@ impl FmpApp {
         let locations = Locations::new("", "");
         if let Ok(names) = read_directory(&locations.fmp.join("vaults")) {
             self.vault_names = names;
-            self.output = None;
         } else {
-            self.output = Some(Err("Failed to fetch vault names.".to_string()));
+            self.toasts
+                .error("Failed to fetch vault names.")
+                .duration(Some(Duration::from_secs(3)));
         }
     }
 
@@ -140,9 +142,10 @@ impl FmpApp {
         let locations = Locations::new(&self.vault_name, "");
         if let Ok(names) = read_directory(&locations.vault) {
             self.account_names = names;
-            self.output = None;
         } else {
-            self.output = Some(Err("Failed to fetch account names.".to_string()));
+            self.toasts
+                .error("Failed to fetch account names.")
+                .duration(Some(Duration::from_secs(3)));
         }
     }
 

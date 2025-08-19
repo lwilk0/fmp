@@ -200,17 +200,6 @@ fn render_accounts_section(app: &mut FmpApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Render the optional output/status message.
-fn render_output_message(app: &FmpApp, ui: &mut egui::Ui) {
-    if let Some(msg) = &app.output {
-        ui.separator();
-        match msg {
-            Ok(info) => ui.label(info),
-            Err(err_msg) => ui.colored_label(egui::Color32::RED, err_msg),
-        };
-    }
-}
-
 /// Sidebar entry point: now very small, delegates to section helpers.
 pub fn sidebar(app: &mut FmpApp, ui: &mut egui::Ui) {
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -222,7 +211,5 @@ pub fn sidebar(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.separator();
 
         render_accounts_section(app, ui);
-
-        render_output_message(app, ui);
     });
 }
