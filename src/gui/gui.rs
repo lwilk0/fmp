@@ -152,6 +152,7 @@ impl FmpApp {
     /// Clear the data in userpass
     pub fn clear_account_data(&mut self) {
         self.userpass.username.clear();
+        self.userpass.password.zeroize();
         self.userpass.password = SecretBox::new(Box::new(vec![]));
     }
 

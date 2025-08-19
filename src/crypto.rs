@@ -67,8 +67,10 @@ pub fn securely_retrieve_password(
             let mut pw_bytes = password.as_bytes().to_vec();
 
             if generating {
+                app.generated_password.zeroize();
                 app.generated_password = SecretBox::new(Box::new(pw_bytes.clone()));
             } else {
+                app.userpass.password.zeroize();
                 app.userpass.password = SecretBox::new(Box::new(pw_bytes.clone()));
             }
 
