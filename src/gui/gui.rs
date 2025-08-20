@@ -66,6 +66,7 @@ pub struct FmpApp {
     pub quit: bool,
     pub confirm_action: bool,
     pub show_confirm_action_popup: bool,
+    pub show_gpg_requirements_popup: bool,
 
     pub needs_refresh_vaults: bool,
     pub needs_refresh_accounts: bool,
@@ -107,6 +108,7 @@ impl Default for FmpApp {
             show_password_account: false,
             show_password_retrieve: false,
             show_confirm_action_popup: false,
+            show_gpg_requirements_popup: false,
 
             show_welcome: false,
             quit: false,
