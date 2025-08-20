@@ -3,6 +3,7 @@ use crate::{
         account_selected, alter_account_information, alter_vault_name, nothing_selected,
         random_password, vault_selected,
     },
+    popups::{confirmation_popup, quit_popup, welcome_popup},
     sidebar::sidebar,
     vault::{Locations, UserPass, read_directory},
 };
@@ -34,11 +35,6 @@ pub struct FmpApp {
     pub vault_name: String,
     pub account_name: String,
 
-    /// Message to show to the user.
-    /// - None: show nothing
-    /// - Some(Ok(msg)): informational/success message
-    /// - Some(Err(msg)): error message (drawn in red)
-    //pub output: Option<Result<String, String>>,
     pub vault_names: Vec<String>,
     pub account_names: Vec<String>,
     pub userpass: UserPass,
@@ -61,11 +57,15 @@ pub struct FmpApp {
 
     pub change_account_info: bool,
     pub change_vault_name: bool,
+
     pub random_password: bool,
-    pub quit: bool,
     pub show_password_account: bool,
     pub show_password_retrieve: bool,
+
     pub show_welcome: bool,
+    pub quit: bool,
+    pub confirm_action: bool,
+    pub show_confirm_action_popup: bool,
 
     pub needs_refresh_vaults: bool,
     pub needs_refresh_accounts: bool,
@@ -86,7 +86,7 @@ impl Default for FmpApp {
         Self {
             vault_name: String::new(),
             account_name: String::new(),
-            //output: None,
+
             vault_names: Vec::new(),
             account_names: Vec::new(),
             userpass: UserPass::default(),
@@ -102,14 +102,19 @@ impl Default for FmpApp {
 
             change_account_info: false,
             change_vault_name: false,
+
             random_password: false,
-            quit: false,
             show_password_account: false,
             show_password_retrieve: false,
+            show_confirm_action_popup: false,
+
             show_welcome: false,
+            quit: false,
+            confirm_action: false,
 
             needs_refresh_vaults: true,
             needs_refresh_accounts: false,
+
             initialized: false,
 
             vault_filter: String::new(),
@@ -273,41 +278,15 @@ impl eframe::App for FmpApp {
                 } else {
                     account_selected(self, ui);
                 }
+
+                if self.quit {
+                    quit_popup(self, ui);
+                } else if self.show_welcome {
+                    welcome_popup(self, ui);
+                } else if self.show_confirm_action_popup {
+                    confirmation_popup(self, ui);
+                }
             });
-
-        if self.quit {
-            egui::Window::new("Confirm Exit")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.label("Are you sure you want to quit?");
-                    ui.horizontal(|ui| {
-                        if ui.button("Yes").clicked() {
-                            self.userpass.password.zeroize();
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-
-                        if ui.button("No").clicked() {
-                            self.quit = false;
-                        }
-                    });
-                });
-        }
-
-        if self.show_welcome {
-            egui::Window::new("Welcome to FMP!")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.heading("Welcome!");
-                    ui.label("Thank you for installing FMP.\n\nGet started by creating your first vault and adding an account to it.");
-                    if ui.button("Get Started").clicked() {
-                        self.show_welcome = false;
-                    }
-                });
-        }
 
         self.toasts.show(ctx);
     }

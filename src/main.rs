@@ -30,6 +30,8 @@ mod vault;
 mod content;
 #[path = "gui/gui.rs"]
 mod gui;
+#[path = "gui/popups.rs"]
+mod popups;
 #[path = "gui/sidebar.rs"]
 mod sidebar;
 
