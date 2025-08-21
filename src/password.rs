@@ -103,8 +103,8 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
     entropy *= len; // Total entropy in bits
 
     // Apply penalties for common patterns/passwords to avoid overestimating strength
-    let penalty = pattern_penalty_bits(password);
-    let entropy = (entropy - penalty).max(0.0);
+    let penalty: f64 = pattern_penalty_bits(password);
+    let entropy: f64 = (entropy - penalty).max(0.0);
 
     let rating = if entropy <= 28.0 || entropy.is_nan() {
         "Very Weak"
@@ -121,7 +121,6 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
     (entropy, rating)
 }
 
-/// Applies penalties based on common weak patterns and passwords.
 fn pattern_penalty_bits(password: &str) -> f64 {
     if password.is_empty() {
         return 0.0;
@@ -133,7 +132,6 @@ fn pattern_penalty_bits(password: &str) -> f64 {
     let norm = normalize_leetspeak(&lower);
     let rev: String = lower.chars().rev().collect();
 
-    // Exact match against common passwords (case-insensitive and leetspeak-normalized)
     if COMMON_PASSWORDS.iter().any(|&p| p == lower) {
         penalty += 60.0;
     }
@@ -144,7 +142,6 @@ fn pattern_penalty_bits(password: &str) -> f64 {
         penalty += 30.0;
     }
 
-    // Contains common password as substring (min len 4)
     if contains_common_substring(&lower, 4) {
         penalty += 12.0;
     }
@@ -152,34 +149,28 @@ fn pattern_penalty_bits(password: &str) -> f64 {
         penalty += 10.0;
     }
 
-    // Repeating single character (e.g., "aaaaaa")
     if is_repeating_char(&lower) {
         penalty += 40.0;
     }
 
-    // Sequential runs: digits/letters like abcdef, 123456
     if contains_ordered_sequence(&lower, 4) {
         penalty += 15.0;
     }
 
-    // Keyboard sequences like qwerty, asdf, 1qaz
     if contains_keyboard_sequence(&lower, 4) {
         penalty += 15.0;
     }
 
-    // Years (1900..=2099)
     if contains_year(&lower) {
         penalty += 10.0;
     }
 
-    // Months/Weekdays tokens
     if contains_any_token(&lower, &COMMON_MONTHS_DAYS, 3) {
         penalty += 10.0;
     }
 
-    // Simple composition (few classes)
     let (has_l, has_u, has_d, has_s) = classify_chars(password);
-    let classes = has_l as u8 + has_u as u8 + has_d as u8 + has_s as u8;
+    let classes = u8::from(has_l) + u8::from(has_u) + u8::from(has_d) + u8::from(has_s);
     let len = password.chars().count();
     if classes <= 1 {
         penalty += 20.0;
@@ -187,7 +178,7 @@ fn pattern_penalty_bits(password: &str) -> f64 {
         penalty += 10.0;
     }
 
-    // Cap the penalty to avoid over-penalizing very long high-entropy passwords
+    #[allow(clippy::unnecessary_cast)]
     (penalty as f64).clamp(0.0_f64, 100.0_f64)
 }
 
@@ -200,11 +191,9 @@ fn normalize_leetspeak(input: &str) -> String {
             '3' => 'e',
             '4' | '@' => 'a',
             '5' | '$' => 's',
-            '6' => 'g',
-            '7' => 't',
+            '6' | '9' => 'g',
+            '7' | '+' => 't',
             '8' => 'b',
-            '9' => 'g',
-            '+' => 't',
             '!' => 'i',
             _ => ch,
         };
@@ -255,15 +244,19 @@ fn contains_common_substring(hay: &str, min_len: usize) -> bool {
 }
 
 fn contains_keyboard_sequence(s: &str, min_len: usize) -> bool {
-    for row in COMMON_KEYBOARD_ROWS.iter() {
+    for row in &COMMON_KEYBOARD_ROWS {
         let row_chars: Vec<char> = row.chars().collect();
         let row_len = row_chars.len();
         for k in min_len..=row_len {
             for i in 0..=row_len - k {
                 let sub: String = row_chars[i..i + k].iter().collect();
-                if s.contains(&sub) { return true; }
+                if s.contains(&sub) {
+                    return true;
+                }
                 let rev: String = sub.chars().rev().collect();
-                if s.contains(&rev) { return true; }
+                if s.contains(&rev) {
+                    return true;
+                }
             }
         }
     }
@@ -271,17 +264,34 @@ fn contains_keyboard_sequence(s: &str, min_len: usize) -> bool {
 }
 
 fn contains_ordered_sequence(s: &str, min_len: usize) -> bool {
-    if min_len <= 1 { return false; }
+    if min_len <= 1 {
+        return false;
+    }
     let mut inc_run: usize = 1;
     let mut dec_run: usize = 1;
     let mut prev: Option<char> = None;
     for ch in s.chars() {
-        if !ch.is_ascii_alphanumeric() { inc_run = 1; dec_run = 1; prev = None; continue; }
+        if !ch.is_ascii_alphanumeric() {
+            inc_run = 1;
+            dec_run = 1;
+            prev = None;
+            continue;
+        }
         if let Some(p) = prev {
             let diff = (ch as i32) - (p as i32);
-            if diff == 1 { inc_run += 1; } else { inc_run = 1; }
-            if diff == -1 { dec_run += 1; } else { dec_run = 1; }
-            if inc_run >= min_len || dec_run >= min_len { return true; }
+            if diff == 1 {
+                inc_run += 1;
+            } else {
+                inc_run = 1;
+            }
+            if diff == -1 {
+                dec_run += 1;
+            } else {
+                dec_run = 1;
+            }
+            if inc_run >= min_len || dec_run >= min_len {
+                return true;
+            }
         }
         prev = Some(ch);
     }
@@ -289,33 +299,289 @@ fn contains_ordered_sequence(s: &str, min_len: usize) -> bool {
 }
 
 fn classify_chars(s: &str) -> (bool, bool, bool, bool) {
-    let mut l = false; let mut u = false; let mut d = false; let mut sym = false;
+    let mut l = false;
+    let mut u = false;
+    let mut d = false;
+    let mut sym = false;
     for ch in s.chars() {
-        if ch.is_ascii_lowercase() { l = true; }
-        else if ch.is_ascii_uppercase() { u = true; }
-        else if ch.is_ascii_digit() { d = true; }
-        else { sym = true; }
+        if ch.is_ascii_lowercase() {
+            l = true;
+        } else if ch.is_ascii_uppercase() {
+            u = true;
+        } else if ch.is_ascii_digit() {
+            d = true;
+        } else {
+            sym = true;
+        }
     }
     (l, u, d, sym)
 }
 
-const COMMON_KEYBOARD_ROWS: [&str; 4] = [
-    "1234567890",
-    "qwertyuiop",
-    "asdfghjkl",
-    "zxcvbnm",
-];
+const COMMON_KEYBOARD_ROWS: [&str; 4] = ["1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
 const COMMON_MONTHS_DAYS: [&str; 42] = [
     // months
-    "jan","january","feb","february","mar","march","apr","april","may","jun","june","jul","july","aug","august","sep","sept","september","oct","october","nov","november","dec","december",
+    "jan",
+    "january",
+    "feb",
+    "february",
+    "mar",
+    "march",
+    "apr",
+    "april",
+    "may",
+    "jun",
+    "june",
+    "jul",
+    "july",
+    "aug",
+    "august",
+    "sep",
+    "sept",
+    "september",
+    "oct",
+    "october",
+    "nov",
+    "november",
+    "dec",
+    "december",
     // weekdays
-    "mon","monday","tue","tues","tuesday","wed","weds","wednesday","thu","thur","thurs","thursday","fri","friday","sat","saturday","sun","sunday",
+    "mon",
+    "monday",
+    "tue",
+    "tues",
+    "tuesday",
+    "wed",
+    "weds",
+    "wednesday",
+    "thu",
+    "thur",
+    "thurs",
+    "thursday",
+    "fri",
+    "friday",
+    "sat",
+    "saturday",
+    "sun",
+    "sunday",
 ];
 
-// Curated list of common passwords (lowercase). Not exhaustive but broad enough for penalties.
 const COMMON_PASSWORDS: &[&str] = &[
-    "123456","password","123456789","12345","12345678","qwerty","1234567","111111","123123","abc123","password1","1234","iloveyou","1q2w3e4r","000000","qwertyuiop","monkey","dragon","letmein","696969","shadow","master","666666","qwerty123","football","welcome","admin","princess","login","solo","passw0rd","starwars","hello","freedom","whatever","qazwsx","trustno1","zaq12wsx","password123","batman","superman","121212","flower","hottie","loveme","photoshop","adobe123","123qwe","qwe123","qwerty1","q1w2e3r4","1qaz2wsx","baseball","1qazxsw2","asdfgh","asdfghjkl","asdf","qazwsxedc","pokemon","football1","charlie","donald","jennifer","michelle","nicole","ashley","sunshine","michael","jordan","harley","ginger","summer","taylor","liverpool","chelsea","arsenal","manchester","q1w2e3","aa123456","abc123456","1234567890","qwerty12345","1q2w3e","temp123","welcome1","admin123","root","toor","letmein1","pass123","pass1234","pass12345","love","lovely","secret","secret1","password!","password$","p@ssw0rd","p@ssword","p@55w0rd","p4ssw0rd","p@ssw0rd1","iloveyou1","qwert","qwertyui","qwertyu","qwerty12","qwerty1234","qwerty!","123321","654321","7777777","87654321","987654321","31415926","password2","112233","q1w2e3r4t5","1q2w3e4r5t","qwertyqwerty","letmein123","adminadmin","qazxsw","zaqxsw","test","testing","test123","test1","password0","welcome123","hello123","dragon123","monkey123","superman1","batman1","baseball1","football2","soccer","soccer1","hockey","hockey1","basketball","basketball1","computer","computer1","internet","internet1","qweasd","asdasd","asd123","asd123456","abc321","abcd1234","abcd123","myspace1","fuckyou","fuckyou1","qweasd123","iloveu","iloveu2","letmein!","passw0rd1","login123","qazwsx123","11111111","222222","333333","444444","555555","888888","999999","q1w2e3r4t5y6","1q2w3e4r","12341234","12121212","love123","sexy","sexy123","blink182","mustang","honda","mercedes","chevrolet","ferrari","porsche","volvo","ford","tesla","nissan","toyota","qweqwe","qwe12345","asdf1234","asdf123","1qaz2wsx3edc","!qaz2wsx","admin1","rootroot","letmein2","passw0rd!","user","user123","welcome!","welcome2","qwert1","qwert12","qwert123","qwert1234","pass!","pass!!","pass$","password@","pass@123","pass@word1",
+    "123456",
+    "password",
+    "123456789",
+    "12345",
+    "12345678",
+    "qwerty",
+    "1234567",
+    "111111",
+    "123123",
+    "abc123",
+    "password1",
+    "1234",
+    "iloveyou",
+    "1q2w3e4r",
+    "000000",
+    "qwertyuiop",
+    "monkey",
+    "dragon",
+    "letmein",
+    "696969",
+    "shadow",
+    "master",
+    "666666",
+    "qwerty123",
+    "football",
+    "welcome",
+    "admin",
+    "princess",
+    "login",
+    "solo",
+    "passw0rd",
+    "starwars",
+    "hello",
+    "freedom",
+    "whatever",
+    "qazwsx",
+    "trustno1",
+    "zaq12wsx",
+    "password123",
+    "batman",
+    "superman",
+    "121212",
+    "flower",
+    "hottie",
+    "loveme",
+    "photoshop",
+    "adobe123",
+    "123qwe",
+    "qwe123",
+    "qwerty1",
+    "q1w2e3r4",
+    "1qaz2wsx",
+    "baseball",
+    "1qazxsw2",
+    "asdfgh",
+    "asdfghjkl",
+    "asdf",
+    "qazwsxedc",
+    "pokemon",
+    "football1",
+    "charlie",
+    "donald",
+    "jennifer",
+    "michelle",
+    "nicole",
+    "ashley",
+    "sunshine",
+    "michael",
+    "jordan",
+    "harley",
+    "ginger",
+    "summer",
+    "taylor",
+    "liverpool",
+    "chelsea",
+    "arsenal",
+    "manchester",
+    "q1w2e3",
+    "aa123456",
+    "abc123456",
+    "1234567890",
+    "qwerty12345",
+    "1q2w3e",
+    "temp123",
+    "welcome1",
+    "admin123",
+    "root",
+    "toor",
+    "letmein1",
+    "pass123",
+    "pass1234",
+    "pass12345",
+    "love",
+    "lovely",
+    "secret",
+    "secret1",
+    "password!",
+    "password$",
+    "p@ssw0rd",
+    "p@ssword",
+    "p@55w0rd",
+    "p4ssw0rd",
+    "p@ssw0rd1",
+    "iloveyou1",
+    "qwert",
+    "qwertyui",
+    "qwertyu",
+    "qwerty12",
+    "qwerty1234",
+    "qwerty!",
+    "123321",
+    "654321",
+    "7777777",
+    "87654321",
+    "987654321",
+    "31415926",
+    "password2",
+    "112233",
+    "q1w2e3r4t5",
+    "1q2w3e4r5t",
+    "qwertyqwerty",
+    "letmein123",
+    "adminadmin",
+    "qazxsw",
+    "zaqxsw",
+    "test",
+    "testing",
+    "test123",
+    "test1",
+    "password0",
+    "welcome123",
+    "hello123",
+    "dragon123",
+    "monkey123",
+    "superman1",
+    "batman1",
+    "baseball1",
+    "football2",
+    "soccer",
+    "soccer1",
+    "hockey",
+    "hockey1",
+    "basketball",
+    "basketball1",
+    "computer",
+    "computer1",
+    "internet",
+    "internet1",
+    "qweasd",
+    "asdasd",
+    "asd123",
+    "asd123456",
+    "abc321",
+    "abcd1234",
+    "abcd123",
+    "myspace1",
+    "fuckyou",
+    "fuckyou1",
+    "qweasd123",
+    "iloveu",
+    "iloveu2",
+    "letmein!",
+    "passw0rd1",
+    "login123",
+    "qazwsx123",
+    "11111111",
+    "222222",
+    "333333",
+    "444444",
+    "555555",
+    "888888",
+    "999999",
+    "q1w2e3r4t5y6",
+    "1q2w3e4r",
+    "12341234",
+    "12121212",
+    "love123",
+    "sexy",
+    "sexy123",
+    "blink182",
+    "mustang",
+    "honda",
+    "mercedes",
+    "chevrolet",
+    "ferrari",
+    "porsche",
+    "volvo",
+    "ford",
+    "tesla",
+    "nissan",
+    "toyota",
+    "qweqwe",
+    "qwe12345",
+    "asdf1234",
+    "asdf123",
+    "1qaz2wsx3edc",
+    "!qaz2wsx",
+    "admin1",
+    "rootroot",
+    "letmein2",
+    "passw0rd!",
+    "user",
+    "user123",
+    "welcome!",
+    "welcome2",
+    "qwert1",
+    "qwert12",
+    "qwert123",
+    "qwert1234",
+    "pass!",
+    "pass!!",
+    "pass$",
+    "password@",
+    "pass@123",
+    "pass@word1",
 ];
 
 /// Draws a password strength meter in the UI.
