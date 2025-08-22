@@ -1,4 +1,6 @@
 use crate::gui::FmpApp;
+use crate::totp::verify_totp_code;
+use crate::vault::warm_up_gpg;
 use zeroize::Zeroize;
 
 /// Displays the content quit popup.
@@ -96,6 +98,68 @@ pub fn confirmation_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                 }
                 if ui.button("No").clicked() {
                     app.show_confirm_action_popup = false;
+                }
+            });
+        });
+}
+
+/// Render a full-screen translucent overlay that captures input to block underlying UI.
+pub fn modal_blocker(ctx: &egui::Context) {
+    egui::Area::new("modal_blocker".into())
+        .order(egui::Order::Foreground)
+        .interactable(true)
+        .show(ctx, |ui| {
+            let rect = ui.max_rect();
+            ui.painter()
+                .rect_filled(rect, 0.0, egui::Color32::from_black_alpha(160));
+            let _ = ui.interact(
+                rect,
+                ui.id().with("modal_block"),
+                egui::Sense::click_and_drag(),
+            );
+        });
+}
+
+/// Shows a TOTP verification popup when a vault requires 2FA. On success, triggers GPG unlock.
+pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
+    egui::Window::new("Two-Factor Authentication")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ui.ctx(), |ui| {
+            ui.label("Enter your 2FA code to unlock this vault:");
+            ui.add(egui::TextEdit::singleline(&mut app.totp_code_input).desired_width(120.0));
+            ui.horizontal(|ui| {
+                if ui.button("Verify").clicked() {
+                    match verify_totp_code(&app.vault_name, &app.totp_code_input) {
+                        Ok(true) => {
+                            app.totp_verified_until = Some(
+                                std::time::Instant::now() + std::time::Duration::from_secs(120),
+                            );
+                            app.totp_code_input.clear();
+                            app.show_totp_popup = false;
+
+                            if let Err(e) = warm_up_gpg(&app.vault_name) {
+                                app.toasts
+                                    .error(format!("GPG unlock failed: {e}"))
+                                    .duration(Some(std::time::Duration::from_secs(3)));
+                            }
+                        }
+                        Ok(false) => {
+                            app.toasts
+                                .error("Invalid code.")
+                                .duration(Some(std::time::Duration::from_secs(2)));
+                        }
+                        Err(e) => {
+                            app.toasts
+                                .error(format!("Verification failed: {e}"))
+                                .duration(Some(std::time::Duration::from_secs(3)));
+                        }
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    app.vault_name.clear();
+                    app.show_totp_popup = false;
                 }
             });
         });

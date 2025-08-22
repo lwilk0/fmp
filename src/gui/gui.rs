@@ -3,7 +3,7 @@ use crate::{
         account_selected, alter_account_information, alter_vault_name, nothing_selected,
         random_password, vault_selected,
     },
-    popups::{confirmation_popup, quit_popup, welcome_popup},
+    popups::{confirmation_popup, modal_blocker, quit_popup, totp_popup, welcome_popup},
     sidebar::sidebar,
     vault::{Locations, UserPass, read_directory},
 };
@@ -80,6 +80,16 @@ pub struct FmpApp {
     pub sort_case_sensitive: bool,
 
     pub toasts: Toasts,
+
+    // TOTP / 2FA state
+    pub totp_enabled: bool,
+    pub totp_required: bool,
+    pub show_totp_setup: bool,
+    pub show_totp_popup: bool,
+    pub totp_secret_b32: String,
+    pub totp_otpauth_uri: String,
+    pub totp_code_input: String,
+    pub totp_verified_until: Option<std::time::Instant>,
 }
 
 impl Default for FmpApp {
@@ -126,6 +136,15 @@ impl Default for FmpApp {
             sort_case_sensitive: false,
 
             toasts: Toasts::default(),
+
+            totp_enabled: false,
+            totp_required: false,
+            show_totp_setup: false,
+            show_totp_popup: false,
+            totp_secret_b32: String::new(),
+            totp_otpauth_uri: String::new(),
+            totp_code_input: String::new(),
+            totp_verified_until: None,
         }
     }
 }
@@ -251,9 +270,23 @@ impl eframe::App for FmpApp {
             self.needs_refresh_accounts = false;
         }
 
+        // Expire 2FA verification session if elapsed
+        if let Some(until) = self.totp_verified_until {
+            if std::time::Instant::now() >= until {
+                self.totp_verified_until = None;
+            }
+        }
+
         egui::SidePanel::left("sidebar")
             .frame(egui::Frame::side_top_panel(&ctx.style()).inner_margin(egui::Margin::same(12)))
             .show(ctx, |ui| {
+                let modal_active = self.quit
+                    || self.show_welcome
+                    || self.show_confirm_action_popup
+                    || self.show_totp_popup;
+                if modal_active {
+                    ui.disable();
+                }
                 sidebar(self, ui);
             });
 
@@ -266,6 +299,14 @@ impl eframe::App for FmpApp {
 
                 ui.separator();
                 ui.add_space(8.0);
+
+                let modal_active = self.quit
+                    || self.show_welcome
+                    || self.show_confirm_action_popup
+                    || self.show_totp_popup;
+                if modal_active {
+                    ui.disable();
+                }
 
                 if self.change_vault_name {
                     alter_vault_name(self, ui);
@@ -281,12 +322,18 @@ impl eframe::App for FmpApp {
                     account_selected(self, ui);
                 }
 
+                if modal_active {
+                    modal_blocker(ctx);
+                }
+
                 if self.quit {
                     quit_popup(self, ui);
                 } else if self.show_welcome {
                     welcome_popup(self, ui);
                 } else if self.show_confirm_action_popup {
                     confirmation_popup(self, ui);
+                } else if self.show_totp_popup {
+                    totp_popup(self, ui);
                 }
             });
 

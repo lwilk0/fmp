@@ -1,3 +1,5 @@
+use crate::totp::{ensure_gate_exists, is_totp_enabled, is_totp_required};
+use crate::vault::warm_up_gpg;
 use crate::{gui::FmpApp, vault::get_account_details};
 use log::error;
 
@@ -105,6 +107,27 @@ fn select_vault(app: &mut FmpApp, vault: String) {
     app.random_password = false;
 
     app.needs_refresh_accounts = true;
+
+    app.totp_enabled = is_totp_enabled(&app.vault_name);
+    app.totp_required = is_totp_required(&app.vault_name);
+    app.show_totp_setup = false;
+    app.totp_secret_b32.clear();
+    app.totp_otpauth_uri.clear();
+    app.totp_code_input.clear();
+    app.totp_verified_until = None;
+
+    if app.totp_required {
+        app.show_totp_popup = true;
+    }
+
+    if let Err(e) = ensure_gate_exists(&app.vault_name) {
+        log::error!("Failed to ensure gate file: {e}");
+    }
+    if !app.totp_required {
+        if let Err(e) = warm_up_gpg(&app.vault_name) {
+            log::error!("GPG warm-up failed: {e}");
+        }
+    }
 }
 
 /// Apply side effects when an account is selected and load its details.

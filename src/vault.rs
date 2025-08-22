@@ -47,6 +47,8 @@ pub struct Locations {
     pub account: PathBuf,
     pub recipient: PathBuf,
     pub data: PathBuf,
+    pub totp: PathBuf,
+    pub gate: PathBuf,
 }
 
 impl Locations {
@@ -71,6 +73,8 @@ impl Locations {
         let account = vault.join(account_name);
         let recipient = vault.join("recipient");
         let data = account.join("data.gpg");
+        let totp = vault.join("totp.gpg");
+        let gate = vault.join("gate.gpg");
 
         Self {
             fmp,
@@ -79,6 +83,8 @@ impl Locations {
             account,
             recipient,
             data,
+            totp,
+            gate,
         }
     }
 
@@ -374,3 +380,19 @@ pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserP
 #[cfg(test)]
 #[path = "tests/vault_tests.rs"]
 mod vault_tests;
+
+/// Attempt to decrypt the vault's gate file to warm up GPG (triggers passphrase prompt).
+pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
+    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+    let locations = Locations::new(vault_name, "");
+    let mut encrypted = Vec::new();
+    let mut out = Vec::new();
+
+    let file = File::open(&locations.gate)?;
+    let mut reader = BufReader::new(file);
+    reader.read_to_end(&mut encrypted)?;
+
+    ctx.decrypt(&encrypted, &mut out)
+        .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
+    Ok(())
+}

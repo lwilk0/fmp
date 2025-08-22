@@ -25,6 +25,7 @@ mod crypto;
 mod flags;
 mod password;
 mod vault;
+mod totp;
 
 #[path = "gui/content.rs"]
 mod content;

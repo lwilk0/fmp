@@ -25,6 +25,7 @@ use crate::{
     },
     gui::FmpApp,
     password::{generate_password, password_strength_meter},
+    totp::{disable_totp, enable_totp, verify_totp_code},
 };
 use core::mem;
 use secrecy::ExposeSecret;
@@ -174,6 +175,46 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 app.change_vault_name = true;
             }
 
+            if ui.button(if app.totp_enabled { "Disable 2FA" } else { "Enable 2FA" }).clicked() {
+                if app.totp_enabled {
+                    match disable_totp(&app.vault_name) {
+                        Ok(()) => {
+                            app.totp_enabled = false;
+                            app.show_totp_setup = false;
+                            app.totp_secret_b32.clear();
+                            app.totp_otpauth_uri.clear();
+                            app.totp_code_input.clear();
+                            app.totp_verified_until = None;
+                            app.toasts
+                                .success("2FA disabled for this vault.")
+                                .duration(Some(Duration::from_secs(2)));
+                        }
+                        Err(e) => {
+                            app.toasts
+                                .error(format!("Failed to disable 2FA: {e}"))
+                                .duration(Some(Duration::from_secs(3)));
+                        }
+                    }
+                } else {
+                    match enable_totp(&app.vault_name) {
+                        Ok((b32, uri)) => {
+                            app.totp_enabled = true;
+                            app.show_totp_setup = true;
+                            app.totp_secret_b32 = b32;
+                            app.totp_otpauth_uri = uri;
+                            app.toasts
+                                .success("2FA secret generated. Scan the QR/URI in your Authenticator and verify a code.")
+                                .duration(Some(Duration::from_secs(4)));
+                        }
+                        Err(e) => {
+                            app.toasts
+                                .error(format!("Failed to enable 2FA: {e}"))
+                                .duration(Some(Duration::from_secs(3)));
+                        }
+                    }
+                }
+            }
+
             if ui
                 .button(egui::RichText::new("Delete Vault").color(egui::Color32::LIGHT_RED))
                 .clicked()
@@ -201,6 +242,47 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 }
             }
         });
+
+        if app.totp_enabled {
+            ui.add_space(8.0);
+            egui::CollapsingHeader::new("Two-Factor Authentication").show(ui, |ui| {
+                if app.show_totp_setup {
+                    ui.label("Scan or add this secret in an authenticator app:");
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Secret (Base32): {}", app.totp_secret_b32));
+                        if ui.button("Copy").clicked() { ui.ctx().copy_text(app.totp_secret_b32.clone()); }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("otpauth URI:");
+                        ui.monospace(&app.totp_otpauth_uri);
+                        if ui.button("Copy").clicked() { ui.ctx().copy_text(app.totp_otpauth_uri.clone()); }
+                    });
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        ui.label("Enter code to verify:");
+                        ui.add(egui::TextEdit::singleline(&mut app.totp_code_input).desired_width(100.0));
+                        if ui.button("Verify").clicked() {
+                            match verify_totp_code(&app.vault_name, &app.totp_code_input) {
+                                Ok(true) => {
+                                    app.totp_verified_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(120));
+                                    app.totp_code_input.clear();
+                                    app.show_totp_setup = false;
+                                    app.toasts.success("2FA verified.").duration(Some(Duration::from_secs(2)));
+                                }
+                                Ok(false) => {
+                                    app.toasts.error("Invalid code.").duration(Some(Duration::from_secs(2)));
+                                }
+                                Err(e) => {
+                                    app.toasts.error(format!("Verification failed: {e}")).duration(Some(Duration::from_secs(3)));
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    ui.label("2FA is enabled for this vault.");
+                }
+            });
+        }
     });
 
     ui.add_space(16.0);
@@ -229,6 +311,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
     });
 }
 
+#[allow(clippy::too_many_lines)]
 /// Displays the content for the main window of the application when an account is selected.
 ///
 /// # Arguments
@@ -261,14 +344,55 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
         ui.add_space(8.0);
 
+        // 2FA gating block: require verification before revealing/copying
+        let totp_verified = !app.totp_enabled || app.totp_verified_until.is_some();
+        if app.totp_enabled && !totp_verified {
+            ui.group(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Two-Factor Verification required to reveal/copy password:");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut app.totp_code_input).desired_width(100.0),
+                    );
+                    if ui.button("Verify").clicked() {
+                        match verify_totp_code(&app.vault_name, &app.totp_code_input) {
+                            Ok(true) => {
+                                app.totp_verified_until = Some(
+                                    std::time::Instant::now() + std::time::Duration::from_secs(120),
+                                );
+                                app.totp_code_input.clear();
+                                app.toasts
+                                    .success("2FA verified.")
+                                    .duration(Some(Duration::from_secs(2)));
+                            }
+                            Ok(false) => {
+                                app.toasts
+                                    .error("Invalid code.")
+                                    .duration(Some(Duration::from_secs(2)));
+                            }
+                            Err(e) => {
+                                app.toasts
+                                    .error(format!("Verification failed: {e}"))
+                                    .duration(Some(Duration::from_secs(3)));
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
         ui.horizontal(|ui| {
-            if app.show_password_account {
+            let can_reveal = totp_verified;
+
+            if can_reveal && app.show_password_account {
                 ui.label(egui::RichText::new(format!("Password: {password}")));
             } else {
                 ui.label(egui::RichText::new("Password: ********"));
             }
 
-            if ui.button("Copy").clicked() {
+            if ui
+                .add_enabled(can_reveal, egui::Button::new("Copy"))
+                .clicked()
+            {
                 app.toasts
                     .success("Password copied to clipboard.")
                     .duration(Some(Duration::from_secs(2)));
@@ -280,19 +404,29 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 ui.ctx().copy_text(password.to_string());
             }
 
-            app.show_password_account = show_password_button(
-                ui,
-                app.show_password_account,
-                if app.show_password_account {
+            if can_reveal {
+                app.show_password_account = show_password_button(
+                    ui,
+                    app.show_password_account,
+                    if app.show_password_account {
+                        "Hide"
+                    } else {
+                        "Show"
+                    },
+                );
+            } else {
+                let label = if app.show_password_account {
                     "Hide"
                 } else {
                     "Show"
-                },
-            );
+                };
+                ui.add_enabled(false, egui::Button::new(label));
+                app.show_password_account = false;
+            }
         });
 
         if app.show_password_account {
-            password_strength_meter(ui, &password); // TODO: cache
+            password_strength_meter(ui, &password);
         }
     });
 
