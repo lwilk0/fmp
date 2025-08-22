@@ -87,6 +87,8 @@ pub struct FmpApp {
     pub totp_required: bool,
     pub show_totp_setup_popup: bool,
     pub show_totp_popup: bool,
+    pub show_totp_secret: bool,
+    pub show_totp_qr: bool,
     pub totp_secret_b32: String,
     pub totp_otpauth_uri: String,
     pub totp_code_input: String,
@@ -142,6 +144,8 @@ impl Default for FmpApp {
             totp_required: false,
             show_totp_setup_popup: false,
             show_totp_popup: false,
+            show_totp_secret: false,
+            show_totp_qr: true,
             totp_secret_b32: String::new(),
             totp_otpauth_uri: String::new(),
             totp_code_input: String::new(),
@@ -271,7 +275,6 @@ impl eframe::App for FmpApp {
             self.needs_refresh_accounts = false;
         }
 
-        // Expire 2FA verification session if elapsed
         if let Some(until) = self.totp_verified_until {
             if std::time::Instant::now() >= until {
                 self.totp_verified_until = None;

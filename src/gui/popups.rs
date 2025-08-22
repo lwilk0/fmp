@@ -1,4 +1,11 @@
-use crate::{gui::FmpApp, totp::verify_totp_code, vault::warm_up_gpg};
+use crate::{
+    gui::FmpApp,
+    totp::{disable_totp, verify_totp_code},
+    vault::warm_up_gpg,
+};
+use egui::ColorImage;
+use image::Luma;
+use qrcode::QrCode;
 use std::time::Duration;
 use zeroize::Zeroize;
 
@@ -171,6 +178,7 @@ pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
         });
 }
 
+#[allow(clippy::too_many_lines)]
 /// Displays a popup for totp 2FA.
 ///
 /// # Arguments
@@ -184,7 +192,19 @@ pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
         .show(ui.ctx(), |ui| {
             ui.label("Scan or add this secret in an authenticator app:");
             ui.horizontal(|ui| {
-                ui.label(format!("Secret (Base32): {}", app.totp_secret_b32));
+                let masked = "•".repeat(app.totp_secret_b32.len().max(6));
+                let shown = if app.show_totp_secret {
+                    app.totp_secret_b32.as_str()
+                } else {
+                    masked.as_str()
+                };
+                ui.label(format!("Secret (Base32): {shown}"));
+                if ui
+                    .button(if app.show_totp_secret { "Hide" } else { "Show" })
+                    .clicked()
+                {
+                    app.show_totp_secret = !app.show_totp_secret;
+                }
                 if ui.button("Copy").clicked() {
                     ui.ctx().copy_text(app.totp_secret_b32.clone());
                 }
@@ -196,6 +216,39 @@ pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                     ui.ctx().copy_text(app.totp_otpauth_uri.clone());
                 }
             });
+            ui.add_space(8.0);
+            ui.checkbox(&mut app.show_totp_qr, "Show QR code");
+            if app.show_totp_qr {
+                if let Ok(code) = QrCode::new(app.totp_otpauth_uri.as_bytes()) {
+                    let size = 192; // logical pixels for display
+                    let img = code
+                        .render::<Luma<u8>>()
+                        .min_dimensions(size, size)
+                        .quiet_zone(true)
+                        .build();
+                    let (w, h) = (img.width() as usize, img.height() as usize);
+                    let mut rgba = vec![0u8; w * h * 4];
+                    for y in 0..h {
+                        for x in 0..w {
+                            #[allow(clippy::cast_possible_truncation)]
+                            let lum = img.get_pixel(x as u32, y as u32)[0];
+                            let idx = (y * w + x) * 4;
+                            rgba[idx] = lum;
+                            rgba[idx + 1] = lum;
+                            rgba[idx + 2] = lum;
+                            rgba[idx + 3] = 255;
+                        }
+                    }
+                    let color = ColorImage::from_rgba_unmultiplied([w, h], &rgba);
+                    let tex =
+                        ui.ctx()
+                            .load_texture("totp_qr", color, egui::TextureOptions::NEAREST);
+                    #[allow(clippy::cast_precision_loss)]
+                    ui.image((tex.id(), egui::vec2(w as f32, h as f32)));
+                } else {
+                    ui.colored_label(egui::Color32::LIGHT_RED, "Failed to generate QR");
+                }
+            }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.label("Enter code to verify:");
@@ -225,5 +278,27 @@ pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                     }
                 }
             });
+
+            if ui.button("Cancel").clicked() {
+                app.show_totp_setup_popup = false;
+                match disable_totp(&app.vault_name) {
+                    Ok(()) => {
+                        app.totp_enabled = false;
+                        app.show_totp_setup_popup = false;
+                        app.totp_secret_b32.clear();
+                        app.totp_otpauth_uri.clear();
+                        app.totp_code_input.clear();
+                        app.totp_verified_until = None;
+                        app.toasts
+                            .success("2FA disabled for this vault.")
+                            .duration(Some(Duration::from_secs(2)));
+                    }
+                    Err(e) => {
+                        app.toasts
+                            .error(format!("Failed to disable 2FA: {e}"))
+                            .duration(Some(Duration::from_secs(3)));
+                    }
+                }
+            }
         });
 }
