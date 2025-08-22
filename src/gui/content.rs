@@ -220,8 +220,9 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 .clicked()
             {
                 app.show_confirm_action_popup = true;
+            }
 
-                if app.confirm_action {
+            if app.confirm_action {
                     match delete_vault(app) {
                         Ok(()) => {
                             app.toasts
@@ -240,7 +241,6 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
                     app.confirm_action = false;
                 }
-            }
         });
 
         if app.totp_enabled {
@@ -443,30 +443,30 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             .clicked()
         {
             app.show_confirm_action_popup = true;
+        }
 
-            if app.confirm_action {
-                match delete_account_from_vault(app) {
-                    Ok(_o) => {
-                        app.toasts
-                            .success(format!(
-                                "Account `{}` deleted from vault `{}`.",
-                                app.account_name, app.vault_name
-                            ))
-                            .duration(Some(Duration::from_secs(2)));
+        if app.confirm_action {
+            match delete_account_from_vault(app) {
+                Ok(_o) => {
+                    app.toasts
+                        .success(format!(
+                            "Account `{}` deleted from vault `{}`.",
+                            app.account_name, app.vault_name
+                        ))
+                        .duration(Some(Duration::from_secs(2)));
 
-                        app.account_name.clear();
-                        app.clear_account_data();
-                        app.fetch_account_names();
-                    }
+                    app.account_name.clear();
+                    app.clear_account_data();
+                    app.fetch_account_names();
+                }
 
-                    Err(e) => {
-                        app.toasts
-                            .error(format!(
-                                "Failed to delete account `{}` from vault {}. Error: {}",
-                                app.account_name, app.vault_name, e
-                            ))
-                            .duration(Some(Duration::from_secs(3)));
-                    }
+                Err(e) => {
+                    app.toasts
+                        .error(format!(
+                            "Failed to delete account `{}` from vault {}. Error: {}",
+                            app.account_name, app.vault_name, e
+                        ))
+                        .duration(Some(Duration::from_secs(3)));
                 }
             }
         }
