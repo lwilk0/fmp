@@ -1,6 +1,5 @@
-use crate::gui::FmpApp;
-use crate::totp::verify_totp_code;
-use crate::vault::warm_up_gpg;
+use crate::{gui::FmpApp, totp::verify_totp_code, vault::warm_up_gpg};
+use std::time::Duration;
 use zeroize::Zeroize;
 
 /// Displays the content quit popup.
@@ -28,8 +27,7 @@ pub fn quit_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
         });
 }
 
-/// Displays a welcome screen for new users,
-/// featuring onboarding and GPG setup guidance.
+/// Displays a welcome popup for new users, featuring onboarding and GPG setup guidance.
 ///
 /// # Arguments
 /// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
@@ -50,40 +48,44 @@ pub fn welcome_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                    You'll need to have GPG available on your system and a valid GPG key pair for secure storage.");
 
             if ui.button("Learn about GPG requirements").clicked() {
-    app.show_gpg_requirements_popup = true;
+        app.show_gpg_requirements_popup = true;
+    }
+
+    if app.show_gpg_requirements_popup {
+        egui::Window::new("GPG Requirements")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ui.ctx(), |ui| {
+                ui.label("You'll need to install GPG (GNU Privacy Guard) if it's not already on your system.\n\
+                                Generate a key with `gpg --full-generate-key`, or use an existing key.\n\
+                                You can also import a key with `gpg --import your-key.asc`.");
+
+                if ui.button("Close").clicked() {
+                    app.show_gpg_requirements_popup = false;
+                }
+            });
+    }
+
+        ui.add_space(12.0);
+
+        ui.hyperlink_to("Create your first vault (Walkthrough)", "https://codeberg.org/lwilko/fmp/wiki/Creating-Your-First-Vault").on_hover_text(
+            "Follow a step-by-step guide to set up your first vault and add your account."
+        );
+
+        ui.add_space(16.0);
+
+        if ui.button("Get Started").clicked() {
+            app.show_welcome = false;
+        }
+    });
 }
 
-if app.show_gpg_requirements_popup {
-    egui::Window::new("GPG Requirements")
-        .collapsible(false)
-        .resizable(false)
-        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .show(ui.ctx(), |ui| {
-            ui.label("You'll need to install GPG (GNU Privacy Guard) if it's not already on your system.\n\
-                            Generate a key with `gpg --full-generate-key`, or use an existing key.\n\
-                            You can also import a key with `gpg --import your-key.asc`.");
-
-            if ui.button("Close").clicked() {
-                app.show_gpg_requirements_popup = false;
-            }
-        });
-}
-
-
-
-            ui.add_space(12.0);
-
-            ui.hyperlink_to("Create your first vault (Walkthrough)", "https://codeberg.org/lwilko/fmp/wiki/Creating-Your-First-Vault").on_hover_text(
-                "Follow a step-by-step guide to set up your first vault and add your account."
-            );
-
-            ui.add_space(16.0);
-
-            if ui.button("Get Started").clicked() {
-                app.show_welcome = false;
-            }
-        });
-}
+/// Displays a conformation popup for dangerous actions.
+///
+/// # Arguments
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn confirmation_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
     egui::Window::new("Dangerous Action!")
         .collapsible(false)
@@ -121,6 +123,10 @@ pub fn modal_blocker(ctx: &egui::Context) {
 }
 
 /// Shows a TOTP verification popup when a vault requires 2FA. On success, triggers GPG unlock.
+///
+/// # Arguments
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
     egui::Window::new("Two-Factor Authentication")
         .collapsible(false)
@@ -160,6 +166,63 @@ pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                 if ui.button("Cancel").clicked() {
                     app.vault_name.clear();
                     app.show_totp_popup = false;
+                }
+            });
+        });
+}
+
+/// Displays a popup for totp 2FA.
+///
+/// # Arguments
+/// * `app` - A mutable reference to the `FmpApp` instance containing the application state.
+/// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
+pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
+    egui::Window::new("2FA Setup")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ui.ctx(), |ui| {
+            ui.label("Scan or add this secret in an authenticator app:");
+            ui.horizontal(|ui| {
+                ui.label(format!("Secret (Base32): {}", app.totp_secret_b32));
+                if ui.button("Copy").clicked() {
+                    ui.ctx().copy_text(app.totp_secret_b32.clone());
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("otpauth URI:");
+                ui.monospace(&app.totp_otpauth_uri);
+                if ui.button("Copy").clicked() {
+                    ui.ctx().copy_text(app.totp_otpauth_uri.clone());
+                }
+            });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.label("Enter code to verify:");
+                ui.add(egui::TextEdit::singleline(&mut app.totp_code_input).desired_width(100.0));
+                if ui.button("Verify").clicked() {
+                    match verify_totp_code(&app.vault_name, &app.totp_code_input) {
+                        Ok(true) => {
+                            app.totp_verified_until = Some(
+                                std::time::Instant::now() + std::time::Duration::from_secs(120),
+                            );
+                            app.totp_code_input.clear();
+                            app.show_totp_setup_popup = false;
+                            app.toasts
+                                .success("2FA verified.")
+                                .duration(Some(Duration::from_secs(2)));
+                        }
+                        Ok(false) => {
+                            app.toasts
+                                .error("Invalid code.")
+                                .duration(Some(Duration::from_secs(2)));
+                        }
+                        Err(e) => {
+                            app.toasts
+                                .error(format!("Verification failed: {e}"))
+                                .duration(Some(Duration::from_secs(3)));
+                        }
+                    }
                 }
             });
         });

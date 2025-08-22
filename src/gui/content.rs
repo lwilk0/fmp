@@ -180,7 +180,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     match disable_totp(&app.vault_name) {
                         Ok(()) => {
                             app.totp_enabled = false;
-                            app.show_totp_setup = false;
+                            app.show_totp_setup_popup = false;
                             app.totp_secret_b32.clear();
                             app.totp_otpauth_uri.clear();
                             app.totp_code_input.clear();
@@ -199,7 +199,7 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     match enable_totp(&app.vault_name) {
                         Ok((b32, uri)) => {
                             app.totp_enabled = true;
-                            app.show_totp_setup = true;
+                            app.show_totp_setup_popup = true;
                             app.totp_secret_b32 = b32;
                             app.totp_otpauth_uri = uri;
                             app.toasts
@@ -242,47 +242,6 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     app.confirm_action = false;
                 }
         });
-
-        if app.totp_enabled {
-            ui.add_space(8.0);
-            egui::CollapsingHeader::new("Two-Factor Authentication").show(ui, |ui| {
-                if app.show_totp_setup {
-                    ui.label("Scan or add this secret in an authenticator app:");
-                    ui.horizontal(|ui| {
-                        ui.label(format!("Secret (Base32): {}", app.totp_secret_b32));
-                        if ui.button("Copy").clicked() { ui.ctx().copy_text(app.totp_secret_b32.clone()); }
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("otpauth URI:");
-                        ui.monospace(&app.totp_otpauth_uri);
-                        if ui.button("Copy").clicked() { ui.ctx().copy_text(app.totp_otpauth_uri.clone()); }
-                    });
-                    ui.add_space(6.0);
-                    ui.horizontal(|ui| {
-                        ui.label("Enter code to verify:");
-                        ui.add(egui::TextEdit::singleline(&mut app.totp_code_input).desired_width(100.0));
-                        if ui.button("Verify").clicked() {
-                            match verify_totp_code(&app.vault_name, &app.totp_code_input) {
-                                Ok(true) => {
-                                    app.totp_verified_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(120));
-                                    app.totp_code_input.clear();
-                                    app.show_totp_setup = false;
-                                    app.toasts.success("2FA verified.").duration(Some(Duration::from_secs(2)));
-                                }
-                                Ok(false) => {
-                                    app.toasts.error("Invalid code.").duration(Some(Duration::from_secs(2)));
-                                }
-                                Err(e) => {
-                                    app.toasts.error(format!("Verification failed: {e}")).duration(Some(Duration::from_secs(3)));
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    ui.label("2FA is enabled for this vault.");
-                }
-            });
-        }
     });
 
     ui.add_space(16.0);

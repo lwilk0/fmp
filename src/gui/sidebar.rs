@@ -110,7 +110,7 @@ fn select_vault(app: &mut FmpApp, vault: String) {
 
     app.totp_enabled = is_totp_enabled(&app.vault_name);
     app.totp_required = is_totp_required(&app.vault_name);
-    app.show_totp_setup = false;
+    app.show_totp_setup_popup = false;
     app.totp_secret_b32.clear();
     app.totp_otpauth_uri.clear();
     app.totp_code_input.clear();

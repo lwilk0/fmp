@@ -3,7 +3,9 @@ use crate::{
         account_selected, alter_account_information, alter_vault_name, nothing_selected,
         random_password, vault_selected,
     },
-    popups::{confirmation_popup, modal_blocker, quit_popup, totp_popup, welcome_popup},
+    popups::{
+        confirmation_popup, modal_blocker, quit_popup, totp_popup, totp_setup_popup, welcome_popup,
+    },
     sidebar::sidebar,
     vault::{Locations, UserPass, read_directory},
 };
@@ -81,10 +83,9 @@ pub struct FmpApp {
 
     pub toasts: Toasts,
 
-    // TOTP / 2FA state
     pub totp_enabled: bool,
     pub totp_required: bool,
-    pub show_totp_setup: bool,
+    pub show_totp_setup_popup: bool,
     pub show_totp_popup: bool,
     pub totp_secret_b32: String,
     pub totp_otpauth_uri: String,
@@ -139,7 +140,7 @@ impl Default for FmpApp {
 
             totp_enabled: false,
             totp_required: false,
-            show_totp_setup: false,
+            show_totp_setup_popup: false,
             show_totp_popup: false,
             totp_secret_b32: String::new(),
             totp_otpauth_uri: String::new(),
@@ -303,7 +304,8 @@ impl eframe::App for FmpApp {
                 let modal_active = self.quit
                     || self.show_welcome
                     || self.show_confirm_action_popup
-                    || self.show_totp_popup;
+                    || self.show_totp_popup
+                    || self.show_totp_setup_popup;
                 if modal_active {
                     ui.disable();
                 }
@@ -334,6 +336,8 @@ impl eframe::App for FmpApp {
                     confirmation_popup(self, ui);
                 } else if self.show_totp_popup {
                     totp_popup(self, ui);
+                } else if self.show_totp_setup_popup {
+                    totp_setup_popup(self, ui);
                 }
             });
 
