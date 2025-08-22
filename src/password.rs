@@ -21,7 +21,11 @@ use crate::gui::FmpApp;
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use secrecy::SecretBox;
+use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+use std::thread_local;
 
 /// Generates a random password of a specified length using ASCII characters.
 ///
@@ -86,7 +90,7 @@ pub fn generate_password(app: &mut FmpApp) {
 ///
 /// # Returns
 /// * A tuple containing the calculated entropy as a `f64` and a rating as a string slice.
-pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
+pub fn calculate_shannon_entropy(password: &str) -> (f64, &'static str) {
     #[allow(clippy::cast_precision_loss)]
     let len = password.chars().count() as f64;
     let mut freq = HashMap::new();
@@ -100,9 +104,8 @@ pub fn calculate_shannon_entropy(password: &str) -> (f64, &str) {
         let p = f64::from(*count) / len;
         entropy -= p * p.log2();
     }
-    entropy *= len; // Total entropy in bits
+    entropy *= len;
 
-    // Apply penalties for common patterns/passwords to avoid overestimating strength
     let penalty: f64 = pattern_penalty_bits(password);
     let entropy: f64 = (entropy - penalty).max(0.0);
 
@@ -187,7 +190,7 @@ fn normalize_leetspeak(input: &str) -> String {
     for ch in input.chars() {
         let mapped = match ch {
             '0' => 'o',
-            '1' => 'l', // could be 'i' but using 'l' suffices for coarse normalization
+            '1' => 'l',
             '3' => 'e',
             '4' | '@' => 'a',
             '5' | '$' => 's',
@@ -584,13 +587,37 @@ const COMMON_PASSWORDS: &[&str] = &[
     "pass@word1",
 ];
 
-/// Draws a password strength meter in the UI.
+thread_local! {
+    static LAST_STRENGTH: RefCell<Option<(u64, f64, &'static str)>> = const { RefCell::new(None) };
+}
+
+fn password_cache_hash(s: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    s.hash(&mut h);
+    h.finish()
+}
+
+/// Draws a password strength meter in the UI (cached per thread by the last seen password hash).
+///
+/// The calculation is cached across frames and re-used as long as the input password bytes
+/// are unchanged. Only a 64-bit hash is stored to avoid retaining the plaintext in memory.
 ///
 /// # Arguments
 /// * `ui` - The egui UI context.
 /// * `password` - The password string to evaluate.
 pub fn password_strength_meter(ui: &mut egui::Ui, password: &str) {
-    let (entropy, rating) = calculate_shannon_entropy(password);
+    let hash = password_cache_hash(password);
+
+    let (entropy, rating) = LAST_STRENGTH.with(|cell| {
+        if let Some((h, e, r)) = *cell.borrow() {
+            if h == hash {
+                return (e, r);
+            }
+        }
+        let (e, r) = calculate_shannon_entropy(password);
+        *cell.borrow_mut() = Some((hash, e, r));
+        (e, r)
+    });
 
     #[allow(clippy::cast_possible_truncation)]
     let length = (entropy / 150.0).clamp(0.0, 1.0) as f32;
