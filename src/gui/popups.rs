@@ -146,16 +146,21 @@ pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                 if ui.button("Verify").clicked() {
                     match verify_totp_code(&app.vault_name, &app.totp_code_input) {
                         Ok(true) => {
-                            app.totp_verified_until = Some(
-                                std::time::Instant::now() + std::time::Duration::from_secs(120),
-                            );
-                            app.totp_code_input.clear();
-                            app.show_totp_popup = false;
-
-                            if let Err(e) = warm_up_gpg(&app.vault_name) {
-                                app.toasts
-                                    .error(format!("GPG unlock failed: {e}"))
-                                    .duration(Some(std::time::Duration::from_secs(3)));
+                            // Only consider the vault unlocked if GPG warm-up succeeds
+                            match warm_up_gpg(&app.vault_name) {
+                                Ok(()) => {
+                                    app.totp_verified_until = Some(
+                                        std::time::Instant::now()
+                                            + std::time::Duration::from_secs(120),
+                                    );
+                                    app.totp_code_input.clear();
+                                    app.show_totp_popup = false;
+                                }
+                                Err(e) => {
+                                    app.toasts
+                                        .error(format!("Unlock canceled or failed: {e}"))
+                                        .duration(Some(std::time::Duration::from_secs(3)));
+                                }
                             }
                         }
                         Ok(false) => {

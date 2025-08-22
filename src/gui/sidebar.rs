@@ -125,7 +125,12 @@ fn select_vault(app: &mut FmpApp, vault: String) {
     }
     if !app.totp_required {
         if let Err(e) = warm_up_gpg(&app.vault_name) {
-            log::error!("GPG warm-up failed: {e}");
+            app.toasts
+                .error(format!("Unlock canceled or failed: {e}"))
+                .duration(Some(std::time::Duration::from_secs(3)));
+            app.vault_name.clear();
+            app.account_names.clear();
+            app.account_name.clear();
         }
     }
 }
