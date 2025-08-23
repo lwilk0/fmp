@@ -36,7 +36,7 @@ Forgot My Password (FMP) is a password manager that safely allows you to generat
    - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    - [rust](https://www.rust-lang.org/tools/install)
 
-  See [INSTALLATION.md](https://codeberg.org/lwilko/fmp/-/blob/main/INSTALLATION.md?ref_type=heads) for OS specific installations.
+  See [INSTALLATION.md](INSTALLATION.md) for OS specific installations.
   
 2. **Clone the Repository**:
    ```bash

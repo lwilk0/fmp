@@ -10,7 +10,7 @@ keywords = ["password-manager", "cli", "crypto", "cryptography", "rust"]
 
 [dependencies]
 anyhow = "1.0.99"
-base32 = "0.4.0"
+base32 = "0.5.1"
 catppuccin-egui = { version = "5.6.0", default-features = false, features = [
     "egui32",
 ] }

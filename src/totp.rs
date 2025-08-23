@@ -93,7 +93,7 @@ pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
     ensure_gate_exists(vault_name)?;
     ledger_add(vault_name)?;
 
-    let secret_b32 = base32::encode(Alphabet::RFC4648 { padding: false }, &secret);
+    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
 
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
