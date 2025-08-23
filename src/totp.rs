@@ -39,12 +39,24 @@ use zeroize::Zeroize;
 pub type HmacSha1 = Hmac<Sha1>;
 
 /// Whether a vault has 2FA enabled (presence of the encrypted TOTP secret file).
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * A `bool` indicating if TOTP is enabled in the specified vault.
 pub fn is_totp_enabled(vault_name: &str) -> bool {
     let locations = Locations::new(vault_name, "");
     locations.totp.exists()
 }
 
 /// Whether a vault requires TOTP (marker-based, cannot be bypassed by renaming totp.gpg).
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * A `bool` indicating if TOTP is to be used.
 pub fn is_totp_required(vault_name: &str) -> bool {
     let in_ledgers = ledger_contains(vault_name);
     if in_ledgers {
@@ -60,8 +72,16 @@ pub fn is_totp_required(vault_name: &str) -> bool {
     false
 }
 
-/// Enable 2FA for a vault: generate a new secret, store it encrypted, and return
-/// (`base32_secret`, `otpauth_uri`) for enrolling in Authy/Aegis/etc.
+/// Enable 2FA for a vault.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(String, String), Error>` - Returns a Base32-encoded secret and an otp URI on success, and an `Error` of failure.
+///
+/// # Errors:
+/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, check if a gate exists or add a vault to the ledger.
 pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
     let locations = Locations::new(vault_name, "");
 
@@ -87,6 +107,16 @@ pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
     Ok((secret_b32, otpauth_uri))
 }
 
+/// Turns off TOTP for a vault
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to: remove the `totp.gpg` file, remove TOTP marker or remove vault from the ledger.
 pub fn disable_totp(vault_name: &str) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     if locations.totp.exists() {
@@ -97,9 +127,19 @@ pub fn disable_totp(vault_name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Verify a user-provided 6-digit TOTP code with a tolerance of ±1 time step.
+/// Verify a user-provided 6-digit TOTP code with a tolerance of ±1 time step(30s).
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+/// * `code` - The user imputed 2FA code.
+///
+/// # Returns:
+/// * `Result<bool, Error>` - Returns a `bool` indicating if the code is valid on success, and an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to calculate the time since the Unix Epoch.
 pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
-    let code = code.trim();
+    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
     if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
         return Ok(false);
     }
@@ -132,6 +172,14 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
 }
 
 /// RFC 4226 HOTP calculation using HMAC-SHA1.
+///
+/// # Arguments:
+/// * `secret` - A `&[u8]` slice containing the decrypted `totp.gpg` data.
+/// * `counter` - The amount of time steps since the unix epoch, skewed.
+/// * `digits` - The length of the TOTP code.
+///
+/// # Returns:
+/// * Numeric OTP for authentication
 fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
     let mut counter_bytes = [0u8; 8];
     counter_bytes.copy_from_slice(&counter.to_be_bytes());
@@ -150,6 +198,17 @@ fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
     bin_code % modulo
 }
 
+/// Encrypts a secret to `totp.gpg`
+///
+/// # Arguments:
+/// * locations - The `Locations` for the current vault.
+/// * secret = The `&[u8]` slice to encrypt
+///
+/// # Returns:
+/// * Result<(), Error> - Returns `Ok(())` on success, or an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to get key for the specified recipient.
 fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), Error> {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
 
@@ -179,6 +238,16 @@ fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), 
     Ok(())
 }
 
+/// Decrypts `totp.gpg`
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<Vec<u8>, Error>` - Returns a `Vec<u8>` containing the unencrypted data on success, and an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to: find the `totp.gpg` file for the specified vault, open the `totp.gpg` file or get the gpgme `Context`.
 fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
     let locations = Locations::new(vault_name, "");
     if !locations.totp.exists() {
@@ -204,6 +273,15 @@ fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
 }
 
 /// Create a tiny encrypted gate file to trigger GPG passphrase prompt early.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(), Error>` - `OK(())` on success and an `Error` on failure
+///
+/// # Errors:
+/// * Fails when unable to: get gpgme `Context`, read the `recipient.txt` file, get the key for the recipient, encrypt the `gate.gpg` file, open the `gate.gpg` file, change the `gate.gpg` files permissions or write data to `gate.gpg`.
 pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     if locations.gate.exists() {
@@ -238,12 +316,27 @@ pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
 }
 
 /// Compute the path to the external TOTP-required marker in the user config directory.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * A `PathBuf` with the location of the `totp_required` file.
 fn required_marker_path(vault_name: &str) -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     base.join("fmp").join("totp_required").join(vault_name)
 }
 
 /// Mark a vault as requiring TOTP by creating a marker file in the config directory.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(), Error>` - An `Ok(())` on success and an `Error` on failure
+///
+/// # Errors:
+/// * Fails when unable to: Create the directory for the `totp_required` file or create the `totp_required` file itself.
 pub fn require_totp(vault_name: &str) -> Result<(), Error> {
     let marker = required_marker_path(vault_name);
     if let Some(dir) = marker.parent() {
@@ -256,6 +349,15 @@ pub fn require_totp(vault_name: &str) -> Result<(), Error> {
 }
 
 /// Remove the TOTP requirement marker.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * Result<(), Error> - An `Ok(())` on success and an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to remove marker file.
 pub fn unrequire_totp(vault_name: &str) -> Result<(), Error> {
     let marker = required_marker_path(vault_name);
     if marker.exists() {
@@ -264,16 +366,37 @@ pub fn unrequire_totp(vault_name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Simple newline-based ledgers in both config and data dirs for redundancy
+/// Returns the path to the TOTP ledger in the user config directory.
+///
+/// # Returns:
+/// * `PathBuf` - Path to the config-based ledger text file.
 fn ledger_path_config() -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     base.join("fmp").join("totp_ledger")
 }
+
+/// Returns the path to the TOTP ledger in the user data directory.
+///
+/// # Arguments:
+/// * None
+///
+/// # Returns:
+/// * `PathBuf` - Path to the data-based ledger text file.
 fn ledger_path_data() -> PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     base.join("fmp").join("totp_ledger")
 }
 
+/// Loads a ledger file containing vault names (one per line).
+///
+/// # Arguments:
+/// * `path` - `&PathBuf`, filesystem path to read from.
+///
+/// # Returns:
+/// * `HashSet<String>` - Set of vault names read from the file (if present).
+///
+/// # Errors:
+/// * Returns empty set if the file or its contents are invalid, but does NOT propagate IO errors.
 fn load_ledger_at(path: &PathBuf) -> HashSet<String> {
     if let Ok(bytes) = std::fs::read(path) {
         if let Ok(text) = String::from_utf8(bytes) {
@@ -287,6 +410,17 @@ fn load_ledger_at(path: &PathBuf) -> HashSet<String> {
     HashSet::new()
 }
 
+/// Saves the given set of vault names to a ledger file, one per line, sorted.
+///
+/// # Arguments:
+/// * `path` - `&PathBuf`, filesystem path to write to.
+/// * `set` - `&HashSet<String>`, set of vault names.
+///
+/// # Returns:
+/// * `Result<(), Error>`
+///
+/// # Errors:
+/// * Returns an error if the file cannot be written or its parent cannot be created.
 fn save_ledger_at(path: &PathBuf, set: &HashSet<String>) -> Result<(), Error> {
     if let Some(dir) = path.parent() {
         create_dir_all(dir)?;
@@ -298,16 +432,37 @@ fn save_ledger_at(path: &PathBuf, set: &HashSet<String>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Returns the union set of all ledger entries from config and data directories.
+///
+/// # Returns:
+/// * `HashSet<String>` - Set of all vault names required in any ledger found.
 fn ledger_union() -> HashSet<String> {
     let mut set = load_ledger_at(&ledger_path_config());
     set.extend(load_ledger_at(&ledger_path_data()));
     set
 }
 
+/// Checks if a given vault name is present in any TOTP ledger.
+///
+/// # Arguments:
+/// * `vault` - `&str`, vault name.
+///
+/// # Returns:
+/// * `bool` - True if found.
 fn ledger_contains(vault: &str) -> bool {
     ledger_union().contains(vault)
 }
 
+/// Adds a vault name to the ledgers in both config and data directories.
+///
+/// # Arguments:
+/// * `vault` - `&str`, vault name to add.
+///
+/// # Returns:
+/// * `Result<(), Error>` - Ok on success, Err for IO errors.
+///
+/// # Errors:
+/// * Returns an error if a ledger file or directory cannot be written/created.
 fn ledger_add(vault: &str) -> Result<(), Error> {
     for p in [ledger_path_config(), ledger_path_data()] {
         let mut set = load_ledger_at(&p);
@@ -317,6 +472,16 @@ fn ledger_add(vault: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// Removes a vault name from the ledgers in both config and data directories.
+///
+/// # Arguments:
+/// * `vault` - `&str`, vault name to remove.
+///
+/// # Returns:
+/// * `Result<(), Error>` - Ok on success, Err for IO errors.
+///
+/// # Errors:
+/// * Returns an error if a ledger file or directory cannot be written/created.
 fn ledger_remove(vault: &str) -> Result<(), Error> {
     for p in [ledger_path_config(), ledger_path_data()] {
         let mut set = load_ledger_at(&p);

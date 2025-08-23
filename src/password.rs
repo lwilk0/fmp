@@ -52,7 +52,6 @@ pub fn generate_password(app: &mut FmpApp) {
         pool.push_str("áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ");
     }
 
-    // Build character pool set with include/exclude adjustments
     let mut base: HashSet<char> = pool.chars().collect();
     let include: HashSet<char> = app.consider_characters.chars().collect();
     let exclude: HashSet<char> = app.ignore_characters.chars().collect();

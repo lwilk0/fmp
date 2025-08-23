@@ -373,10 +373,6 @@ pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserP
     })
 }
 
-#[cfg(test)]
-#[path = "tests/vault_tests.rs"]
-mod vault_tests;
-
 /// Attempt to decrypt the vault's gate file to warm up GPG (triggers passphrase prompt).
 pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
@@ -392,3 +388,7 @@ pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
         .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/vault_tests.rs"]
+mod vault_tests;
