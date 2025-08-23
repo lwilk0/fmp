@@ -25,11 +25,16 @@ mod crypto;
 mod flags;
 mod password;
 mod vault;
+mod totp;
 
 #[path = "gui/content.rs"]
 mod content;
 #[path = "gui/gui.rs"]
 mod gui;
+#[path = "gui/popups.rs"]
+mod popups;
+#[path = "gui/sidebar.rs"]
+mod sidebar;
 
 use crate::gui::run_gui;
 

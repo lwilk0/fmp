@@ -24,10 +24,10 @@ use anyhow::Error;
 use dirs::data_dir;
 use gpgme::{Context, Protocol};
 use secrecy::{ExposeSecret, SecretBox};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{File, create_dir_all, read_dir, read_to_string, rename},
     io::{BufReader, Read, Write},
-    os::unix::fs::PermissionsExt,
     path::PathBuf,
 };
 use zeroize::Zeroize;
@@ -41,57 +41,72 @@ pub struct UserPass {
 
 /// Represents the locations of various files and directories within a vault.
 pub struct Locations {
-    pub fmp_location: PathBuf,
-    pub vault_location: PathBuf,
-    pub backup_location: PathBuf,
-    pub account_location: PathBuf,
-    pub recipient_location: PathBuf,
-    pub data_location: PathBuf,
+    pub fmp: PathBuf,
+    pub vault: PathBuf,
+    pub backup: PathBuf,
+    pub account: PathBuf,
+    pub recipient: PathBuf,
+    pub data: PathBuf,
+    pub totp: PathBuf,
+    pub gate: PathBuf,
 }
 
 impl Locations {
-    /// Creates a new "Locations" instance with paths based on the provided vault and account names.
+    /// Creates a new `Locations` instance with paths based on the provided vault and account names.
     ///
     /// # Arguments
-    /// * "vault_name" - The name of the vault.
-    /// * "account_name" - The name of the account.
+    /// * `vault_name` - The name of the vault.
+    /// * `account_name` - The name of the account.
     ///
     /// # Returns
-    /// * "Result<Self, Error>" - Returns a "Locations" instance on success, or an error on failure.
+    /// * `Result<Self, Error>` - Returns a `Locations` instance on success, or an error on failure.
     ///
     /// # Errors
     /// * If the vault or account paths cannot be created, an error is returned.
-    pub fn new(vault_name: &str, account_name: &str) -> Result<Self, Error> {
-        let fmp_location = data_dir()
-            .expect("Failed to find data directory")
-            .join("fmp");
+    pub fn new(vault_name: &str, account_name: &str) -> Locations {
+        let base = data_dir().unwrap_or_else(|| PathBuf::from("."));
+        let fmp = base.join("fmp");
 
-        let vault_location = fmp_location.join("vaults").join(vault_name);
-        let backup_location = fmp_location.join("backups");
-        let account_location = vault_location.join(account_name);
-        let recipient_location = vault_location.join("recipient");
-        let data_location = account_location.join("data.gpg");
+        let vault = fmp.join("vaults").join(vault_name);
+        let backup = fmp.join("backups");
+        let account = vault.join(account_name);
+        let recipient = vault.join("recipient");
+        let data = account.join("data.gpg");
+        let totp = vault.join("totp.gpg");
+        let gate = vault.join("gate.gpg");
 
-        Ok(Self {
-            fmp_location,
-            vault_location,
-            backup_location,
-            account_location,
-            recipient_location,
-            data_location,
-        })
+        Self {
+            fmp,
+            vault,
+            backup,
+            account,
+            recipient,
+            data,
+            totp,
+            gate,
+        }
     }
 
     /// Initializes the vault by creating the necessary directories and files.
     ///
     /// # Returns
-    /// * "Result<(), Error>" - Returns "Ok(())" on success, or an error on failure.
+    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
     ///
     /// # Errors
     /// * If the vault directory cannot be created or if the recipient file cannot be created, an error is returned.
     pub fn initialize_vault(&self) -> Result<(), Error> {
-        create_dir_all(&self.vault_location)?;
-        File::create(&self.recipient_location)?;
+        create_dir_all(&self.vault)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.vault, std::fs::Permissions::from_mode(0o700))?;
+        }
+        let recipient_file = File::create(&self.recipient)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            recipient_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        }
 
         Ok(())
     }
@@ -99,12 +114,17 @@ impl Locations {
     /// Creates an account directory within the vault.
     ///
     /// # Returns
-    /// * "Result<(), Error>" - Returns "Ok(())" on success, or an error on failure.
+    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
     ///
     /// # Errors
     /// * If the account directory cannot be created, an error is returned.
     pub fn create_account_directory(&self) -> Result<(), Error> {
-        create_dir_all(&self.account_location)?;
+        create_dir_all(&self.account)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.account, std::fs::Permissions::from_mode(0o700))?;
+        }
 
         Ok(())
     }
@@ -112,15 +132,15 @@ impl Locations {
     /// Checks if a vault with the specified name exists.
     ///
     /// # Arguments
-    /// * "vault_name" - The name of the vault to check.
+    /// * `vault_name` - The name of the vault to check.
     ///
     /// # Returns
-    /// * "Result<(), Error>" - Returns a "OK(())" if the vault exists, or an error on failure.
+    /// * `Result<(), Error>` - Returns a "OK(())" if the vault exists, or an error on failure.
     pub fn does_vault_exist(&self) -> Result<(), Error> {
-        if !self.vault_location.exists() {
+        if !self.vault.exists() {
             return Err(anyhow::anyhow!(
-                "Vault \"{:?}\" does not exist. Check for typos or create it.",
-                self.vault_location
+                "Vault `{:?}` does not exist. Check for typos or create it.",
+                self.vault
             ));
         }
 
@@ -130,15 +150,15 @@ impl Locations {
     /// Checks if an account with the specified name exists within the vault.
     ///
     /// # Returns
-    /// * "Result<(), Error>" - Returns "Ok(())" if the account exists, or an error on failure.
+    /// * `Result<(), Error>` - Returns `Ok(())` if the account exists, or an error on failure.
     ///
     /// # Errors
     /// * If the account directory does not exist, an error is returned.
     pub fn does_account_exist(&self) -> Result<(), Error> {
-        if !self.account_location.exists() {
+        if !self.account.exists() {
             return Err(anyhow::anyhow!(
-                "Account \"{:?}\" does not exist. Check for typos or create it.",
-                self.account_location
+                "Account `{:?}` does not exist. Check for typos or create it.",
+                self.account
             ));
         }
 
@@ -155,29 +175,29 @@ impl Store {
     /// Creates a new "Store" instance with a GPGME context and locations based on the provided vault and account names.
     ///
     /// # Arguments
-    /// * "vault_name" - The name of the vault.
-    /// * "account_name" - The name of the account.
+    /// * `vault_name` - The name of the vault.
+    /// * `account_name` - The name of the account.
     ///
     /// # Returns
-    /// * "Result<Self, Error>" - Returns a "Store" instance on success, or an error on failure.
+    /// * `Result<Self, Error>` - Returns a "Store" instance on success, or an error on failure.
     ///
     /// # Errors
     /// * If the GPGME context cannot be created or if the locations cannot be initialized, an error is returned.
     pub fn new(vault_name: &str, account_name: &str) -> Result<Self, Error> {
         let ctx = Context::from_protocol(Protocol::OpenPgp)?;
 
-        let locations = Locations::new(vault_name, account_name)?;
+        let locations = Locations::new(vault_name, account_name);
 
         Ok(Self { ctx, locations })
     }
 
-    /// Encrypts a "UserPass" struct and writes it to the data.gpg file in the vault.
+    /// Encrypts a `UserPass` struct and writes it to the data.gpg file in the vault.
     ///
     /// # Arguments
-    /// * "userpass" - A "UserPass" struct containing the username and password to be encrypted and stored.
+    /// * `userpass` - A `UserPass` struct containing the username and password to be encrypted and stored.
     ///
     /// # Returns
-    /// * "Result<(), Error>" - Returns "Ok(())" on success, or an error on failure.
+    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
     ///
     /// # Errors
     /// * If the recipient cannot be found, if the file cannot be created, or if encryption fails.
@@ -190,53 +210,28 @@ impl Store {
 
         lock_memory(data.as_slice());
 
-        let recipient = read_to_string(&self.locations.recipient_location)?;
-        let recipient_key = &self.ctx.get_key(&recipient).map_err(|e| {
+        let recipient = read_to_string(&self.locations.recipient)?
+            .trim()
+            .to_string();
+        let recipient_key = self.ctx.get_key(&recipient).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to find recipient \"{}\" for encryption. Error: {}",
+                "Failed to find recipient `{}` for encryption. Error: {}",
                 recipient,
                 e
             )
         })?;
 
-        let mut file = File::create(&self.locations.data_location)?;
+        let mut file = File::create(&self.locations.data)?;
 
         #[cfg(unix)]
         file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
 
-        #[cfg(windows)]
-        {
-            use windows::Win32::Security::{
-                GetSecurityDescriptorDacl, InitializeSecurityDescriptor, SECURITY_DESCRIPTOR,
-                SetSecurityDescriptorDacl,
-            };
-            use windows::Win32::Storage::FileSystem::{
-                DACL_SECURITY_INFORMATION, SetFileSecurityW,
-            };
-
-            let mut security_descriptor = SECURITY_DESCRIPTOR::default();
-            unsafe {
-                InitializeSecurityDescriptor(&mut security_descriptor as *mut _ as *mut c_void, 1)?;
-                SetSecurityDescriptorDacl(
-                    &mut security_descriptor as *mut _ as *mut c_void,
-                    true.into(),
-                    None,
-                    false.into(),
-                )?;
-                SetFileSecurityW(
-                    self.locations.data_location.as_os_str(),
-                    DACL_SECURITY_INFORMATION,
-                    &security_descriptor as *const _ as *const c_void,
-                )?;
-            }
-        }
-
         let mut output = Vec::new();
         self.ctx
-            .encrypt([recipient_key], &data, &mut output)
+            .encrypt([&recipient_key], &data, &mut output)
             .map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to encrypt data for recipient \"{}\". Error: {}",
+                    "Failed to encrypt data for recipient `{}`. Error: {}",
                     recipient,
                     e
                 )
@@ -249,71 +244,77 @@ impl Store {
         Ok(())
     }
 
-    /// Decrypts data from data.gpg file in the vault and returns a "UserPass" struct.
+    /// Decrypts data from data.gpg file in the vault and returns a `UserPass` struct.
     ///
     /// # Returns
-    /// * "Result<UserPass, Error>" - Returns a "UserPass" struct containing the decrypted username and password on success, or an error on failure.
+    /// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the decrypted username and password on success, or an error on failure.
     ///
     /// # Errors
     /// * If the recipient cannot be found, if the file cannot be opened, or if decryption fails.
     pub fn decrypt_from_file(&mut self) -> Result<UserPass, Error> {
         let mut encrypted_data = Vec::new();
-        let file = File::open(&self.locations.data_location)?;
+        let file = File::open(&self.locations.data)?;
 
         let mut reader = BufReader::new(file);
         reader.read_to_end(&mut encrypted_data)?;
 
         let mut output = Vec::new();
-
-        lock_memory(&output);
-
         self.ctx
             .decrypt(&encrypted_data, &mut output)
             .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
 
-        let mut output_split: Vec<Vec<u8>> =
-            output.split(|&b| b == b':').map(|s| s.to_vec()).collect();
+        // Lock the decrypted buffer to reduce swap risk
+        lock_memory(&output);
 
-        lock_memory(&output_split.concat());
+        // Parse "username:password" using the first ':' only
+        let sep = output
+            .iter()
+            .position(|&b| b == b':')
+            .ok_or_else(|| anyhow::anyhow!("Decrypted data is malformed: missing separator"))?;
 
+        let username_bytes = &output[..sep];
+        let password_bytes = &output[sep + 1..];
+
+        if password_bytes.is_empty() {
+            output.zeroize();
+            return Err(anyhow::anyhow!(
+                "Decrypted data is malformed: empty password"
+            ));
+        }
+
+        let username = String::from_utf8(username_bytes.to_vec())?;
+        let password_vec = password_bytes.to_vec();
+
+        // Zeroize decrypted buffer before constructing return value
         output.zeroize();
-
-        let username = String::from_utf8(output_split[0].clone())?;
 
         let output_as_userpass = UserPass {
             username,
-            password: SecretBox::new(Box::new(output_split[1].to_vec())),
+            password: SecretBox::new(Box::new(password_vec)),
         };
 
         lock_memory(output_as_userpass.password.expose_secret());
-
-        for slice in &mut output_split {
-            let mut slice_vec = slice.to_vec();
-            slice_vec.zeroize();
-        }
-
-        output_split.zeroize();
 
         Ok(output_as_userpass)
     }
 }
 
-/// Renames a directory from "old_path" to "new_path".
+/// Renames a directory from `old_path` to `new_path`.
 ///
 /// # Arguments
-/// * "old_path" - The current path of the directory to be renamed.
-/// * "new_path" - The new path for the directory.
+/// * `old_path` - The current path of the directory to be renamed.
+/// * `new_path` - The new path for the directory.
 ///
 /// # Returns
-/// * "Result<(), Error>" - Returns "Ok(())" on success, or an error on failure.
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
 /// # Errors
-/// * If the directory at "old_path" does not exist, or if the renaming operation fails, an error is returned.
+/// * If the directory at `old_path` does not exist, or if the renaming operation fails, an error is returned.
 pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Error> {
     if old_path.exists() {
         rename(old_path, new_path)?;
     } else {
         return Err(anyhow::anyhow!(
-            "The directory \"{}\" does not exist.",
+            "The directory `{}` does not exist.",
             old_path.display()
         ));
     }
@@ -324,10 +325,10 @@ pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Er
 /// Reads all directories in the specified directory and returns their names as a vector of strings.
 ///
 /// # Arguments
-/// * "directory" - The path to the directory to read.
+/// * `directory` - The path to the directory to read.
 ///
 /// # Returns
-/// * "Result<Vec<String>, Error>" - Returns a vector of directory names on success, or an error on failure.
+/// * `Result<Vec<String>, Error>` - Returns a vector of directory names on success, or an error on failure.
 ///
 /// # Errors
 /// * If reading the directory fails, or if the file type cannot be determined, an error is returned.
@@ -351,11 +352,11 @@ pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
 /// Retrieves the account details for a specific account in a vault.
 ///
 /// # Arguments
-/// * "vault_name" - The name of the vault containing the account.
-/// * "account_name" - The name of the account to retrieve details for.
+/// * `vault_name` - The name of the vault containing the account.
+/// * `account_name` - The name of the account to retrieve details for.
 ///
 /// # Returns
-/// * "Result<UserPass, Error>" - Returns a "UserPass" struct containing the username and decrypted password on success, or an error on failure.
+/// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the username and decrypted password on success, or an error on failure.
 ///
 /// # Errors
 /// * If the vault does not exist, if the account does not exist, or if decryption fails.
@@ -370,6 +371,22 @@ pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserP
         username: userpass.username,
         password: userpass.password,
     })
+}
+
+/// Attempt to decrypt the vault's gate file to warm up GPG (triggers passphrase prompt).
+pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
+    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+    let locations = Locations::new(vault_name, "");
+    let mut encrypted = Vec::new();
+    let mut out = Vec::new();
+
+    let file = File::open(&locations.gate)?;
+    let mut reader = BufReader::new(file);
+    reader.read_to_end(&mut encrypted)?;
+
+    ctx.decrypt(&encrypted, &mut out)
+        .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
+    Ok(())
 }
 
 #[cfg(test)]
