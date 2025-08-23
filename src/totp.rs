@@ -89,7 +89,6 @@ pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
     rng().fill(&mut secret);
 
     encrypt_and_store_secret(&locations, &secret)?;
-    require_totp(vault_name)?;
     ensure_gate_exists(vault_name)?;
     ledger_add(vault_name)?;
 
@@ -122,7 +121,6 @@ pub fn disable_totp(vault_name: &str) -> Result<(), Error> {
     if locations.totp.exists() {
         remove_file(&locations.totp)?;
     }
-    unrequire_totp(vault_name)?;
     ledger_remove(vault_name)?;
     Ok(())
 }
@@ -314,58 +312,6 @@ pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
     file.write_all(&output)?;
     Ok(())
 }
-
-/// Compute the path to the external TOTP-required marker in the user config directory.
-///
-/// # Arguments:
-/// * `vault_name` - The name of the vault.
-///
-/// # Returns:
-/// * A `PathBuf` with the location of the `totp_required` file.
-fn required_marker_path(vault_name: &str) -> PathBuf {
-    let base = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    base.join("fmp").join("totp_required").join(vault_name)
-}
-
-/// Mark a vault as requiring TOTP by creating a marker file in the config directory.
-///
-/// # Arguments:
-/// * `vault_name` - The name of the vault.
-///
-/// # Returns:
-/// * `Result<(), Error>` - An `Ok(())` on success and an `Error` on failure
-///
-/// # Errors:
-/// * Fails when unable to: Create the directory for the `totp_required` file or create the `totp_required` file itself.
-pub fn require_totp(vault_name: &str) -> Result<(), Error> {
-    let marker = required_marker_path(vault_name);
-    if let Some(dir) = marker.parent() {
-        create_dir_all(dir)?;
-    }
-    if !marker.exists() {
-        File::create(&marker)?;
-    }
-    Ok(())
-}
-
-/// Remove the TOTP requirement marker.
-///
-/// # Arguments:
-/// * `vault_name` - The name of the vault.
-///
-/// # Returns:
-/// * Result<(), Error> - An `Ok(())` on success and an `Error` on failure.
-///
-/// # Errors:
-/// * Fails when unable to remove marker file.
-pub fn unrequire_totp(vault_name: &str) -> Result<(), Error> {
-    let marker = required_marker_path(vault_name);
-    if marker.exists() {
-        remove_file(&marker)?;
-    }
-    Ok(())
-}
-
 /// Returns the path to the TOTP ledger in the user config directory.
 ///
 /// # Returns:
