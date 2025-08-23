@@ -24,10 +24,10 @@ use anyhow::Error;
 use dirs::data_dir;
 use gpgme::{Context, Protocol};
 use secrecy::{ExposeSecret, SecretBox};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{File, create_dir_all, read_dir, read_to_string, rename},
     io::{BufReader, Read, Write},
-    os::unix::fs::PermissionsExt,
     path::PathBuf,
 };
 use zeroize::Zeroize;
@@ -64,9 +64,8 @@ impl Locations {
     /// # Errors
     /// * If the vault or account paths cannot be created, an error is returned.
     pub fn new(vault_name: &str, account_name: &str) -> Locations {
-        let fmp = data_dir()
-            .expect("Failed to find data directory")
-            .join("fmp");
+        let base = data_dir().unwrap_or_else(|| PathBuf::from("."));
+        let fmp = base.join("fmp");
 
         let vault = fmp.join("vaults").join(vault_name);
         let backup = fmp.join("backups");
@@ -97,7 +96,17 @@ impl Locations {
     /// * If the vault directory cannot be created or if the recipient file cannot be created, an error is returned.
     pub fn initialize_vault(&self) -> Result<(), Error> {
         create_dir_all(&self.vault)?;
-        File::create(&self.recipient)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.vault, std::fs::Permissions::from_mode(0o700))?;
+        }
+        let recipient_file = File::create(&self.recipient)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            recipient_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        }
 
         Ok(())
     }
@@ -111,6 +120,11 @@ impl Locations {
     /// * If the account directory cannot be created, an error is returned.
     pub fn create_account_directory(&self) -> Result<(), Error> {
         create_dir_all(&self.account)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.account, std::fs::Permissions::from_mode(0o700))?;
+        }
 
         Ok(())
     }
@@ -196,8 +210,10 @@ impl Store {
 
         lock_memory(data.as_slice());
 
-        let recipient = read_to_string(&self.locations.recipient)?;
-        let recipient_key = &self.ctx.get_key(&recipient).map_err(|e| {
+        let recipient = read_to_string(&self.locations.recipient)?
+            .trim()
+            .to_string();
+        let recipient_key = self.ctx.get_key(&recipient).map_err(|e| {
             anyhow::anyhow!(
                 "Failed to find recipient `{}` for encryption. Error: {}",
                 recipient,
@@ -210,36 +226,9 @@ impl Store {
         #[cfg(unix)]
         file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
 
-        #[cfg(windows)]
-        {
-            use windows::Win32::Security::{
-                GetSecurityDescriptorDacl, InitializeSecurityDescriptor, SECURITY_DESCRIPTOR,
-                SetSecurityDescriptorDacl,
-            };
-            use windows::Win32::Storage::FileSystem::{
-                DACL_SECURITY_INFORMATION, SetFileSecurityW,
-            };
-
-            let mut security_descriptor = SECURITY_DESCRIPTOR::default();
-            unsafe {
-                InitializeSecurityDescriptor(&mut security_descriptor as *mut _ as *mut c_void, 1)?;
-                SetSecurityDescriptorDacl(
-                    &mut security_descriptor as *mut _ as *mut c_void,
-                    true.into(),
-                    None,
-                    false.into(),
-                )?;
-                SetFileSecurityW(
-                    self.locations.data.as_os_str(),
-                    DACL_SECURITY_INFORMATION,
-                    &security_descriptor as *const _ as *const c_void,
-                )?;
-            }
-        }
-
         let mut output = Vec::new();
         self.ctx
-            .encrypt([recipient_key], &data, &mut output)
+            .encrypt([&recipient_key], &data, &mut output)
             .map_err(|e| {
                 anyhow::anyhow!(
                     "Failed to encrypt data for recipient `{}`. Error: {}",
@@ -270,34 +259,41 @@ impl Store {
         reader.read_to_end(&mut encrypted_data)?;
 
         let mut output = Vec::new();
-
-        lock_memory(&output);
-
         self.ctx
             .decrypt(&encrypted_data, &mut output)
             .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
 
-        let mut output_split: Vec<Vec<u8>> = output.split(|&b| b == b':').map(Vec::from).collect();
+        // Lock the decrypted buffer to reduce swap risk
+        lock_memory(&output);
 
-        lock_memory(&output_split.concat());
+        // Parse "username:password" using the first ':' only
+        let sep = output
+            .iter()
+            .position(|&b| b == b':')
+            .ok_or_else(|| anyhow::anyhow!("Decrypted data is malformed: missing separator"))?;
 
+        let username_bytes = &output[..sep];
+        let password_bytes = &output[sep + 1..];
+
+        if password_bytes.is_empty() {
+            output.zeroize();
+            return Err(anyhow::anyhow!(
+                "Decrypted data is malformed: empty password"
+            ));
+        }
+
+        let username = String::from_utf8(username_bytes.to_vec())?;
+        let password_vec = password_bytes.to_vec();
+
+        // Zeroize decrypted buffer before constructing return value
         output.zeroize();
-
-        let username = String::from_utf8(output_split[0].clone())?;
 
         let output_as_userpass = UserPass {
             username,
-            password: SecretBox::new(Box::new(output_split[1].clone())),
+            password: SecretBox::new(Box::new(password_vec)),
         };
 
         lock_memory(output_as_userpass.password.expose_secret());
-
-        for slice in &mut output_split {
-            let mut slice_vec = slice.clone();
-            slice_vec.zeroize();
-        }
-
-        output_split.zeroize();
 
         Ok(output_as_userpass)
     }

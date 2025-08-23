@@ -52,20 +52,17 @@ pub fn generate_password(app: &mut FmpApp) {
         pool.push_str("áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ");
     }
 
-    // HashSet is faster for dedupe/exclude/add ops
+    // Build character pool set with include/exclude adjustments
     let mut base: HashSet<char> = pool.chars().collect();
-    let add_set: HashSet<char> = app.consider_characters.chars().collect();
-    let retain_set: HashSet<char> = app.ignore_characters.chars().collect();
+    let include: HashSet<char> = app.consider_characters.chars().collect();
+    let exclude: HashSet<char> = app.ignore_characters.chars().collect();
 
-    for ch in &retain_set {
+    for ch in &exclude {
         base.remove(ch);
     }
-
-    for ch in &add_set {
-        base.insert(*ch);
+    for &ch in &include {
+        base.insert(ch);
     }
-
-    base.extend(add_set.iter());
 
     let pool_vec: Vec<char> = base.into_iter().collect();
 

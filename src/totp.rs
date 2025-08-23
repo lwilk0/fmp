@@ -31,7 +31,9 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::crypto::lock_memory;
 use crate::vault::Locations;
+use zeroize::Zeroize;
 
 /// HMAC-SHA1 type alias
 pub type HmacSha1 = Hmac<Sha1>;
@@ -102,7 +104,7 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    let secret = decrypt_secret(vault_name)?;
+    let mut secret = decrypt_secret(vault_name)?;
 
     #[allow(clippy::cast_possible_wrap)]
     let now = SystemTime::now()
@@ -113,17 +115,20 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
     let step = 30i64;
     let digits = 6u32;
 
+    let mut valid = false;
     for skew in [-1i64, 0, 1] {
         #[allow(clippy::cast_sign_loss)]
         let counter = ((now / step) + skew) as u64;
         let hotp_val = hotp(&secret, counter, digits);
         let candidate = format!("{:0width$}", hotp_val, width = digits as usize);
         if candidate == code {
-            return Ok(true);
+            valid = true;
+            break;
         }
     }
 
-    Ok(false)
+    secret.zeroize();
+    Ok(valid)
 }
 
 /// RFC 4226 HOTP calculation using HMAC-SHA1.
@@ -148,7 +153,9 @@ fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
 fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), Error> {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
 
-    let recipient = std::fs::read_to_string(&locations.recipient)?;
+    let recipient = std::fs::read_to_string(&locations.recipient)?
+        .trim()
+        .to_string();
     let recipient_key = ctx.get_key(&recipient).map_err(|e| {
         anyhow::anyhow!(
             "Failed to find recipient `{}` for encryption. Error: {}",
@@ -190,6 +197,9 @@ fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
     ctx.decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt TOTP secret. Error: {}", e))?;
 
+    lock_memory(&out);
+    encrypted.zeroize();
+
     Ok(out)
 }
 
@@ -201,7 +211,9 @@ pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
     }
 
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-    let recipient = std::fs::read_to_string(&locations.recipient)?;
+    let recipient = std::fs::read_to_string(&locations.recipient)?
+        .trim()
+        .to_string();
     let recipient_key = ctx.get_key(&recipient).map_err(|e| {
         anyhow::anyhow!(
             "Failed to find recipient `{}` for encryption. Error: {}",

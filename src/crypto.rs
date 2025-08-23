@@ -19,7 +19,6 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::{content::show_password_button, gui::FmpApp, password::password_strength_meter};
-use libc::c_void;
 use secrecy::{ExposeSecret, SecretBox};
 use zeroize::Zeroize;
 
@@ -92,12 +91,15 @@ pub fn securely_retrieve_password(
 pub fn lock_memory(data: &[u8]) {
     #[cfg(unix)]
     unsafe {
-        libc::mlock(data.as_ptr().cast::<c_void>(), data.len());
+        #[allow(clippy::ptr_as_ptr)]
+        libc::mlock(data.as_ptr() as *const _, data.len());
     }
 
     #[cfg(windows)]
     unsafe {
+        use core::ffi::c_void;
         use windows::Win32::System::Memory::VirtualLock;
-        VirtualLock(data.as_ptr().cast::<c_void>(), data.len());
+        #[allow(clippy::ptr_as_ptr)]
+        let _ = VirtualLock(data.as_ptr() as *const c_void, data.len());
     }
 }

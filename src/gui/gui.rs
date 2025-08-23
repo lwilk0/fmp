@@ -107,7 +107,7 @@ impl Default for FmpApp {
             recipient: String::new(),
             vault_name_create: String::new(),
             account_name_create: String::new(),
-            password_length: 0,
+            password_length: 16,
 
             selections: [true, true, true, true, false, false],
             consider_characters: String::new(),
