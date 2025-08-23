@@ -1,10 +1,7 @@
-## Due to Microsoft making GitHub part of CoreAI, I have moved to [Codeberg](https://codeberg.org/lwilko).
-
 # FMP (Forgot My Password)
 
 [![Latest Version](https://img.shields.io/crates/v/forgot-my-password.svg?logo=rust)](https://crates.io/crates/forgot-my-password)
-[![Build Status](https://github.com/lwilk0/fmp/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/lwilk0/fmp/actions/workflows/rust-ci.yml)
-[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://github.com/lwilk0/fmp/blob/main/LICENSE)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://codeberg.org/lwilko/fmp/-/blob/main/LICENSE?ref_type=heads)
 
 A password manager written in memory-safe Rust.
 
@@ -39,11 +36,11 @@ Forgot My Password (FMP) is a password manager that safely allows you to generat
    - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    - [rust](https://www.rust-lang.org/tools/install)
 
-  See [INSTALLATION.md](https://github.com/lwilk0/fmp/blob/main/INSTALLATION.md) for OS specific installations.
+  See [INSTALLATION.md](INSTALLATION.md) for OS specific installations.
   
 2. **Clone the Repository**:
    ```bash
-   git clone https://github.com/lwilk0/fmp.git
+   git clone https://codeberg.org/lwilko/fmp.git
    cd fmp
    ```
 
@@ -88,8 +85,6 @@ Contributions are welcome! Please follow these steps to contribute:
 1. Fork this repository.
 2. Create a new branch for your feature or bug-fix.
 3. Submit a pull request with a detailed description of your changes.
-
-Please ensure you run `cargo test` before submitting a pull request, as the workflow cannot do this for you, as testing requires user interaction.
 
 ## License
 
