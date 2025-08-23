@@ -1,6 +1,8 @@
-use crate::totp::{ensure_gate_exists, is_totp_enabled, is_totp_required};
-use crate::vault::warm_up_gpg;
-use crate::{gui::FmpApp, vault::get_account_details};
+use crate::{
+    gui::FmpApp,
+    totp::{ensure_gate_exists, is_totp_enabled, is_totp_required},
+    vault::{get_account_details, warm_up_gpg},
+};
 use log::error;
 
 /// Small reusable UI helper that renders:
