@@ -3,6 +3,7 @@ use crate::{
     totp::{ensure_gate_exists, is_totp_enabled, is_totp_required},
     vault::{get_account_details, warm_up_gpg},
 };
+use egui_toast::ToastKind;
 use log::error;
 
 /// Small reusable UI helper that renders:
@@ -127,9 +128,11 @@ fn select_vault(app: &mut FmpApp, vault: String) {
     }
     if !app.totp_required {
         if let Err(e) = warm_up_gpg(&app.vault_name) {
-            app.toasts
-                .error(format!("Unlock canceled or failed: {e}"))
-                .duration(Some(std::time::Duration::from_secs(3)));
+            app.display_toast(
+                format!("Unlock canceled or failed: {e}").as_str(),
+                3.0,
+                ToastKind::Error,
+            );
             app.vault_name.clear();
             app.account_names.clear();
             app.account_name.clear();

@@ -10,9 +10,9 @@ use crate::{
     vault::{Locations, UserPass, read_directory},
 };
 use eframe::egui;
-use egui_notify::Toasts;
+use egui::Align2;
+use egui_toast::{Toast, ToastKind, ToastOptions, Toasts};
 use secrecy::SecretBox;
-use std::time::Duration;
 use zeroize::Zeroize;
 
 /// Runs the FMP GUI application.
@@ -138,7 +138,7 @@ impl Default for FmpApp {
             account_sort_asc: true,
             sort_case_sensitive: false,
 
-            toasts: Toasts::default(),
+            toasts: Toasts::new().anchor(Align2::RIGHT_TOP, (-20.0, 10.0)),
 
             totp_enabled: false,
             totp_required: false,
@@ -162,9 +162,7 @@ impl FmpApp {
         if let Ok(names) = read_directory(&locations.fmp.join("vaults")) {
             self.vault_names = names;
         } else {
-            self.toasts
-                .error("Failed to fetch vault names.")
-                .duration(Some(Duration::from_secs(3)));
+            self.display_toast("Failed to fetch vault names.", 3.0, ToastKind::Error);
         }
     }
 
@@ -174,9 +172,7 @@ impl FmpApp {
         if let Ok(names) = read_directory(&locations.vault) {
             self.account_names = names;
         } else {
-            self.toasts
-                .error("Failed to fetch account names.")
-                .duration(Some(Duration::from_secs(3)));
+            self.display_toast("Failed to fetch account names.", 3.0, ToastKind::Error);
         }
     }
 
@@ -251,6 +247,40 @@ impl FmpApp {
         }
 
         view
+    }
+
+    pub fn display_toast(&mut self, message: &str, duration: f64, kind: ToastKind) {
+        let wrapped_message = if message.len() > 40 {
+            let mut result = String::new();
+            let words: Vec<&str> = message.split_whitespace().collect();
+            let mut current_line_len = 0;
+
+            for (i, word) in words.iter().enumerate() {
+                if current_line_len + word.len() > 35 && current_line_len > 0 {
+                    result.push('\n');
+                    current_line_len = 0;
+                }
+                if i > 0 && current_line_len > 0 {
+                    result.push(' ');
+                    current_line_len += 1;
+                }
+                result.push_str(word);
+                current_line_len += word.len();
+            }
+            result
+        } else {
+            message.to_string()
+        };
+
+        self.toasts.add(Toast {
+            text: wrapped_message.into(),
+            kind,
+            options: ToastOptions::default()
+                .duration_in_seconds(duration)
+                .show_progress(true)
+                .show_icon(true),
+            ..Default::default()
+        });
     }
 }
 
@@ -345,6 +375,7 @@ impl eframe::App for FmpApp {
                 }
             });
 
+        // Show toasts with custom styling
         self.toasts.show(ctx);
     }
 }

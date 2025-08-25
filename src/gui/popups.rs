@@ -4,9 +4,9 @@ use crate::{
     vault::warm_up_gpg,
 };
 use egui::ColorImage;
+use egui_toast::ToastKind;
 use image::Luma;
 use qrcode::QrCode;
-use std::time::Duration;
 use zeroize::Zeroize;
 
 /// Displays the content quit popup.
@@ -157,21 +157,23 @@ pub fn totp_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                                     app.show_totp_popup = false;
                                 }
                                 Err(e) => {
-                                    app.toasts
-                                        .error(format!("Unlock canceled or failed: {e}"))
-                                        .duration(Some(std::time::Duration::from_secs(3)));
+                                    app.display_toast(
+                                        format!("Unlock canceled or failed: {e}").as_str(),
+                                        3.0,
+                                        ToastKind::Error,
+                                    );
                                 }
                             }
                         }
                         Ok(false) => {
-                            app.toasts
-                                .error("Invalid code.")
-                                .duration(Some(std::time::Duration::from_secs(2)));
+                            app.display_toast("Invalid code.", 3.0, ToastKind::Error);
                         }
                         Err(e) => {
-                            app.toasts
-                                .error(format!("Verification failed: {e}"))
-                                .duration(Some(std::time::Duration::from_secs(3)));
+                            app.display_toast(
+                                format!("Verification failed {e}").as_str(),
+                                3.0,
+                                ToastKind::Error,
+                            );
                         }
                     }
                 }
@@ -266,19 +268,18 @@ pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                             );
                             app.totp_code_input.clear();
                             app.show_totp_setup_popup = false;
-                            app.toasts
-                                .success("2FA verified.")
-                                .duration(Some(Duration::from_secs(2)));
+
+                            app.display_toast("2FA verified.", 2.0, ToastKind::Success);
                         }
                         Ok(false) => {
-                            app.toasts
-                                .error("Invalid code.")
-                                .duration(Some(Duration::from_secs(2)));
+                            app.display_toast("Invalid code.", 3.0, ToastKind::Error);
                         }
                         Err(e) => {
-                            app.toasts
-                                .error(format!("Verification failed: {e}"))
-                                .duration(Some(Duration::from_secs(3)));
+                            app.display_toast(
+                                format!("Verification failed: {e}").as_str(),
+                                3.0,
+                                ToastKind::Error,
+                            );
                         }
                     }
                 }
@@ -294,14 +295,14 @@ pub fn totp_setup_popup(app: &mut FmpApp, ui: &mut egui::Ui) {
                         app.totp_otpauth_uri.clear();
                         app.totp_code_input.clear();
                         app.totp_verified_until = None;
-                        app.toasts
-                            .success("2FA disabled for this vault.")
-                            .duration(Some(Duration::from_secs(2)));
+                        app.display_toast("2FA disabled for this vault.", 2.0, ToastKind::Success);
                     }
                     Err(e) => {
-                        app.toasts
-                            .error(format!("Failed to disable 2FA: {e}"))
-                            .duration(Some(Duration::from_secs(3)));
+                        app.display_toast(
+                            format!("Failed to disable 2FA: {e}").as_str(),
+                            3.0,
+                            ToastKind::Error,
+                        );
                     }
                 }
             }

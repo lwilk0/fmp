@@ -28,8 +28,8 @@ use crate::{
     totp::{disable_totp, enable_totp, verify_totp_code},
 };
 use core::mem;
+use egui_toast::ToastKind;
 use secrecy::ExposeSecret;
-use std::time::Duration;
 use zeroize::Zeroize;
 
 /// Displays the content for the main window of the application when nothing is selected.
@@ -62,18 +62,14 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Create Vault").clicked() {
                 if app.vault_name_create.is_empty() || app.recipient.is_empty() {
-                    app.toasts
-                        .error("Please fill in all fields before adding an account.")
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast("Please fill in all fields before adding an account.", 3.0, ToastKind::Error);
 
                     return;
                 }
                 match create_new_vault(app) {
                     Ok(_o) => {
-                        app.toasts
-                            .success(format!("Vault `{}` created successfully!",
-                            app.vault_name_create))
-                            .duration(Some(Duration::from_secs(2)));
+                        app.display_toast(format!("Vault `{}` created successfully!",
+                            app.vault_name_create).as_str(), 2.0, ToastKind::Success);
 
                         app.vault_name_create.clear();
                         app.recipient.clear();
@@ -82,10 +78,8 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                     }
 
                     Err(_e) => {
-                        app.toasts
-                            .error(format!("Failed to create vault `{}`",
-                            app.vault_name_create))
-                            .duration(Some(Duration::from_secs(3)));
+                        app.display_toast(format!("Failed to create vault `{}`",
+                            app.vault_name_create).as_str(), 3.0, ToastKind::Error);
                     }
                 }
             }
@@ -129,31 +123,39 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Add Account").clicked() {
                 if app.account_name_create.is_empty() {
-                    app.toasts
-                        .error("Please fill in all fields before adding an account")
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast(
+                        "Please fill in all fields before adding an account",
+                        3.0,
+                        ToastKind::Warning,
+                    );
                     return;
                 }
                 match add_account(app) {
                     Ok(_o) => {
-                        app.toasts
-                            .success(format!(
+                        app.display_toast(
+                            format!(
                                 "Account `{}` added to vault `{}`.",
                                 app.account_name_create, app.vault_name
-                            ))
-                            .duration(Some(Duration::from_secs(2)));
+                            )
+                            .as_str(),
+                            2.0,
+                            ToastKind::Success,
+                        );
 
                         app.clear_account_data();
                         app.account_name_create.clear();
                         app.fetch_account_names();
                     }
                     Err(e) => {
-                        app.toasts
-                            .error(format!(
+                        app.display_toast(
+                            format!(
                                 "Failed to add account `{}` to vault `{}`. Error: {}",
                                 app.account_name_create, app.vault_name, e
-                            ))
-                            .duration(Some(Duration::from_secs(3)));
+                            )
+                            .as_str(),
+                            3.0,
+                            ToastKind::Error,
+                        );
                     }
                 }
             }
@@ -185,14 +187,10 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                             app.totp_otpauth_uri.clear();
                             app.totp_code_input.clear();
                             app.totp_verified_until = None;
-                            app.toasts
-                                .success("2FA disabled for this vault.")
-                                .duration(Some(Duration::from_secs(2)));
+                            app.display_toast("2FA disabled for this vault.", 2.0, ToastKind::Success);
                         }
                         Err(e) => {
-                            app.toasts
-                                .error(format!("Failed to disable 2FA: {e}"))
-                                .duration(Some(Duration::from_secs(3)));
+                            app.display_toast(format!("Failed to disable 2FA: {e}").as_str(), 3.0, ToastKind::Error);
                         }
                     }
                 } else {
@@ -202,14 +200,10 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                             app.show_totp_setup_popup = true;
                             app.totp_secret_b32 = b32;
                             app.totp_otpauth_uri = uri;
-                            app.toasts
-                                .success("2FA secret generated. Scan the QR/URI in your Authenticator and verify a code.")
-                                .duration(Some(Duration::from_secs(4)));
+                            app.display_toast("2FA secret generated. Scan the QR/URI in your Authenticator and verify a code.", 4.0, ToastKind::Info);
                         }
                         Err(e) => {
-                            app.toasts
-                                .error(format!("Failed to enable 2FA: {e}"))
-                                .duration(Some(Duration::from_secs(3)));
+                            app.display_toast(format!("Failed to enable 2FA: {e}").as_str(), 3.0, ToastKind::Error);
                         }
                     }
                 }
@@ -225,17 +219,13 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             if app.confirm_action {
                     match delete_vault(app) {
                         Ok(()) => {
-                            app.toasts
-                                .success(format!("Vault `{}` deleted.", app.vault_name))
-                                .duration(Some(Duration::from_secs(2)));
+                            app.display_toast(format!("Vault `{}` deleted.", app.vault_name).as_str(), 2.0, ToastKind::Success);
 
                             app.vault_name.clear();
                             app.fetch_vault_names();
                         }
                         Err(_e) => {
-                            app.toasts
-                                .error(format!("Failed to delete vault `{}`", app.vault_name))
-                                .duration(Some(Duration::from_secs(3)));
+                            app.display_toast(format!("Failed to delete vault `{}`", app.vault_name).as_str(), 3.0, ToastKind::Error);
                         }
                     }
 
@@ -299,7 +289,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
             app.userpass.username
         )));
 
-        let password = String::from_utf8_lossy(app.userpass.password.expose_secret());
+        let password = String::from_utf8_lossy(app.userpass.password.expose_secret()).to_string();
 
         ui.add_space(8.0);
 
@@ -319,19 +309,17 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                                     std::time::Instant::now() + std::time::Duration::from_secs(120),
                                 );
                                 app.totp_code_input.clear();
-                                app.toasts
-                                    .success("2FA verified.")
-                                    .duration(Some(Duration::from_secs(2)));
+                                app.display_toast("2FA verified.", 2.0, ToastKind::Success);
                             }
                             Ok(false) => {
-                                app.toasts
-                                    .error("Invalid code.")
-                                    .duration(Some(Duration::from_secs(2)));
+                                app.display_toast("Invalid code.", 3.0, ToastKind::Error);
                             }
                             Err(e) => {
-                                app.toasts
-                                    .error(format!("Verification failed: {e}"))
-                                    .duration(Some(Duration::from_secs(3)));
+                                app.display_toast(
+                                    format!("Verification failed: {e}").as_str(),
+                                    3.0,
+                                    ToastKind::Error,
+                                );
                             }
                         }
                     }
@@ -352,15 +340,14 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 .add_enabled(can_reveal, egui::Button::new("Copy"))
                 .clicked()
             {
-                app.toasts
-                    .success("Password copied to clipboard.")
-                    .duration(Some(Duration::from_secs(2)));
+                app.display_toast("Password copied to clipboard.", 2.0, ToastKind::Success);
+                app.display_toast(
+                    "Clipboard may be read by other apps.",
+                    3.0,
+                    ToastKind::Warning,
+                );
 
-                app.toasts
-                    .warning("Clipboard may be read by other apps.")
-                    .duration(Some(Duration::from_secs(3)));
-
-                ui.ctx().copy_text(password.to_string());
+                ui.ctx().copy_text(password.clone());
             }
 
             if can_reveal {
@@ -407,12 +394,15 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         if app.confirm_action {
             match delete_account_from_vault(app) {
                 Ok(_o) => {
-                    app.toasts
-                        .success(format!(
+                    app.display_toast(
+                        format!(
                             "Account `{}` deleted from vault `{}`.",
                             app.account_name, app.vault_name
-                        ))
-                        .duration(Some(Duration::from_secs(2)));
+                        )
+                        .as_str(),
+                        2.0,
+                        ToastKind::Success,
+                    );
 
                     app.account_name.clear();
                     app.clear_account_data();
@@ -420,12 +410,15 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                 }
 
                 Err(e) => {
-                    app.toasts
-                        .error(format!(
+                    app.display_toast(
+                        format!(
                             "Failed to delete account `{}` from vault {}. Error: {}",
                             app.account_name, app.vault_name, e
-                        ))
-                        .duration(Some(Duration::from_secs(3)));
+                        )
+                        .as_str(),
+                        3.0,
+                        ToastKind::Error,
+                    );
                 }
             }
             app.confirm_action = false;
@@ -474,9 +467,11 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Change Information").clicked() {
                 if app.account_name_create.is_empty() {
-                    app.toasts
-                        .error("Please fill in all fields before changing an accounts information.")
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast(
+                        "Please fill in all fields before changing an accounts information.",
+                        3.0,
+                        ToastKind::Error,
+                    );
 
                     return;
                 }
@@ -489,32 +484,39 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
                                     app.account_name_create.clear();
                                 }
                                 Err(_e) => {
-                                    app.toasts
-                                        .error("Failed to change account name.")
-                                        .duration(Some(Duration::from_secs(3)));
-
+                                    app.display_toast(
+                                        "Failed to change account name.",
+                                        3.0,
+                                        ToastKind::Error,
+                                    );
                                     return;
                                 }
                             }
                         }
 
-                        app.toasts
-                            .success(format!(
+                        app.display_toast(
+                            format!(
                                 "Account `{}` updated successfully in vault `{}`.",
                                 app.account_name, app.vault_name
-                            ))
-                            .duration(Some(Duration::from_secs(2)));
+                            )
+                            .as_str(),
+                            2.0,
+                            ToastKind::Success,
+                        );
 
                         app.change_account_info = false;
                         app.fetch_account_names();
                     }
                     Err(e) => {
-                        app.toasts
-                            .error(format!(
+                        app.display_toast(
+                            format!(
                                 "Failed to change account name `{}`. Error: {}",
                                 app.account_name, e
-                            ))
-                            .duration(Some(Duration::from_secs(3)));
+                            )
+                            .as_str(),
+                            3.0,
+                            ToastKind::Error,
+                        );
                     }
                 }
             }
@@ -560,31 +562,37 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Rename Vault").clicked() {
                 if app.vault_name_create.is_empty() {
-                    app.toasts
-                        .error("Please fill in all fields before changing vault name.")
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast(
+                        "Please fill in all fields before changing vault name.",
+                        3.0,
+                        ToastKind::Warning,
+                    );
 
                     return;
                 }
 
                 match rename_vault(app) {
                     Ok(_o) => {
-                        app.toasts
-                            .success(format!("Vault renamed to `{}`.", app.vault_name_create))
-                            .duration(Some(Duration::from_secs(2)));
-
+                        app.display_toast(
+                            format!("Vault renamed to `{}`.", app.vault_name_create).as_str(),
+                            2.0,
+                            ToastKind::Success,
+                        );
                         app.vault_name.clone_from(&app.vault_name_create);
                         app.vault_name_create.clear();
                         app.fetch_vault_names();
                         app.change_vault_name = false;
                     }
                     Err(e) => {
-                        app.toasts
-                            .error(format!(
+                        app.display_toast(
+                            format!(
                                 "Failed to rename vault `{}`. Error: {}",
                                 app.vault_name_create, e
-                            ))
-                            .duration(Some(Duration::from_secs(3)));
+                            )
+                            .as_str(),
+                            3.0,
+                            ToastKind::Error,
+                        );
                     }
                 }
             }
@@ -755,20 +763,19 @@ fn backup(app: &mut FmpApp, ui: &mut egui::Ui) {
         if ui.button("Backup Vault").clicked() {
             match create_backup(app) {
                 Ok(_o) => {
-                    app.toasts
-                        .success(format!(
-                            "Vault `{}` backed up successfully.",
-                            app.vault_name
-                        ))
-                        .duration(Some(Duration::from_secs(2)));
+                    app.display_toast(
+                        format!("Vault `{}` backed up successfully.", app.vault_name).as_str(),
+                        2.0,
+                        ToastKind::Success,
+                    );
                 }
                 Err(e) => {
-                    app.toasts
-                        .error(format!(
-                            "Failed to back up vault `{}`. Error: {}",
-                            app.vault_name, e
-                        ))
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast(
+                        format!("Failed to back up vault `{}`. Error: {}", app.vault_name, e)
+                            .as_str(),
+                        3.0,
+                        ToastKind::Error,
+                    );
                 }
             }
         }
@@ -776,17 +783,19 @@ fn backup(app: &mut FmpApp, ui: &mut egui::Ui) {
         if ui.button("Restore Vault").clicked() {
             match install_backup(app) {
                 Ok(_o) => {
-                    app.toasts
-                        .success(format!("Vault `{}` restored successfully.", app.vault_name))
-                        .duration(Some(Duration::from_secs(2)));
+                    app.display_toast(
+                        format!("Vault `{}` restored successfully.", app.vault_name).as_str(),
+                        2.0,
+                        ToastKind::Success,
+                    );
                 }
                 Err(e) => {
-                    app.toasts
-                        .error(format!(
-                            "Failed to restore vault `{}`. Error: {}",
-                            app.vault_name, e
-                        ))
-                        .duration(Some(Duration::from_secs(3)));
+                    app.display_toast(
+                        format!("Failed to restore vault `{}`. Error: {}", app.vault_name, e)
+                            .as_str(),
+                        3.0,
+                        ToastKind::Error,
+                    );
                 }
             }
         }
