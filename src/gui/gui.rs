@@ -258,7 +258,7 @@ impl FmpApp {
 impl eframe::App for FmpApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
-
+        ctx.set_pixels_per_point(1.15);
         if !self.initialized {
             self.check_first_run();
             self.needs_refresh_vaults = true;
