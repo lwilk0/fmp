@@ -275,13 +275,6 @@ impl Store {
         let username_bytes = &output[..sep];
         let password_bytes = &output[sep + 1..];
 
-        if password_bytes.is_empty() {
-            output.zeroize();
-            return Err(anyhow::anyhow!(
-                "Decrypted data is malformed: empty password"
-            ));
-        }
-
         let username = String::from_utf8(username_bytes.to_vec())?;
         let password_vec = password_bytes.to_vec();
 
