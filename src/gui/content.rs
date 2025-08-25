@@ -428,6 +428,7 @@ pub fn account_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
                         .duration(Some(Duration::from_secs(3)));
                 }
             }
+            app.confirm_action = false;
         }
     });
 
