@@ -34,7 +34,7 @@ fn filter_bar(
     ui.horizontal(|ui| {
         let text_box = egui::TextEdit::singleline(filter)
             .hint_text(hint)
-            .desired_width(160.0);
+            .desired_width(100.0);
         ui.add_enabled(input_enabled, text_box);
 
         let clear_button = egui::Button::new("×");
@@ -108,6 +108,7 @@ fn select_vault(app: &mut FmpApp, vault: String) {
     app.change_account_info = false;
     app.change_vault_name = false;
     app.random_password = false;
+    app.show_password_retrieve = false;
 
     app.needs_refresh_accounts = true;
 

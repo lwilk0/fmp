@@ -29,11 +29,15 @@ use zeroize::Zeroize;
 /// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the UI.
 /// * "text" - A string slice containing the label text to display alongside the password input field.
 /// * "generating" - Bool representing if the password being retrieved if from the password generation menu
+/// * "spacing" - Float value representing the amount of space between the label and the password input field.
+/// * "width" - Float value representing the desired width of the password input field.
 pub fn securely_retrieve_password(
     app: &mut FmpApp,
     ui: &mut egui::Ui,
     text: &str,
     generating: bool,
+    spacing: f32,
+    width: f32,
 ) {
     let mut password = if generating {
         String::from_utf8(app.generated_password.expose_secret().clone()).unwrap_or_default()
@@ -44,13 +48,15 @@ pub fn securely_retrieve_password(
     ui.horizontal(|ui| {
         ui.label(text);
 
+        ui.add_space(spacing);
+
         let response = if app.show_password_retrieve {
-            ui.add(egui::TextEdit::singleline(&mut password).desired_width(200.0))
+            ui.add(egui::TextEdit::singleline(&mut password).desired_width(width))
         } else {
             ui.add(
                 egui::TextEdit::singleline(&mut password)
                     .password(true)
-                    .desired_width(200.0),
+                    .desired_width(width),
             )
         };
 

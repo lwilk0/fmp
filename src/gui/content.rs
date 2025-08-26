@@ -46,12 +46,13 @@ pub fn nothing_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.add_space(8.0);
 
-        labeled_text_input(ui, "Vault Name:", &mut app.vault_name_create, None);
+        labeled_text_input(ui, "Vault Name:", &mut app.vault_name_create, 0.0, None);
         ui.add_space(4.0);
         labeled_text_input(
             ui,
             "Email:",
             &mut app.recipient,
+            34.5,
             Some(
                 "What email address should the vault be associated with? (This should be a public key you have imported into GPG). You can create a public key using the command `gpg --full-generate-key`, or import an existing one using `gpg --import <keyfile>`.",
             ),
@@ -109,15 +110,35 @@ pub fn vault_selected(app: &mut FmpApp, ui: &mut egui::Ui) {
 
         ui.separator();
         ui.add_space(8.0);
-        labeled_text_input(ui, "Account Name:", &mut app.account_name_create, None);
+
+        labeled_text_input(
+            ui,
+            "Account Name:",
+            &mut app.account_name_create,
+            23.0,
+            None,
+        );
+
         ui.add_space(4.0);
-        labeled_text_input(ui, "Account Username:", &mut app.userpass.username, None);
+
+        labeled_text_input(
+            ui,
+            "Account Username:",
+            &mut app.userpass.username,
+            0.0,
+            None,
+        );
+
         ui.add_space(4.0);
-        securely_retrieve_password(app, ui, "Account Password:", false);
+
+        securely_retrieve_password(app, ui, "Account Password:", false, 4.0, 280.0);
+
         ui.add_space(4.0);
+
         if ui.button("Generate Password").clicked() {
             app.random_password = true;
         }
+
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
@@ -453,11 +474,11 @@ pub fn alter_account_information(app: &mut FmpApp, ui: &mut egui::Ui) {
 
         ui.separator();
         ui.add_space(8.0);
-        labeled_text_input(ui, "Account Name:", &mut app.account_name_create, None);
+        labeled_text_input(ui, "Account Name:", &mut app.account_name_create, 0.0, None);
         ui.add_space(4.0);
-        labeled_text_input(ui, "Username:", &mut app.userpass.username, None);
+        labeled_text_input(ui, "Username:", &mut app.userpass.username, 24.0, None);
         ui.add_space(4.0);
-        securely_retrieve_password(app, ui, "New Password:", false);
+        securely_retrieve_password(app, ui, "New Password:", false, 1.0, 280.0);
         ui.add_space(4.0);
         if ui.button("Generate Password").clicked() {
             app.random_password = true;
@@ -557,7 +578,7 @@ pub fn alter_vault_name(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.add_space(8.0);
 
-        labeled_text_input(ui, "New Vault Name:", &mut app.vault_name_create, None);
+        labeled_text_input(ui, "New Vault Name:", &mut app.vault_name_create, 0.0, None);
 
         ui.horizontal(|ui| {
             if ui.button("Rename Vault").clicked() {
@@ -644,19 +665,26 @@ pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
                         ui,
                         "Consider Characters:",
                         &mut app.consider_characters,
+                        0.0,
                         None,
                     );
                     ui.end_row();
 
                     ui.toggle_value(&mut app.selections[1], "Upper case characters");
                     ui.toggle_value(&mut app.selections[3], "Symbols   ");
-                    labeled_text_input(ui, "Ignore Characters:", &mut app.ignore_characters, None);
+                    labeled_text_input(
+                        ui,
+                        "Ignore Characters:    ",
+                        &mut app.ignore_characters,
+                        0.0,
+                        None,
+                    );
                     ui.end_row();
 
                     ui.toggle_value(&mut app.selections[5], "Accented characters   ");
                     ui.toggle_value(&mut app.selections[4], "Spaces      ");
                     ui.horizontal(|ui| {
-                        ui.label("Length:");
+                        ui.label("Length:                           ");
                         ui.add(egui::Slider::new(&mut app.password_length, 8..=128));
                     });
                     ui.end_row();
@@ -672,7 +700,7 @@ pub fn random_password(app: &mut FmpApp, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.separator();
 
-        securely_retrieve_password(app, ui, "Generated Password:", true);
+        securely_retrieve_password(app, ui, "Generated Password:", true, 0.0, 200.0);
 
         ui.horizontal(|ui| {
             if ui.button("Use").clicked() {
@@ -724,10 +752,19 @@ pub fn quit_button(app: &mut FmpApp, ui: &mut egui::Ui) {
 /// * `ui` - A mutable reference to the `egui::Ui` instance for rendering the user interface.
 /// * `label` - The label for the text input field.
 /// * `value` - A mutable reference to the value of the text input field.
+/// * `spacing` - The space between the label and the text input field.
 /// * `hover` - An optional string to display as a hover text for the text input field.
-fn labeled_text_input(ui: &mut egui::Ui, label: &str, value: &mut String, hover: Option<&str>) {
+fn labeled_text_input(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut String,
+    spacing: f32,
+    hover: Option<&str>,
+) {
     ui.horizontal(|ui| {
         ui.label(label);
+
+        ui.add_space(spacing);
 
         let text_edit = ui.text_edit_singleline(value);
 
