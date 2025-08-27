@@ -5,4 +5,7 @@ mod password;
 mod totp;
 mod vault;
 
-fn main() {}
+use crate::gui::application::run_gui;
+fn main() {
+    run_gui();
+}

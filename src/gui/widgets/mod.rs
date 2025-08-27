@@ -1,2 +1,2 @@
-mod filtering;
-mod toast_manager;
+pub mod filtering;
+pub mod toast_manager;
