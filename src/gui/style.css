@@ -1,0 +1,96 @@
+/* Sidebar Styling */
+.sidebar {
+    background-color: #2d3142;
+    border-right: 1px solid #4f5b66;
+    min-width: 250px;
+}
+
+.sidebar-title {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.2em;
+    padding: 4px 0;
+    text-align: center;
+}
+
+.sidebar-divider {
+    background-color: #4f5b66;
+    min-height: 1px;
+    opacity: 0.6;
+    margin: 8px 0;
+}
+
+.sidebar-search-entry {
+    background-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    color: #ffffff;
+    padding: 10px 14px;
+    font-size: 0.95em;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-search-entry:focus {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-color: #5e81ac;
+    box-shadow: 0 0 0 3px rgba(94, 129, 172, 0.3), 0 2px 6px rgba(0, 0, 0, 0.15);
+    outline: none;
+}
+
+.sidebar-search-entry placeholder {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/* Vault Button Styling */
+.sidebar-vault-button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 3px 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-vault-button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.sidebar-vault-button:active,
+.sidebar-vault-button:checked {
+    background-color: rgba(94, 129, 172, 0.3);
+    border-color: #5e81ac;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transform: translateY(0px);
+}
+
+.sidebar-vault-button:focus {
+    outline: 2px solid rgba(94, 129, 172, 0.5);
+    outline-offset: 2px;
+}
+
+.sidebar-vault-label {
+    color: #ffffff;
+    font-weight: 500;
+    text-align: left;
+    font-size: 0.95em;
+}
+
+/* Empty Message Styling */
+.sidebar-empty-message {
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+    text-align: left;
+}
+
+/* General improvements */
+.dim-label {
+    opacity: 0.7;
+}
+
+.heading {
+    font-weight: bold;
+}

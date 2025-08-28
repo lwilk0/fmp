@@ -1,9 +1,8 @@
 use adw::prelude::*;
 
-use crate::gui::sidebar::create_paned_layout;
-use crate::gui::state::{create_app_state, ui_helpers};
+use crate::gui::{content::show_home_view, sidebar::create_paned_layout_with_callbacks};
 use adw::{Application, ApplicationWindow, HeaderBar};
-use gtk4::{Box, Label, Orientation};
+use gtk4::{Box, CssProvider, Label, Orientation, StyleContext, gdk};
 
 pub fn run_gui() {
     let application = Application::builder().application_id("com.fmp").build();
@@ -15,8 +14,8 @@ pub fn run_gui() {
 }
 
 fn run_ui(app: &Application) {
-    // Create shared application state
-    let app_state = create_app_state();
+    // Load CSS styles
+    load_css();
 
     let main_content = Box::new(Orientation::Vertical, 0);
 
@@ -29,12 +28,13 @@ fn run_ui(app: &Application) {
     let content_area = Box::new(Orientation::Vertical, 12);
     content_area.add_css_class("main-content");
 
-    // Initialize main content with current state
-    ui_helpers::update_main_content(&app_state, &content_area);
+    // Initialize with home view
+    show_home_view(&content_area);
 
     main_content.append(&content_area);
 
-    let paned = create_paned_layout(&main_content, &app_state);
+    // Create sidebar with content area reference for updating
+    let paned = create_paned_layout_with_callbacks(&main_content, &content_area);
 
     let window = ApplicationWindow::builder()
         .application(app)
@@ -45,4 +45,17 @@ fn run_ui(app: &Application) {
         .build();
 
     window.present();
+}
+
+fn load_css() {
+    let provider = CssProvider::new();
+    let css_data = include_str!("style.css");
+
+    provider.load_from_data(css_data);
+
+    StyleContext::add_provider_for_display(
+        &gdk::Display::default().expect("Could not connect to a display."),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 }
