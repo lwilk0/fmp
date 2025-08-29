@@ -1,9 +1,10 @@
+use adw::ButtonContent;
 use adw::prelude::*;
 
 use crate::gui::sidebar::refresh_vaults_section;
 use crate::vault::{
-    Account, Locations, create_account, create_vault, get_full_account_details, read_directory,
-    update_account,
+    Account, Locations, SecureClipboardString, SecurePassword, create_account, create_vault,
+    get_full_account_details, read_directory, update_account,
 };
 use gtk4::pango::EllipsizeMode;
 use gtk4::{
@@ -13,6 +14,7 @@ use gtk4::{
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use zeroize::Zeroize;
 
 /// Shows the home view in the content area
 pub fn show_home_view(content_area: &Box) {
@@ -443,9 +445,11 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
     // In edit mode, show the actual password; in view mode, show masked
     if edit_mode {
-        password_entry.set_text(&account.password);
+        account.password.with_exposed(|password| {
+            password_entry.set_text(password);
+        });
     } else {
-        let masked_password = "•".repeat(account.password.len().max(8));
+        let masked_password = account.password.masked(8);
         password_entry.set_text(&masked_password);
     }
     password_entry.set_editable(edit_mode);
@@ -458,12 +462,15 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
         password_entry.connect_changed(move |entry| {
             let text = entry.text().to_string();
             let mut account = account_rc_edit.borrow_mut();
-            account.password = text;
+            account.password.update(text);
         });
     }
 
     let reveal_button = Button::new();
-    reveal_button.set_label("👁");
+    let reveal_button_content = ButtonContent::builder()
+        .icon_name("view-reveal-symbolic")
+        .build();
+    reveal_button.set_child(Some(&reveal_button_content));
     reveal_button.add_css_class("flat");
     reveal_button.set_tooltip_text(Some("Show/Hide Password"));
 
@@ -480,19 +487,24 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
             if *revealed {
                 // Hide password
-                let masked_password = "•".repeat(account.password.len().max(8));
+                let masked_password = account.password.masked(8);
                 password_entry_clone.set_text(&masked_password);
                 *revealed = false;
             } else {
-                // Show password
-                password_entry_clone.set_text(&account.password);
+                // Show password using secure exposure
+                account.password.with_exposed(|password| {
+                    password_entry_clone.set_text(password);
+                });
                 *revealed = true;
             }
         });
     }
 
     let copy_button = Button::new();
-    copy_button.set_label("📋");
+    let copy_button_content = ButtonContent::builder()
+        .icon_name("edit-copy-symbolic")
+        .build();
+    copy_button.set_child(Some(&copy_button_content));
     copy_button.add_css_class("flat");
     copy_button.set_tooltip_text(Some("Copy Password"));
 
@@ -502,8 +514,22 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
         let account = account_rc_copy.borrow();
         let display = button.display();
         let clipboard = display.clipboard();
-        clipboard.set_text(&account.password);
-        println!("Password copied to clipboard");
+
+        // Use secure clipboard exposure with automatic cleanup
+        let password_copy = account.password.expose_for_clipboard();
+        clipboard.set_text(&password_copy);
+
+        // The SecureClipboardString will be automatically zeroized when dropped
+
+        // Schedule clipboard clearing after 30 seconds for security
+        let clipboard_clone = clipboard.clone();
+        glib::timeout_add_seconds_local(30, move || {
+            clipboard_clone.set_text("");
+            println!("Clipboard cleared for security");
+            glib::ControlFlow::Break
+        });
+
+        println!("Password copied to clipboard (will be cleared in 30 seconds)");
     });
 
     password_box.append(&password_entry);
@@ -681,7 +707,10 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     // Copy button for copyable fields
     if copyable {
         let copy_button = Button::new();
-        copy_button.set_label("📋");
+        let copy_button_content = ButtonContent::builder()
+            .icon_name("edit-copy-symbolic")
+            .build();
+        copy_button.set_child(Some(&copy_button_content));
         copy_button.add_css_class("flat");
         copy_button.set_tooltip_text(Some("Copy to clipboard"));
 
@@ -691,7 +720,19 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
             let display = button.display();
             let clipboard = display.clipboard();
             clipboard.set_text(&value_text_owned);
-            println!("Copied '{}' to clipboard", value_text_owned);
+
+            // Schedule clipboard clearing after 60 seconds for non-password fields
+            let clipboard_clone = clipboard.clone();
+            glib::timeout_add_seconds_local(60, move || {
+                clipboard_clone.set_text("");
+                println!("Clipboard cleared for security");
+                glib::ControlFlow::Break
+            });
+
+            println!(
+                "Copied '{}' to clipboard (will be cleared in 60 seconds)",
+                value_text_owned
+            );
         });
 
         value_box.append(&copy_button);
@@ -731,7 +772,10 @@ fn create_password_field_row(
 
     // Show/hide button
     let reveal_button = Button::new();
-    reveal_button.set_label("👁");
+    let reveal_button_content = ButtonContent::builder()
+        .icon_name("view-reveal-symbolic")
+        .build();
+    reveal_button.set_child(Some(&reveal_button_content));
     reveal_button.add_css_class("flat");
     reveal_button.set_tooltip_text(Some("Show/Hide Password"));
 
@@ -740,7 +784,7 @@ fn create_password_field_row(
     entry.connect_changed(move |entry| {
         let text = entry.text().to_string();
         let mut account = account_rc_clone.borrow_mut();
-        account.password = text;
+        account.password.update(text);
     });
 
     // Connect reveal button
@@ -915,7 +959,7 @@ fn create_editable_field_row(
             "account_type" => account.account_type = text,
             "website" => account.website = text,
             "username" => account.username = text,
-            "password" => account.password = text,
+            "password" => account.password.update(text),
             "notes" => account.notes = text,
             _ => {}
         }

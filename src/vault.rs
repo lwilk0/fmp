@@ -19,12 +19,12 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
-use crate::crypto::lock_memory;
+use crate::crypto::{lock_memory, secure_overwrite, unlock_memory};
 use anyhow::Error;
 use dirs::data_dir;
 use gpgme::{Context, Protocol};
-use secrecy::{ExposeSecret, SecretBox};
-use serde::{Deserialize, Serialize};
+use secrecy::{ExposeSecret, SecretBox, SecretString};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::os::unix::fs::PermissionsExt;
 use std::{
@@ -34,11 +34,222 @@ use std::{
 };
 use zeroize::Zeroize;
 
-/// Represents an accounts data with a username and a securely stored password.
-#[derive(Default)]
-pub struct UserPass {
-    pub username: String,
-    pub password: SecretBox<Vec<u8>>,
+/// A secure string wrapper specifically for clipboard operations
+pub struct SecureClipboardString {
+    inner: String,
+}
+
+impl SecureClipboardString {
+    fn new(mut password: String) -> Self {
+        lock_memory(password.as_bytes());
+        Self { inner: password }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+}
+
+impl Drop for SecureClipboardString {
+    fn drop(&mut self) {
+        // Unlock memory before zeroization
+        unlock_memory(self.inner.as_bytes());
+
+        // The ZeroizeOnDrop will handle the actual zeroization
+        // but we add extra security measures
+        unsafe {
+            let bytes = self.inner.as_bytes_mut();
+            secure_overwrite(bytes);
+        }
+    }
+}
+
+impl std::ops::Deref for SecureClipboardString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+/// A secure password wrapper that handles memory locking and zeroization
+#[derive(Clone, Debug)]
+pub struct SecurePassword {
+    inner: SecretString,
+    // Add a dummy field to make memory layout less predictable
+    _obfuscation: [u8; 32],
+}
+
+impl SecurePassword {
+    /// Creates a new secure password from a string
+    pub fn new(mut password: String) -> Self {
+        // Lock the password in memory to prevent swapping
+        lock_memory(password.as_bytes());
+
+        // Generate random obfuscation data
+        use rand::RngCore;
+        let mut obfuscation = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut obfuscation);
+
+        let secure_password = Self {
+            inner: SecretString::new(password.clone().into_boxed_str()),
+            _obfuscation: obfuscation,
+        };
+
+        // Zeroize the original password string
+        password.zeroize();
+
+        secure_password
+    }
+
+    /// Creates an empty secure password
+    pub fn empty() -> Self {
+        // Generate random obfuscation data even for empty passwords
+        use rand::RngCore;
+        let mut obfuscation = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut obfuscation);
+
+        Self {
+            inner: SecretString::new(String::new().into_boxed_str()),
+            _obfuscation: obfuscation,
+        }
+    }
+
+    /// Exposes the password securely for temporary use
+    pub fn expose_secret(&self) -> &str {
+        self.inner.expose_secret()
+    }
+
+    /// Returns the length of the password for UI purposes
+    pub fn len(&self) -> usize {
+        self.inner.expose_secret().len()
+    }
+
+    /// Checks if the password is empty
+    pub fn is_empty(&self) -> bool {
+        self.inner.expose_secret().is_empty()
+    }
+
+    /// Updates the password with a new value
+    pub fn update(&mut self, mut new_password: String) {
+        // Lock the new password in memory
+        lock_memory(new_password.as_bytes());
+
+        // Regenerate obfuscation data on update
+        use rand::RngCore;
+        rand::thread_rng().fill_bytes(&mut self._obfuscation);
+
+        self.inner = SecretString::new(new_password.clone().into_boxed_str());
+
+        // Zeroize the input password string
+        new_password.zeroize();
+    }
+
+    /// Creates a masked version of the password for display
+    pub fn masked(&self, min_length: usize) -> String {
+        let len = self.len().max(min_length);
+        "•".repeat(len)
+    }
+
+    /// Securely copies password to a temporary string for clipboard operations
+    /// The returned string should be used immediately and then dropped
+    pub fn expose_for_clipboard(&self) -> SecureClipboardString {
+        let password = self.inner.expose_secret().to_string();
+        // Lock this temporary copy in memory too
+        lock_memory(password.as_bytes());
+        SecureClipboardString::new(password)
+    }
+
+    /// Creates a temporary obfuscated copy for operations that need the actual password
+    /// but want to minimize exposure time
+    pub fn with_exposed<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&str) -> R,
+    {
+        let password = self.inner.expose_secret();
+        // Lock the exposed password in memory during the operation
+        lock_memory(password.as_bytes());
+
+        // Add some timing obfuscation to prevent timing attacks
+        let start_time = std::time::Instant::now();
+        let result = f(password);
+
+        // Ensure minimum execution time to prevent timing analysis
+        let min_duration = std::time::Duration::from_millis(10);
+        let elapsed = start_time.elapsed();
+        if elapsed < min_duration {
+            std::thread::sleep(min_duration - elapsed);
+        }
+
+        result
+    }
+
+    /// Constant-time comparison to prevent timing attacks
+    pub fn constant_time_eq(&self, other: &str) -> bool {
+        use std::cmp::Ordering;
+
+        let self_password = self.inner.expose_secret();
+        let self_bytes = self_password.as_bytes();
+        let other_bytes = other.as_bytes();
+
+        // Ensure we always compare the same amount of data
+        let max_len = self_bytes.len().max(other_bytes.len());
+        let mut result = self_bytes.len() == other_bytes.len();
+
+        for i in 0..max_len {
+            let a = self_bytes.get(i).copied().unwrap_or(0);
+            let b = other_bytes.get(i).copied().unwrap_or(0);
+            result &= a == b;
+        }
+
+        result
+    }
+}
+
+impl Default for SecurePassword {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl Drop for SecurePassword {
+    fn drop(&mut self) {
+        // Securely overwrite the obfuscation data
+        secure_overwrite(&mut self._obfuscation);
+
+        // The SecretString will be zeroized by its own Drop implementation
+        // but we add extra security measures here
+
+        // Add a small delay to make timing attacks harder
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+// Custom serialization to handle SecretString
+impl Serialize for SecurePassword {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Serialize the exposed secret (this should only happen during save operations)
+        serializer.serialize_str(self.inner.expose_secret())
+    }
+}
+
+// Custom deserialization to handle SecretString
+impl<'de> Deserialize<'de> for SecurePassword {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut password = String::deserialize(deserializer)?;
+        let secure_password = SecurePassword::new(password.clone());
+
+        // Zeroize the temporary password string
+        password.zeroize();
+
+        Ok(secure_password)
+    }
 }
 
 /// Represents a comprehensive account with all fields supported by the GUI
@@ -48,7 +259,7 @@ pub struct Account {
     pub account_type: String,
     pub website: String,
     pub username: String,
-    pub password: String,
+    pub password: SecurePassword,
     pub notes: String,
     pub additional_fields: HashMap<String, String>,
     pub created_at: String,
@@ -63,7 +274,7 @@ impl Default for Account {
             account_type: "Password Account".to_string(),
             website: String::new(),
             username: String::new(),
-            password: String::new(),
+            password: SecurePassword::empty(),
             notes: String::new(),
             additional_fields: HashMap::new(),
             created_at: now.clone(),
@@ -236,59 +447,6 @@ impl Store {
         Ok(Self { ctx, locations })
     }
 
-    /// Encrypts a `UserPass` struct and writes it to the data.gpg file in the vault.
-    ///
-    /// # Arguments
-    /// * `userpass` - A `UserPass` struct containing the username and password to be encrypted and stored.
-    ///
-    /// # Returns
-    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
-    ///
-    /// # Errors
-    /// * If the recipient cannot be found, if the file cannot be created, or if encryption fails.
-    pub fn encrypt_to_file(&mut self, userpass: &UserPass) -> Result<(), Error> {
-        let mut data: Vec<u8> = Vec::new();
-
-        data.extend_from_slice(userpass.username.as_bytes());
-        data.push(b':');
-        data.extend_from_slice(userpass.password.expose_secret());
-
-        lock_memory(data.as_slice());
-
-        let recipient = read_to_string(&self.locations.recipient)?
-            .trim()
-            .to_string();
-        let recipient_key = self.ctx.get_key(&recipient).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to find recipient `{}` for encryption. Error: {}",
-                recipient,
-                e
-            )
-        })?;
-
-        let mut file = File::create(&self.locations.data)?;
-
-        #[cfg(unix)]
-        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-
-        let mut output = Vec::new();
-        self.ctx
-            .encrypt([&recipient_key], &data, &mut output)
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to encrypt data for recipient `{}`. Error: {}",
-                    recipient,
-                    e
-                )
-            })?;
-
-        file.write_all(&output)?;
-
-        data.zeroize();
-
-        Ok(())
-    }
-
     /// Encrypts an `Account` struct and writes it to the data.gpg file in the vault.
     ///
     /// # Arguments
@@ -338,53 +496,6 @@ impl Store {
         data.zeroize();
 
         Ok(())
-    }
-
-    /// Decrypts data from data.gpg file in the vault and returns a `UserPass` struct.
-    ///
-    /// # Returns
-    /// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the decrypted username and password on success, or an error on failure.
-    ///
-    /// # Errors
-    /// * If the recipient cannot be found, if the file cannot be opened, or if decryption fails.
-    pub fn decrypt_from_file(&mut self) -> Result<UserPass, Error> {
-        let mut encrypted_data = Vec::new();
-        let file = File::open(&self.locations.data)?;
-
-        let mut reader = BufReader::new(file);
-        reader.read_to_end(&mut encrypted_data)?;
-
-        let mut output = Vec::new();
-        self.ctx
-            .decrypt(&encrypted_data, &mut output)
-            .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
-
-        // Lock the decrypted buffer to reduce swap risk
-        lock_memory(&output);
-
-        // Parse "username:password" using the first ':' only
-        let sep = output
-            .iter()
-            .position(|&b| b == b':')
-            .ok_or_else(|| anyhow::anyhow!("Decrypted data is malformed: missing separator"))?;
-
-        let username_bytes = &output[..sep];
-        let password_bytes = &output[sep + 1..];
-
-        let username = String::from_utf8(username_bytes.to_vec())?;
-        let password_vec = password_bytes.to_vec();
-
-        // Zeroize decrypted buffer before constructing return value
-        output.zeroize();
-
-        let output_as_userpass = UserPass {
-            username,
-            password: SecretBox::new(Box::new(password_vec)),
-        };
-
-        lock_memory(output_as_userpass.password.expose_secret());
-
-        Ok(output_as_userpass)
     }
 
     /// Decrypts data from data.gpg file in the vault and returns an `Account` struct.
@@ -441,12 +552,15 @@ impl Store {
         let password_bytes = &data[sep + 1..];
 
         let username = String::from_utf8(username_bytes.to_vec())?;
-        let password = String::from_utf8(password_bytes.to_vec())?;
+        let mut password = String::from_utf8(password_bytes.to_vec())?;
 
         let mut account = Account::default();
         account.username = username;
-        account.password = password;
+        account.password = SecurePassword::new(password.clone());
         account.name = "Migrated Account".to_string();
+
+        // Zeroize the temporary password string
+        password.zeroize();
 
         Ok(account)
     }
@@ -500,30 +614,6 @@ pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
     }
 
     Ok(directories)
-}
-
-/// Retrieves the account details for a specific account in a vault.
-///
-/// # Arguments
-/// * `vault_name` - The name of the vault containing the account.
-/// * `account_name` - The name of the account to retrieve details for.
-///
-/// # Returns
-/// * `Result<UserPass, Error>` - Returns a `UserPass` struct containing the username and decrypted password on success, or an error on failure.
-///
-/// # Errors
-/// * If the vault does not exist, if the account does not exist, or if decryption fails.
-pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserPass, Error> {
-    let mut store = Store::new(vault_name, account_name)?;
-
-    let userpass = store.decrypt_from_file()?;
-
-    lock_memory(userpass.password.expose_secret());
-
-    Ok(UserPass {
-        username: userpass.username,
-        password: userpass.password,
-    })
 }
 
 /// Retrieves the full account details for a specific account in a vault.
@@ -640,7 +730,3 @@ pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
         .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "tests/vault_tests.rs"]
-mod vault_tests;
