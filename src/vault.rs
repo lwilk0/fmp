@@ -24,6 +24,8 @@ use anyhow::Error;
 use dirs::data_dir;
 use gpgme::{Context, Protocol};
 use secrecy::{ExposeSecret, SecretBox};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{File, create_dir_all, read_dir, read_to_string, rename},
@@ -37,6 +39,49 @@ use zeroize::Zeroize;
 pub struct UserPass {
     pub username: String,
     pub password: SecretBox<Vec<u8>>,
+}
+
+/// Represents a comprehensive account with all fields supported by the GUI
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Account {
+    pub name: String,
+    pub account_type: String,
+    pub website: String,
+    pub username: String,
+    pub password: String,
+    pub notes: String,
+    pub additional_fields: HashMap<String, String>,
+    pub created_at: String,
+    pub modified_at: String,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        Self {
+            name: String::new(),
+            account_type: "Password Account".to_string(),
+            website: String::new(),
+            username: String::new(),
+            password: String::new(),
+            notes: String::new(),
+            additional_fields: HashMap::new(),
+            created_at: now.clone(),
+            modified_at: now,
+        }
+    }
+}
+
+impl Account {
+    pub fn new(name: String) -> Self {
+        let mut account = Self::default();
+        account.name = name;
+        account
+    }
+
+    pub fn update_modified_time(&mut self) {
+        self.modified_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    }
 }
 
 /// Represents the locations of various files and directories within a vault.
@@ -244,6 +289,57 @@ impl Store {
         Ok(())
     }
 
+    /// Encrypts an `Account` struct and writes it to the data.gpg file in the vault.
+    ///
+    /// # Arguments
+    /// * `account` - An `Account` struct containing all account data to be encrypted and stored.
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+    ///
+    /// # Errors
+    /// * If the recipient cannot be found, if the file cannot be created, or if encryption fails.
+    pub fn encrypt_account_to_file(&mut self, account: &Account) -> Result<(), Error> {
+        // Serialize the account to JSON
+        let json_data = serde_json::to_string(account)?;
+        let mut data = json_data.into_bytes();
+
+        lock_memory(data.as_slice());
+
+        let recipient = read_to_string(&self.locations.recipient)?
+            .trim()
+            .to_string();
+        let recipient_key = self.ctx.get_key(&recipient).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to find recipient `{}` for encryption. Error: {}",
+                recipient,
+                e
+            )
+        })?;
+
+        let mut file = File::create(&self.locations.data)?;
+
+        #[cfg(unix)]
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+
+        let mut output = Vec::new();
+        self.ctx
+            .encrypt([&recipient_key], &data, &mut output)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to encrypt data for recipient `{}`. Error: {}",
+                    recipient,
+                    e
+                )
+            })?;
+
+        file.write_all(&output)?;
+
+        data.zeroize();
+
+        Ok(())
+    }
+
     /// Decrypts data from data.gpg file in the vault and returns a `UserPass` struct.
     ///
     /// # Returns
@@ -289,6 +385,70 @@ impl Store {
         lock_memory(output_as_userpass.password.expose_secret());
 
         Ok(output_as_userpass)
+    }
+
+    /// Decrypts data from data.gpg file in the vault and returns an `Account` struct.
+    ///
+    /// # Returns
+    /// * `Result<Account, Error>` - Returns an `Account` struct containing all decrypted account data on success, or an error on failure.
+    ///
+    /// # Errors
+    /// * If the file cannot be opened, if decryption fails, or if JSON parsing fails.
+    pub fn decrypt_account_from_file(&mut self) -> Result<Account, Error> {
+        let mut encrypted_data = Vec::new();
+        let file = File::open(&self.locations.data)?;
+
+        let mut reader = BufReader::new(file);
+        reader.read_to_end(&mut encrypted_data)?;
+
+        let mut output = Vec::new();
+        self.ctx
+            .decrypt(&encrypted_data, &mut output)
+            .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
+
+        // Lock the decrypted buffer to reduce swap risk
+        lock_memory(&output);
+
+        // Try to parse as JSON first (new format)
+        let account = if let Ok(json_str) = String::from_utf8(output.clone()) {
+            if let Ok(account) = serde_json::from_str::<Account>(&json_str) {
+                account
+            } else {
+                // Fallback to old format parsing
+                self.parse_legacy_format(&output)?
+            }
+        } else {
+            return Err(anyhow::anyhow!(
+                "Failed to convert decrypted data to string"
+            ));
+        };
+
+        // Zeroize decrypted buffer
+        output.zeroize();
+
+        Ok(account)
+    }
+
+    /// Parses legacy format (username:password) into an Account struct
+    fn parse_legacy_format(&self, data: &[u8]) -> Result<Account, Error> {
+        // Parse "username:password" using the first ':' only
+        let sep = data
+            .iter()
+            .position(|&b| b == b':')
+            .ok_or_else(|| anyhow::anyhow!("Decrypted data is malformed: missing separator"))?;
+
+        let username_bytes = &data[..sep];
+        let password_bytes = &data[sep + 1..];
+
+        let username = String::from_utf8(username_bytes.to_vec())?;
+        let password = String::from_utf8(password_bytes.to_vec())?;
+
+        let mut account = Account::default();
+        account.username = username;
+        account.password = password;
+        account.name = "Migrated Account".to_string();
+
+        Ok(account)
     }
 }
 
@@ -364,6 +524,105 @@ pub fn get_account_details(vault_name: &str, account_name: &str) -> Result<UserP
         username: userpass.username,
         password: userpass.password,
     })
+}
+
+/// Retrieves the full account details for a specific account in a vault.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault containing the account.
+/// * `account_name` - The name of the account to retrieve details for.
+///
+/// # Returns
+/// * `Result<Account, Error>` - Returns an `Account` struct containing all decrypted account data on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault does not exist, if the account does not exist, or if decryption fails.
+pub fn get_full_account_details(vault_name: &str, account_name: &str) -> Result<Account, Error> {
+    let mut store = Store::new(vault_name, account_name)?;
+    store.locations.does_vault_exist()?;
+    store.locations.does_account_exist()?;
+
+    let account = store.decrypt_account_from_file()?;
+    Ok(account)
+}
+
+/// Creates a new account in the specified vault.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault to create the account in.
+/// * `account` - The account data to encrypt and store.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault does not exist, if the account directory cannot be created, or if encryption fails.
+pub fn create_account(vault_name: &str, account: &Account) -> Result<(), Error> {
+    let mut store = Store::new(vault_name, &account.name)?;
+    store.locations.does_vault_exist()?;
+    store.locations.create_account_directory()?;
+    store.encrypt_account_to_file(account)?;
+    Ok(())
+}
+
+/// Updates an existing account in the specified vault.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault containing the account.
+/// * `account` - The updated account data to encrypt and store.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault does not exist, if the account does not exist, or if encryption fails.
+pub fn update_account(vault_name: &str, account: &Account) -> Result<(), Error> {
+    let mut store = Store::new(vault_name, &account.name)?;
+    store.locations.does_vault_exist()?;
+    store.locations.does_account_exist()?;
+    store.encrypt_account_to_file(account)?;
+    Ok(())
+}
+
+/// Creates a new vault with the specified name and recipient.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault to create.
+/// * `recipient` - The GPG recipient ID for encryption.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault directory cannot be created or if the recipient file cannot be written.
+pub fn create_vault(vault_name: &str, recipient: &str) -> Result<(), Error> {
+    let locations = Locations::new(vault_name, "");
+    locations.initialize_vault()?;
+
+    // Write recipient to file
+    let mut recipient_file = File::create(&locations.recipient)?;
+    recipient_file.write_all(recipient.as_bytes())?;
+
+    // Create a gate file for GPG warm-up
+    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+    let recipient_key = ctx.get_key(recipient).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to find recipient `{}` for encryption. Error: {}",
+            recipient,
+            e
+        )
+    })?;
+
+    let gate_data = b"gate";
+    let mut output = Vec::new();
+    ctx.encrypt([&recipient_key], &gate_data[..], &mut output)?;
+
+    let mut gate_file = File::create(&locations.gate)?;
+    #[cfg(unix)]
+    gate_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    gate_file.write_all(&output)?;
+
+    Ok(())
 }
 
 /// Attempt to decrypt the vault's gate file to warm up GPG (triggers passphrase prompt).

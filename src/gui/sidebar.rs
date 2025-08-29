@@ -1,9 +1,14 @@
-use crate::gui::content::{show_home_view, show_settings_view, show_vault_view};
+use crate::gui::content::{
+    show_home_view, show_new_vault_view, show_settings_view, show_vault_view,
+};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
 use adw::{ButtonContent, HeaderBar};
-use gtk4::{Box, Button, Entry, Label, ListBoxRow, Orientation, Paned, Separator};
+use gtk4::{
+    Box, Button, Entry, Label, ListBoxRow, Orientation, Paned, PolicyType, ScrolledWindow,
+    Separator,
+};
 use std::path::PathBuf;
 
 // Constants for better maintainability
@@ -65,15 +70,30 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     let header_bar = create_header_bar(content_area, &filter_bar);
     sidebar.append(&header_bar);
 
-    // Add sidebar title and divider
-    let title_section = create_title_section();
-    sidebar.append(&title_section);
+    // Create a scrollable container for the content below the header
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled_window.set_vexpand(true);
+    scrolled_window.set_hexpand(true);
 
-    // Add filter bar to sidebar
-    sidebar.append(&filter_bar);
+    // Create a box to hold the scrollable content
+    let scrollable_content = Box::new(Orientation::Vertical, 0);
 
-    // Add vaults section to sidebar
-    sidebar.append(&vaults_section);
+    // Add sidebar title and divider to scrollable content
+    let title_section = create_title_section(content_area);
+    scrollable_content.append(&title_section);
+
+    // Add filter bar to scrollable content
+    scrollable_content.append(&filter_bar);
+
+    // Add vaults section to scrollable content
+    scrollable_content.append(&vaults_section);
+
+    // Set the scrollable content as the child of the scrolled window
+    scrolled_window.set_child(Some(&scrollable_content));
+
+    // Add the scrolled window to the sidebar
+    sidebar.append(&scrolled_window);
 
     sidebar
 }
@@ -115,19 +135,40 @@ fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
     header_bar
 }
 
-/// Creates a title section with divider
-fn create_title_section() -> Box {
+/// Creates a title section with divider and add vault button
+fn create_title_section(content_area: &Box) -> Box {
     let title_box = Box::new(Orientation::Vertical, 0);
+
+    // Header with title and add button
+    let header_box = Box::new(Orientation::Horizontal, 8);
+    header_box.set_margin_start(16);
+    header_box.set_margin_end(16);
+    header_box.set_margin_top(12);
+    header_box.set_margin_bottom(8);
 
     // Title label
     let title_label = Label::new(Some("Vaults"));
-    title_label.set_halign(gtk4::Align::Center);
-    title_label.set_margin_start(16);
-    title_label.set_margin_end(16);
-    title_label.set_margin_top(12);
-    title_label.set_margin_bottom(8);
+    title_label.set_halign(gtk4::Align::Start);
+    title_label.set_hexpand(true);
     title_label.add_css_class("heading");
     title_label.add_css_class("sidebar-title");
+
+    // Add vault button
+    let add_vault_button = Button::new();
+    add_vault_button.set_label("+");
+    add_vault_button.add_css_class("circular");
+    add_vault_button.add_css_class("suggested-action");
+    add_vault_button.set_tooltip_text(Some("Add New Vault"));
+    add_vault_button.set_size_request(32, 32);
+
+    // Connect add vault functionality
+    let content_area_clone = content_area.clone();
+    add_vault_button.connect_clicked(move |_| {
+        show_new_vault_view(&content_area_clone);
+    });
+
+    header_box.append(&title_label);
+    header_box.append(&add_vault_button);
 
     // Divider
     let separator = gtk4::Separator::new(Orientation::Horizontal);
@@ -136,7 +177,7 @@ fn create_title_section() -> Box {
     separator.set_margin_bottom(8);
     separator.add_css_class("sidebar-divider");
 
-    title_box.append(&title_label);
+    title_box.append(&header_box);
     title_box.append(&separator);
 
     title_box
@@ -249,6 +290,46 @@ fn create_vault_button(vault_name: &str, content_area: &Box) -> Button {
     });
 
     button
+}
+
+/// Refreshes the vaults section in the sidebar
+pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
+    // Find the scrolled window in the sidebar
+    if let Some(scrolled_window) = sidebar
+        .last_child()
+        .and_then(|child| child.downcast::<ScrolledWindow>().ok())
+    {
+        if let Some(scrollable_content) = scrolled_window
+            .child()
+            .and_then(|child| child.downcast::<Box>().ok())
+        {
+            // Find the vaults section (should be the last child)
+            if let Some(vaults_section) = scrollable_content
+                .last_child()
+                .and_then(|child| child.downcast::<Box>().ok())
+            {
+                // Clear existing vault buttons
+                let mut child = vaults_section.first_child();
+                while let Some(widget) = child {
+                    let next_child = widget.next_sibling();
+                    vaults_section.remove(&widget);
+                    child = next_child;
+                }
+
+                // Recreate the vault buttons with updated vault list
+                let new_vaults_section = create_vaults_section(content_area, "");
+
+                // Move all children from new_vaults_section to vaults_section
+                let mut new_child = new_vaults_section.first_child();
+                while let Some(widget) = new_child {
+                    let next_child = widget.next_sibling();
+                    new_vaults_section.remove(&widget);
+                    vaults_section.append(&widget);
+                    new_child = next_child;
+                }
+            }
+        }
+    }
 }
 
 /// Creates a clickable navigation row
