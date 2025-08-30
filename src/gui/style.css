@@ -102,3 +102,19 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(0, 0, 0, 0.05);
 }
+
+/* Error styling */
+.error {
+    color: @error_color;
+    font-weight: 500;
+}
+
+/* Password display styling */
+.password-display {
+    font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
+    font-size: 14px;
+    background-color: @headerbar_bg_color;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+}

@@ -1,4 +1,4 @@
-use crate::gui::content::{show_home_view, show_settings_view, show_vault_view};
+use crate::gui::content::{open_vault_with_gate, show_home_view, show_settings_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
@@ -269,7 +269,7 @@ fn create_vault_button(vault_name: &str, content_area: &Box) -> Button {
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();
     button.connect_clicked(move |_| {
-        show_vault_view(&content_area_clone, &vault_name_clone);
+        open_vault_with_gate(&content_area_clone, &vault_name_clone);
     });
 
     button

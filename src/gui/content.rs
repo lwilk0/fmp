@@ -2,14 +2,17 @@ use adw::ButtonContent;
 use adw::prelude::*;
 
 use crate::gui::sidebar::refresh_vaults_section;
+use crate::password::{PasswordConfig, generate_password};
+use crate::totp::{is_totp_required, verify_totp_code};
 use crate::vault::{
     Account, Locations, create_account, create_vault, get_full_account_details, read_directory,
-    update_account,
+    update_account, warm_up_gpg,
 };
 use gtk4::pango::EllipsizeMode;
 use gtk4::{
-    Box, Button, Entry, FlowBox, Frame, Label, Orientation, PolicyType, ScrolledWindow,
-    SelectionMode, Separator,
+    Adjustment, Box, Button, CheckButton, Dialog, Entry, FlowBox, Frame, Label, Orientation,
+    PolicyType, ResponseType, Scale, ScrolledWindow, SelectionMode, Separator, SpinButton,
+    TextBuffer, TextView,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -71,6 +74,173 @@ fn clear_content(content_area: &Box) {
 }
 
 /// Shows a specific vault view with improved account display
+/// Handles vault opening with gate logic (TOTP verification and GPG warm-up)
+pub fn open_vault_with_gate(content_area: &Box, vault_name: &str) {
+    let vault_name = vault_name.to_string();
+    let content_area = content_area.clone();
+
+    // Check if TOTP is required for this vault
+    if is_totp_required(&vault_name) {
+        show_totp_verification_dialog(&content_area, &vault_name);
+    } else {
+        // No TOTP required, proceed with gate warm-up
+        proceed_with_gate_warmup(&content_area, &vault_name);
+    }
+}
+
+/// Shows TOTP verification dialog
+fn show_totp_verification_dialog(content_area: &Box, vault_name: &str) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Two-Factor Authentication"));
+    dialog.set_modal(true);
+    dialog.set_default_size(400, 200);
+
+    // Get the main window to set as transient parent
+    if let Some(window) = content_area
+        .root()
+        .and_then(|root| root.downcast::<gtk4::Window>().ok())
+    {
+        dialog.set_transient_for(Some(&window));
+    }
+
+    let content_box = Box::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title and description
+    let title = Label::new(Some("Enter 2FA Code"));
+    title.add_css_class("title-3");
+    title.set_halign(gtk4::Align::Center);
+
+    let description = Label::new(Some(&format!(
+        "Enter the 6-digit code from your authenticator app for vault '{}'",
+        vault_name
+    )));
+    description.set_wrap(true);
+    description.set_halign(gtk4::Align::Center);
+    description.add_css_class("dim-label");
+
+    // TOTP code entry
+    let code_entry = Entry::new();
+    code_entry.set_placeholder_text(Some("000000"));
+    code_entry.set_max_length(8);
+    code_entry.set_input_purpose(gtk4::InputPurpose::Digits);
+    code_entry.set_halign(gtk4::Align::Center);
+    code_entry.set_size_request(150, -1);
+
+    // Error label (initially hidden)
+    let error_label = Label::new(None);
+    error_label.add_css_class("error");
+    error_label.set_halign(gtk4::Align::Center);
+    error_label.set_visible(false);
+
+    content_box.append(&title);
+    content_box.append(&description);
+    content_box.append(&code_entry);
+    content_box.append(&error_label);
+
+    dialog.set_child(Some(&content_box));
+
+    // Add buttons
+    dialog.add_button("Cancel", ResponseType::Cancel);
+    let verify_button = dialog.add_button("Verify", ResponseType::Accept);
+    verify_button.add_css_class("suggested-action");
+
+    // Set up response handling
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    let code_entry_clone = code_entry.clone();
+    let error_label_clone = error_label.clone();
+
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Accept {
+            let code = code_entry_clone.text().to_string();
+
+            match verify_totp_code(&vault_name_clone, &code) {
+                Ok(true) => {
+                    // TOTP verification successful
+                    dialog.close();
+                    proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
+                }
+                Ok(false) => {
+                    // Invalid TOTP code
+                    error_label_clone.set_text("Invalid code. Please try again.");
+                    error_label_clone.set_visible(true);
+                    code_entry_clone.set_text("");
+                    return; // Don't close dialog
+                }
+                Err(e) => {
+                    // Error during verification
+                    error_label_clone.set_text(&format!("Error: {}", e));
+                    error_label_clone.set_visible(true);
+                    return; // Don't close dialog
+                }
+            }
+        } else {
+            // Cancel pressed
+            dialog.close();
+        }
+    });
+
+    // Focus the entry and allow Enter to submit
+    code_entry.grab_focus();
+    let dialog_clone = dialog.clone();
+    code_entry.connect_activate(move |_| {
+        dialog_clone.response(ResponseType::Accept);
+    });
+
+    dialog.present();
+}
+
+/// Proceeds with gate warm-up and then shows the vault view
+fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
+    // Attempt to warm up GPG by decrypting the gate file
+    match warm_up_gpg(vault_name) {
+        Ok(()) => {
+            // Gate warm-up successful, show the vault
+            show_vault_view(content_area, vault_name);
+        }
+        Err(e) => {
+            // Gate warm-up failed, show error
+            show_error_message(
+                content_area,
+                "Failed to Access Vault",
+                &format!("Could not decrypt vault gate file: {}", e),
+            );
+        }
+    }
+}
+
+/// Shows an error message in the content area
+fn show_error_message(content_area: &Box, title: &str, message: &str) {
+    clear_content(content_area);
+
+    let main_box = Box::new(Orientation::Vertical, 24);
+    main_box.set_margin_top(48);
+    main_box.set_margin_bottom(48);
+    main_box.set_margin_start(48);
+    main_box.set_margin_end(48);
+    main_box.set_halign(gtk4::Align::Center);
+    main_box.set_valign(gtk4::Align::Center);
+
+    let error_title = Label::new(Some(title));
+    error_title.add_css_class("title-1");
+    error_title.set_halign(gtk4::Align::Center);
+
+    let error_message = Label::new(Some(message));
+    error_message.set_wrap(true);
+    error_message.set_max_width_chars(60);
+    error_message.set_halign(gtk4::Align::Center);
+    error_message.add_css_class("dim-label");
+
+    main_box.append(&error_title);
+    main_box.append(&error_message);
+
+    content_area.append(&main_box);
+}
+
 pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     clear_content(content_area);
 
@@ -488,6 +658,15 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
         });
     }
 
+    // Connect generate button functionality (only in edit mode)
+    if edit_mode {
+        let password_entry_gen = password_entry.clone();
+        let account_rc_gen = account_rc.clone();
+        generate_button.connect_clicked(move |_| {
+            show_password_generator_dialog(&password_entry_gen, &account_rc_gen);
+        });
+    }
+
     let reveal_button = Button::new();
     let reveal_button_content = ButtonContent::builder()
         .icon_name("view-reveal-symbolic")
@@ -792,6 +971,12 @@ fn create_password_field_row(
     entry.set_visibility(false); // Start hidden
     entry.set_invisible_char(Some('•'));
 
+    // Generate button
+    let generate_button = Button::new();
+    generate_button.set_label("Generate");
+    generate_button.add_css_class("flat");
+    generate_button.set_tooltip_text(Some("Generate Password"));
+
     // Show/hide button
     let reveal_button = Button::new();
     let reveal_button_content = ButtonContent::builder()
@@ -809,6 +994,13 @@ fn create_password_field_row(
         account.password.update(text);
     });
 
+    // Connect generate button
+    let entry_gen = entry.clone();
+    let account_rc_gen = account_rc.clone();
+    generate_button.connect_clicked(move |_| {
+        show_password_generator_dialog(&entry_gen, &account_rc_gen);
+    });
+
     // Connect reveal button
     let entry_clone = entry.clone();
     let is_revealed = Rc::new(RefCell::new(false));
@@ -820,6 +1012,7 @@ fn create_password_field_row(
     });
 
     password_container.append(&entry);
+    password_container.append(&generate_button);
     password_container.append(&reveal_button);
 
     row_box.append(&label);
@@ -1253,8 +1446,8 @@ fn show_create_vault_view(content_area: &Box) {
                         }
                     }
                 }
-                // Show the new vault
-                show_vault_view(&content_area_clone, &vault_name);
+                // Show the new vault with gate logic
+                open_vault_with_gate(&content_area_clone, &vault_name);
             }
             Err(e) => {
                 eprintln!("Failed to create vault: {}", e);
@@ -1347,4 +1540,351 @@ fn get_most_used_vault() -> String {
     } else {
         most_used
     }
+}
+
+/// Shows the password generator window
+pub fn show_password_generator_window() {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Password Generator"));
+    dialog.set_modal(true);
+    dialog.set_default_size(500, 600);
+
+    // Create main content box
+    let content_box = Box::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title
+    let title = Label::new(Some("Generate Secure Password"));
+    title.add_css_class("title-2");
+    title.set_halign(gtk4::Align::Center);
+    content_box.append(&title);
+
+    // Password configuration
+    let config = Rc::new(RefCell::new(PasswordConfig::default()));
+
+    // Length section
+    let length_section = create_length_section(&config);
+    content_box.append(&length_section);
+
+    // Character types section
+    let char_types_section = create_character_types_section(&config);
+    content_box.append(&char_types_section);
+
+    // Additional/Excluded characters section
+    let custom_chars_section = create_custom_characters_section(&config);
+    content_box.append(&custom_chars_section);
+
+    // Generated password display
+    let password_display_section = create_password_display_section(&config, None, None, None);
+    content_box.append(&password_display_section);
+
+    dialog.set_child(Some(&content_box));
+
+    // Add buttons
+    dialog.add_button("Close", ResponseType::Close);
+
+    // Set up response handling
+    dialog.connect_response(move |dialog, response| match response {
+        ResponseType::Close => {
+            dialog.close();
+        }
+        _ => {}
+    });
+
+    dialog.present();
+}
+
+/// Shows the password generator dialog and updates the provided entry field and account
+fn show_password_generator_dialog(entry: &Entry, account_rc: &Rc<RefCell<Account>>) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Password Generator"));
+    dialog.set_modal(true);
+    dialog.set_default_size(500, 600);
+
+    // Create main content box
+    let content_box = Box::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title
+    let title = Label::new(Some("Generate Secure Password"));
+    title.add_css_class("title-2");
+    title.set_halign(gtk4::Align::Center);
+    content_box.append(&title);
+
+    // Password configuration
+    let config = Rc::new(RefCell::new(PasswordConfig::default()));
+
+    // Length section
+    let length_section = create_length_section(&config);
+    content_box.append(&length_section);
+
+    // Character types section
+    let char_types_section = create_character_types_section(&config);
+    content_box.append(&char_types_section);
+
+    // Additional/Excluded characters section
+    let custom_chars_section = create_custom_characters_section(&config);
+    content_box.append(&custom_chars_section);
+
+    // Generated password display
+    let password_display_section =
+        create_password_display_section(&config, Some(entry), Some(account_rc), Some(&dialog));
+    content_box.append(&password_display_section);
+
+    dialog.set_child(Some(&content_box));
+
+    dialog.present();
+}
+
+/// Creates the password length configuration section
+fn create_length_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
+    let section = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Password Length"));
+    title.add_css_class("title-4");
+    title.set_halign(gtk4::Align::Start);
+    section.append(&title);
+
+    let length_box = Box::new(Orientation::Horizontal, 12);
+
+    // Spin button for length
+    let adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
+    let spin_button = SpinButton::new(Some(&adjustment), 1.0, 0);
+    spin_button.set_value(16.0);
+
+    let config_clone = config.clone();
+    spin_button.connect_value_changed(move |spin| {
+        let mut config = config_clone.borrow_mut();
+        config.length = spin.value() as usize;
+    });
+
+    let length_label = Label::new(Some("characters"));
+    length_label.add_css_class("dim-label");
+
+    length_box.append(&spin_button);
+    length_box.append(&length_label);
+    section.append(&length_box);
+
+    section
+}
+
+/// Creates the character types configuration section
+fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
+    let section = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Character Types"));
+    title.add_css_class("title-4");
+    title.set_halign(gtk4::Align::Start);
+    section.append(&title);
+
+    // Create checkboxes for each character type
+    let checkboxes = vec![
+        ("Lowercase letters (a-z)", "include_lowercase", true),
+        ("Uppercase letters (A-Z)", "include_uppercase", true),
+        ("Numbers (0-9)", "include_numbers", true),
+        ("Symbols (!@#$%...)", "include_symbols", false),
+        ("Spaces", "include_spaces", false),
+        ("Extended characters (áéíóú...)", "include_extended", false),
+    ];
+
+    for (label_text, field_name, default_value) in checkboxes {
+        let checkbox = CheckButton::new();
+        checkbox.set_label(Some(label_text));
+        checkbox.set_active(default_value);
+
+        let config_clone = config.clone();
+        let field_name = field_name.to_string();
+        checkbox.connect_toggled(move |cb| {
+            let mut config = config_clone.borrow_mut();
+            let active = cb.is_active();
+            match field_name.as_str() {
+                "include_lowercase" => config.include_lowercase = active,
+                "include_uppercase" => config.include_uppercase = active,
+                "include_numbers" => config.include_numbers = active,
+                "include_symbols" => config.include_symbols = active,
+                "include_spaces" => config.include_spaces = active,
+                "include_extended" => config.include_extended = active,
+                _ => {}
+            }
+        });
+
+        section.append(&checkbox);
+    }
+
+    section
+}
+
+/// Creates the custom characters configuration section
+fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
+    let section = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Custom Characters"));
+    title.add_css_class("title-4");
+    title.set_halign(gtk4::Align::Start);
+    section.append(&title);
+
+    // Additional characters
+    let additional_box = Box::new(Orientation::Vertical, 4);
+    let additional_label = Label::new(Some("Additional characters to include:"));
+    additional_label.add_css_class("dim-label");
+    additional_label.set_halign(gtk4::Align::Start);
+
+    let additional_entry = Entry::new();
+    additional_entry.set_placeholder_text(Some("e.g., @#$"));
+
+    let config_clone = config.clone();
+    additional_entry.connect_changed(move |entry| {
+        let mut config = config_clone.borrow_mut();
+        config.additional_characters = entry.text().to_string();
+    });
+
+    additional_box.append(&additional_label);
+    additional_box.append(&additional_entry);
+    section.append(&additional_box);
+
+    // Excluded characters
+    let excluded_box = Box::new(Orientation::Vertical, 4);
+    let excluded_label = Label::new(Some("Characters to exclude:"));
+    excluded_label.add_css_class("dim-label");
+    excluded_label.set_halign(gtk4::Align::Start);
+
+    let excluded_entry = Entry::new();
+    excluded_entry.set_placeholder_text(Some("e.g., 0O1l"));
+
+    let config_clone = config.clone();
+    excluded_entry.connect_changed(move |entry| {
+        let mut config = config_clone.borrow_mut();
+        config.excluded_characters = entry.text().to_string();
+    });
+
+    excluded_box.append(&excluded_label);
+    excluded_box.append(&excluded_entry);
+    section.append(&excluded_box);
+
+    section
+}
+
+/// Creates the password display section
+fn create_password_display_section(
+    config: &Rc<RefCell<PasswordConfig>>,
+    entry: Option<&Entry>,
+    account_rc: Option<&Rc<RefCell<Account>>>,
+    dialog: Option<&Dialog>,
+) -> Box {
+    let section = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Generated Password"));
+    title.add_css_class("title-4");
+    title.set_halign(gtk4::Align::Start);
+    section.append(&title);
+
+    // Text view for password display
+    let text_view = TextView::new();
+    text_view.set_editable(false);
+    text_view.set_cursor_visible(false);
+    text_view.set_wrap_mode(gtk4::WrapMode::Char);
+    text_view.set_size_request(-1, 80);
+    text_view.add_css_class("password-display");
+
+    // Set monospace font
+    let buffer = text_view.buffer();
+    buffer.set_text("Click 'Generate Password' to create a password");
+
+    let scrolled = ScrolledWindow::new();
+    scrolled.set_policy(PolicyType::Automatic, PolicyType::Automatic);
+    scrolled.set_child(Some(&text_view));
+    scrolled.set_size_request(-1, 100);
+
+    section.append(&scrolled);
+
+    // Button container
+    let button_box = Box::new(Orientation::Horizontal, 8);
+    button_box.set_halign(gtk4::Align::Center);
+
+    // Generate button
+    let generate_button = Button::new();
+    generate_button.set_label("Generate Password");
+    generate_button.add_css_class("suggested-action");
+
+    let text_view_clone = text_view.clone();
+    let config_clone = config.clone();
+    generate_button.connect_clicked(move |_| {
+        let config = config_clone.borrow();
+        match generate_password(&*config) {
+            Ok(password) => {
+                let buffer = text_view_clone.buffer();
+                buffer.set_text(&password);
+            }
+            Err(e) => {
+                eprintln!("Failed to generate password: {}", e);
+                let buffer = text_view_clone.buffer();
+                buffer.set_text("Error generating password");
+            }
+        }
+    });
+
+    button_box.append(&generate_button);
+
+    // Add Use and Cancel buttons only if we have the necessary parameters
+    if let (Some(entry), Some(account_rc), Some(dialog)) = (entry, account_rc, dialog) {
+        // Use button
+        let use_button = Button::new();
+        use_button.set_label("Use");
+        use_button.add_css_class("flat");
+
+        let text_view_use = text_view.clone();
+        let entry_clone = entry.clone();
+        let account_rc_clone = account_rc.clone();
+        let dialog_clone = dialog.clone();
+        use_button.connect_clicked(move |_| {
+            let buffer = text_view_use.buffer();
+            let start = buffer.start_iter();
+            let end = buffer.end_iter();
+            let password = buffer.text(&start, &end, false);
+
+            if !password.is_empty() && password != "Click 'Generate Password' to create a password"
+            {
+                entry_clone.set_text(&password);
+                let mut account = account_rc_clone.borrow_mut();
+                account.password.update(password.to_string());
+                dialog_clone.close();
+            }
+        });
+
+        // Cancel button
+        let cancel_button = Button::new();
+        cancel_button.set_label("Cancel");
+        cancel_button.add_css_class("flat");
+
+        let dialog_cancel = dialog.clone();
+        cancel_button.connect_clicked(move |_| {
+            dialog_cancel.close();
+        });
+
+        button_box.append(&use_button);
+        button_box.append(&cancel_button);
+    }
+
+    section.append(&button_box);
+    section
+}
+
+/// Helper function to find the password text view in the display section
+fn find_password_text_view(section: &Box) -> Option<TextView> {
+    let mut child = section.first_child();
+    while let Some(widget) = child {
+        if let Ok(scrolled) = widget.clone().downcast::<ScrolledWindow>() {
+            if let Some(text_view) = scrolled.child().and_then(|c| c.downcast::<TextView>().ok()) {
+                return Some(text_view);
+            }
+        }
+        child = widget.next_sibling();
+    }
+    None
 }
