@@ -30,7 +30,7 @@ pub fn show_home_view(content_area: &Box) {
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    let main_box = Box::new(Orientation::Vertical, 32);
+    let main_box = Box::new(Orientation::Vertical, 0);
     main_box.set_margin_top(32);
     main_box.set_margin_bottom(32);
     main_box.set_margin_start(48);
@@ -455,7 +455,7 @@ fn show_account_view_with_mode(
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
+    let main_box = Box::new(Orientation::Vertical, 0);
     main_box.set_margin_top(24);
     main_box.set_margin_bottom(24);
     main_box.set_margin_start(24);
@@ -487,7 +487,7 @@ fn show_account_view_with_mode(
     main_box.append(&password_section);
 
     // Additional fields section
-    let additional_fields_section = create_additional_fields_section(&account_rc);
+    let additional_fields_section = create_additional_fields_section(&account_rc, edit_mode);
     main_box.append(&additional_fields_section);
 
     // Notes section
@@ -569,15 +569,30 @@ fn create_account_header(
 /// Creates the account details section
 fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
+    section.add_css_class("account-section");
+    section.set_margin_top(16);
+
+    // Section header
+    let header_box = Box::new(Orientation::Vertical, 8);
+    header_box.set_margin_top(16);
+    header_box.set_margin_bottom(0);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
 
     // Section title
     let title = Label::new(Some("Account Details"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+
+    header_box.append(&title);
+    section.append(&header_box);
 
     // Details grid
     let details_box = Box::new(Orientation::Vertical, 12);
+    details_box.set_margin_bottom(16);
+    details_box.set_margin_start(24);
+    details_box.set_margin_end(24);
+    details_box.set_halign(gtk4::Align::Center);
 
     let account = account_rc.borrow();
 
@@ -610,27 +625,41 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     section
 }
 
+#[allow(clippy::too_many_lines)]
 /// Creates the password section
 fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
+    section.add_css_class("account-section");
+    section.set_margin_top(16);
 
     // Section title with generate button
     let header_box = Box::new(Orientation::Horizontal, 12);
+    header_box.set_margin_top(20);
+    header_box.set_margin_bottom(0);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
+
     let title = Label::new(Some("Password"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
-    title.set_hexpand(true);
 
     let generate_button = Button::new();
     generate_button.set_label("Generate New");
     generate_button.add_css_class("flat");
 
     header_box.append(&title);
-    header_box.append(&generate_button);
+    if edit_mode {
+        header_box.append(&generate_button);
+    }
+
     section.append(&header_box);
 
     // Password field with reveal/copy buttons
     let password_box = Box::new(Orientation::Horizontal, 8);
+    password_box.set_margin_bottom(20);
+    password_box.set_margin_start(24);
+    password_box.set_margin_end(24);
+    password_box.set_halign(gtk4::Align::Center);
 
     let password_entry = Entry::new();
     let account = account_rc.borrow();
@@ -748,26 +777,39 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 }
 
 /// Creates the additional fields section
-fn create_additional_fields_section(account_rc: &Rc<RefCell<Account>>) -> Box {
+fn create_additional_fields_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
+    section.add_css_class("account-section");
+    section.set_margin_top(16);
 
     // Section title with add button
-    let header_box = Box::new(Orientation::Horizontal, 12);
+    let header_box = Box::new(Orientation::Vertical, 12);
+    header_box.set_margin_top(20);
+    header_box.set_margin_bottom(0);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
+
     let title = Label::new(Some("Additional Fields"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
-    title.set_hexpand(true);
 
     let add_button = Button::new();
     add_button.set_label("Add Field");
     add_button.add_css_class("flat");
 
     header_box.append(&title);
-    header_box.append(&add_button);
+    if edit_mode {
+        header_box.append(&add_button);
+    }
+
     section.append(&header_box);
 
     // Additional fields from account data
     let fields_box = Box::new(Orientation::Vertical, 12);
+    fields_box.set_margin_bottom(20);
+    fields_box.set_margin_start(24);
+    fields_box.set_margin_end(24);
+    fields_box.set_halign(gtk4::Align::Center);
 
     let account = account_rc.borrow();
     for (field_name, field_value) in &account.additional_fields {
@@ -790,11 +832,27 @@ fn create_additional_fields_section(account_rc: &Rc<RefCell<Account>>) -> Box {
 /// Creates the notes section
 fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
+    section.add_css_class("account-section");
+    section.set_margin_top(16);
+
+    let header_box = Box::new(Orientation::Vertical, 8);
+    header_box.set_margin_top(20);
+    header_box.set_margin_bottom(0);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
 
     let title = Label::new(Some("Notes"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+
+    header_box.append(&title);
+    section.append(&header_box);
+
+    let notes_box = Box::new(Orientation::Vertical, 12);
+    notes_box.set_margin_bottom(20);
+    notes_box.set_margin_start(24);
+    notes_box.set_margin_end(24);
+    notes_box.set_halign(gtk4::Align::Center);
 
     // Notes text area (using Entry for now, could be TextView for multiline)
     let notes_entry = Entry::new();
@@ -814,7 +872,8 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
         });
     }
 
-    section.append(&notes_entry);
+    notes_box.append(&notes_entry);
+    section.append(&notes_box);
     section
 }
 
