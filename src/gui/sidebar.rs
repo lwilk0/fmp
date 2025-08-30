@@ -1,6 +1,4 @@
-use crate::gui::content::{
-    show_home_view, show_new_vault_view, show_settings_view, show_vault_view,
-};
+use crate::gui::content::{show_home_view, show_settings_view, show_vault_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
@@ -153,22 +151,7 @@ fn create_title_section(content_area: &Box) -> Box {
     title_label.add_css_class("heading");
     title_label.add_css_class("sidebar-title");
 
-    // Add vault button
-    let add_vault_button = Button::new();
-    add_vault_button.set_label("+");
-    add_vault_button.add_css_class("circular");
-    add_vault_button.add_css_class("suggested-action");
-    add_vault_button.set_tooltip_text(Some("Add New Vault"));
-    add_vault_button.set_size_request(32, 32);
-
-    // Connect add vault functionality
-    let content_area_clone = content_area.clone();
-    add_vault_button.connect_clicked(move |_| {
-        show_new_vault_view(&content_area_clone);
-    });
-
     header_box.append(&title_label);
-    header_box.append(&add_vault_button);
 
     // Divider
     let separator = gtk4::Separator::new(Orientation::Horizontal);

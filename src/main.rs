@@ -1,7 +1,9 @@
 mod crypto;
-mod flags;
 mod gui;
+mod models;
 mod password;
+mod security;
+mod storage;
 mod totp;
 mod vault;
 

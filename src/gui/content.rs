@@ -3,31 +3,50 @@ use adw::prelude::*;
 
 use crate::gui::sidebar::refresh_vaults_section;
 use crate::vault::{
-    Account, Locations, SecureClipboardString, SecurePassword, create_account, create_vault,
-    get_full_account_details, read_directory, update_account,
+    Account, Locations, create_account, create_vault, get_full_account_details, read_directory,
+    update_account,
 };
 use gtk4::pango::EllipsizeMode;
 use gtk4::{
-    Box, Button, Entry, FlowBox, Label, Orientation, PolicyType, ScrolledWindow, SelectionMode,
-    Separator, gdk,
+    Box, Button, Entry, FlowBox, Frame, Label, Orientation, PolicyType, ScrolledWindow,
+    SelectionMode, Separator,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
-use zeroize::Zeroize;
 
 /// Shows the home view in the content area
 pub fn show_home_view(content_area: &Box) {
     clear_content(content_area);
 
-    let title = Label::new(Some("Home"));
-    title.add_css_class("title-1");
-    title.set_margin_bottom(20);
-    content_area.append(&title);
+    // Create scrolled window for the home content
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled_window.set_vexpand(true);
+    scrolled_window.set_hexpand(true);
 
-    let placeholder = Label::new(Some("Home panel will be implemented here"));
-    placeholder.add_css_class("dim-label");
-    content_area.append(&placeholder);
+    let main_box = Box::new(Orientation::Vertical, 32);
+    main_box.set_margin_top(32);
+    main_box.set_margin_bottom(32);
+    main_box.set_margin_start(48);
+    main_box.set_margin_end(48);
+
+    // Welcome section
+    let welcome_section = create_welcome_section();
+    main_box.append(&welcome_section);
+
+    // Statistics section
+    let stats_section = create_statistics_section();
+    main_box.append(&stats_section);
+
+    // Quick actions section
+    let actions_section = create_quick_actions_section(content_area);
+    main_box.append(&actions_section);
+
+    scrolled_window.set_child(Some(&main_box));
+    content_area.append(&scrolled_window);
 }
 
 /// Shows the settings view in the content area
@@ -54,6 +73,9 @@ fn clear_content(content_area: &Box) {
 /// Shows a specific vault view with improved account display
 pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     clear_content(content_area);
+
+    // Increment usage count for this vault
+    increment_vault_usage(vault_name);
 
     // Create main container with scrolling
     let scrolled_window = ScrolledWindow::new();
@@ -971,8 +993,171 @@ fn create_editable_field_row(
     row_box
 }
 
-/// Shows the vault creation view
-pub fn show_new_vault_view(content_area: &Box) {
+/// Creates the welcome section for the home view
+fn create_welcome_section() -> Box {
+    let section_box = Box::new(Orientation::Vertical, 16);
+    section_box.set_halign(gtk4::Align::Center);
+
+    // App title and description
+    let title = Label::new(Some("Welcome to FMP"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Center);
+
+    let subtitle = Label::new(Some("Secure Password Manager"));
+    subtitle.add_css_class("title-3");
+    subtitle.add_css_class("dim-label");
+    subtitle.set_halign(gtk4::Align::Center);
+
+    let description = Label::new(Some(
+        "Manage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe.",
+    ));
+    description.add_css_class("body");
+    description.set_halign(gtk4::Align::Center);
+    description.set_wrap(true);
+    description.set_max_width_chars(60);
+
+    section_box.append(&title);
+    section_box.append(&subtitle);
+    section_box.append(&description);
+
+    section_box
+}
+
+/// Creates the statistics section showing vault and account counts
+fn create_statistics_section() -> Box {
+    let section_container = Box::new(Orientation::Vertical, 0);
+    section_container.add_css_class("home-section");
+    section_container.set_margin_top(16);
+
+    // Section header
+    let header_box = Box::new(Orientation::Vertical, 8);
+    header_box.set_margin_top(20);
+    header_box.set_margin_bottom(16);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
+
+    let title = Label::new(Some("📊 Overview"));
+    title.add_css_class("title-3");
+    title.set_halign(gtk4::Align::Start);
+
+    let subtitle = Label::new(Some("Your vault statistics at a glance"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    header_box.append(&title);
+    header_box.append(&subtitle);
+    section_container.append(&header_box);
+
+    let stats_box = Box::new(Orientation::Horizontal, 32);
+    stats_box.set_margin_bottom(20);
+    stats_box.set_margin_start(24);
+    stats_box.set_margin_end(24);
+    stats_box.set_halign(gtk4::Align::Center);
+
+    // Get vault statistics
+    let vaults = crate::gui::sidebar::get_available_vaults();
+    let vault_count = vaults.len();
+    let total_accounts: usize = vaults
+        .iter()
+        .map(|vault_name| get_available_accounts(vault_name).len())
+        .sum();
+
+    // Vault count card
+    let vault_card = create_stat_card("Vaults", &vault_count.to_string(), "🔐");
+    stats_box.append(&vault_card);
+
+    // Account count card
+    let account_card = create_stat_card("Accounts", &total_accounts.to_string(), "👤");
+    stats_box.append(&account_card);
+
+    // Most used vault
+    let most_used = get_most_used_vault();
+    let most_used_card = create_stat_card("Most Used", &most_used, "⭐");
+    stats_box.append(&most_used_card);
+
+    section_container.append(&stats_box);
+    section_container
+}
+
+/// Creates a statistics card
+fn create_stat_card(title: &str, value: &str, icon: &str) -> Box {
+    let card_box = Box::new(Orientation::Vertical, 8);
+    card_box.set_size_request(120, 80);
+    card_box.set_halign(gtk4::Align::Center);
+    card_box.set_valign(gtk4::Align::Center);
+
+    let icon_label = Label::new(Some(icon));
+    icon_label.add_css_class("title-2");
+    icon_label.set_halign(gtk4::Align::Center);
+
+    let value_label = Label::new(Some(value));
+    value_label.add_css_class("title-2");
+    value_label.set_halign(gtk4::Align::Center);
+
+    let title_label = Label::new(Some(title));
+    title_label.add_css_class("caption");
+    title_label.add_css_class("dim-label");
+    title_label.set_halign(gtk4::Align::Center);
+
+    card_box.append(&icon_label);
+    card_box.append(&value_label);
+    card_box.append(&title_label);
+
+    card_box
+}
+
+/// Creates the quick actions section
+fn create_quick_actions_section(content_area: &Box) -> Box {
+    let section_container = Box::new(Orientation::Vertical, 0);
+    section_container.add_css_class("home-section");
+    section_container.set_margin_top(16);
+
+    // Section header
+    let header_box = Box::new(Orientation::Vertical, 8);
+    header_box.set_margin_top(20);
+    header_box.set_margin_bottom(16);
+    header_box.set_margin_start(24);
+    header_box.set_margin_end(24);
+
+    let title = Label::new(Some("⚡ Quick Actions"));
+    title.add_css_class("title-3");
+    title.set_halign(gtk4::Align::Start);
+
+    let subtitle = Label::new(Some("Get started with common tasks"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    header_box.append(&title);
+    header_box.append(&subtitle);
+    section_container.append(&header_box);
+
+    let actions_box = Box::new(Orientation::Horizontal, 16);
+    actions_box.set_margin_bottom(20);
+    actions_box.set_margin_start(24);
+    actions_box.set_margin_end(24);
+    actions_box.set_halign(gtk4::Align::Center);
+
+    // Create new vault button
+    let create_vault_button = Button::new();
+    create_vault_button.set_label("Create New Vault");
+    create_vault_button.add_css_class("suggested-action");
+    create_vault_button.set_size_request(160, 40);
+
+    let content_area_clone = content_area.clone();
+    create_vault_button.connect_clicked(move |_| {
+        show_create_vault_view(&content_area_clone);
+    });
+
+    actions_box.append(&create_vault_button);
+
+    section_container.append(&actions_box);
+    section_container
+}
+
+/// Shows the create vault view
+fn show_create_vault_view(content_area: &Box) {
     clear_content(content_area);
 
     let main_box = Box::new(Orientation::Vertical, 24);
@@ -1082,4 +1267,84 @@ pub fn show_new_vault_view(content_area: &Box) {
     main_box.append(&actions_box);
 
     content_area.append(&main_box);
+}
+
+/// Gets the usage count for a specific vault
+fn get_vault_usage_count(vault_name: &str) -> u32 {
+    let stats_file = get_vault_stats_file();
+
+    if let Ok(content) = fs::read_to_string(&stats_file) {
+        for line in content.lines() {
+            if let Some((name, count_str)) = line.split_once(':') {
+                if name == vault_name {
+                    return count_str.parse().unwrap_or(0);
+                }
+            }
+        }
+    }
+
+    0
+}
+
+/// Increments the usage count for a vault
+pub fn increment_vault_usage(vault_name: &str) {
+    let stats_file = get_vault_stats_file();
+    let mut usage_counts = HashMap::new();
+
+    // Read existing stats
+    if let Ok(content) = fs::read_to_string(&stats_file) {
+        for line in content.lines() {
+            if let Some((name, count_str)) = line.split_once(':') {
+                if let Ok(count) = count_str.parse::<u32>() {
+                    usage_counts.insert(name.to_string(), count);
+                }
+            }
+        }
+    }
+
+    // Increment count for this vault
+    let current_count = usage_counts.get(vault_name).unwrap_or(&0);
+    usage_counts.insert(vault_name.to_string(), current_count + 1);
+
+    // Write back to file
+    let mut content = String::new();
+    for (name, count) in usage_counts {
+        content.push_str(&format!("{}:{}\n", name, count));
+    }
+
+    if let Err(e) = fs::write(&stats_file, content) {
+        eprintln!("Failed to write vault stats: {}", e);
+    }
+}
+
+/// Gets the path to the vault statistics file
+fn get_vault_stats_file() -> PathBuf {
+    let locations = crate::vault::Locations::new("", "");
+    locations.fmp.join("vault_stats.txt")
+}
+
+/// Gets the most used vault name
+fn get_most_used_vault() -> String {
+    let stats_file = get_vault_stats_file();
+    let mut max_count = 0;
+    let mut most_used = "None".to_string();
+
+    if let Ok(content) = fs::read_to_string(&stats_file) {
+        for line in content.lines() {
+            if let Some((name, count_str)) = line.split_once(':') {
+                if let Ok(count) = count_str.parse::<u32>() {
+                    if count > max_count {
+                        max_count = count;
+                        most_used = name.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if max_count == 0 {
+        "None".to_string()
+    } else {
+        most_used
+    }
 }
