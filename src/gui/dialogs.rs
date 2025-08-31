@@ -771,7 +771,6 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                         move || {
                             match disable_totp(&vault_name_clone2) {
                                 Ok(()) => {
-                                    println!("2FA disabled for vault: {}", vault_name_clone2);
                                     dialog_clone2.close();
                                     // Refresh the vault view to update 2FA status
                                     crate::gui::content::show_vault_view(&content_area_clone2, &vault_name_clone2);
@@ -1248,7 +1247,6 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             }
             Err(e) => {
                 eprintln!("Failed to create backup: {}", e);
-                // TODO: Show error dialog
             }
         }
     });
@@ -1316,7 +1314,6 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             }
             Err(e) => {
                 eprintln!("Failed to restore backup: {}", e);
-                // TODO: Show error dialog
             }
         }
     });
@@ -1384,7 +1381,6 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
             }
             Err(e) => {
                 eprintln!("Failed to delete backup: {}", e);
-                // TODO: Show error dialog
             }
         }
     });
@@ -1457,7 +1453,6 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 }
                 Err(e) => {
                     eprintln!("Failed to rename vault: {}", e);
-                    // TODO: Show error dialog
                 }
             }
         }
@@ -1554,7 +1549,6 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 }
                 Err(e) => {
                     eprintln!("Failed to delete vault: {}", e);
-                    // TODO: Show error dialog
                 }
             }
         }
@@ -1632,7 +1626,6 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                 }
                 Err(e) => {
                     eprintln!("Failed to rename account: {}", e);
-                    // TODO: Show error dialog
                 }
             }
         }

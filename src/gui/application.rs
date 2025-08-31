@@ -5,7 +5,7 @@ use crate::gui::{
     dialogs::{is_first_run, show_welcome_dialog},
     sidebar::create_paned_layout_with_callbacks,
 };
-use adw::{Application, ApplicationWindow, HeaderBar};
+use adw::{Application, ApplicationWindow, HeaderBar, ToastOverlay};
 use gtk4::{Box, CssProvider, Label, Orientation, StyleContext, gdk};
 
 pub fn run_gui() {
@@ -40,12 +40,16 @@ fn run_ui(app: &Application) {
     // Create sidebar with content area reference for updating
     let paned = create_paned_layout_with_callbacks(&main_content, &content_area);
 
+    // Create toast overlay and wrap the paned layout
+    let toast_overlay = ToastOverlay::new();
+    toast_overlay.set_child(Some(&paned));
+
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Forgot My Password")
         .default_width(800)
         .default_height(600)
-        .content(&paned)
+        .content(&toast_overlay)
         .build();
 
     window.present();

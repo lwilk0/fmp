@@ -1,2 +1,2 @@
 pub mod filtering;
-pub mod toast_manager;
+pub mod loading_spinner;

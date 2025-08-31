@@ -407,3 +407,193 @@ button.flat:hover {
     min-height: 1px;
     opacity: 0.5;
 }
+
+/* Toast Notification Styling */
+toast {
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+toast.success-toast {
+    background-color: rgba(46, 160, 67, 0.95);
+    color: white;
+    border-color: rgba(46, 160, 67, 0.8);
+}
+
+toast.error-toast {
+    background-color: rgba(192, 28, 40, 0.95);
+    color: white;
+    border-color: rgba(192, 28, 40, 0.8);
+}
+
+toast.warning-toast {
+    background-color: rgba(245, 194, 17, 0.95);
+    color: rgba(0, 0, 0, 0.9);
+    border-color: rgba(245, 194, 17, 0.8);
+}
+
+toast.info-toast {
+    background-color: rgba(53, 132, 228, 0.95);
+    color: white;
+    border-color: rgba(53, 132, 228, 0.8);
+}
+
+/* Settings Page Styling */
+.settings-section {
+    margin-bottom: 32px;
+}
+
+.settings-card {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+    .settings-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+}
+
+.settings-card>box {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.settings-card>box:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .settings-card>box {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Loading Overlay Styling */
+.loading-overlay {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    min-height: 120px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .loading-overlay {
+        background-color: rgba(0, 0, 0, 0.85);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+}
+
+.loading-spinner {
+    opacity: 0.8;
+}
+
+/* Loading Button Styling */
+button .loading-spinner {
+    margin-right: 8px;
+}
+
+button:disabled {
+    opacity: 0.6;
+}
+
+/* Settings Row Styling */
+.settings-row {
+    transition: background-color 0.2s ease;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.settings-row:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+    .settings-row:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+}
+
+/* Enhanced Switch Styling */
+switch {
+    border-radius: 16px;
+    min-width: 48px;
+    min-height: 24px;
+}
+
+switch slider {
+    border-radius: 50%;
+    min-width: 20px;
+    min-height: 20px;
+    margin: 2px;
+}
+
+/* Enhanced ComboBox Styling */
+combobox button {
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-height: 36px;
+}
+
+/* Enhanced SpinButton Styling */
+spinbutton {
+    border-radius: 8px;
+    min-height: 36px;
+}
+
+spinbutton entry {
+    border-radius: 8px 0 0 8px;
+}
+
+spinbutton button {
+    border-radius: 0 8px 8px 0;
+    min-width: 32px;
+}
+
+/* Link Button Styling */
+linkbutton {
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+linkbutton:hover {
+    background-color: rgba(53, 132, 228, 0.1);
+}
+
+/* Progress Bar Styling */
+progressbar {
+    border-radius: 8px;
+    min-height: 8px;
+}
+
+progressbar progress {
+    border-radius: 8px;
+    background-color: #3584e4;
+}
+
+progressbar trough {
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    progressbar trough {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
