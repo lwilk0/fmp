@@ -1,13 +1,13 @@
 use adw::ButtonContent;
 use adw::prelude::*;
 
-use crate::gui::dialogs::show_password_generator_dialog;
+use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog};
 use crate::gui::sidebar::refresh_vaults_section;
 use crate::password::{PasswordConfig, generate_password};
-use crate::totp::{is_totp_required, verify_totp_code};
+use crate::totp::{is_totp_required, verify_totp_code, is_totp_enabled};
 use crate::vault::{
-    Account, Locations, create_account, create_vault, get_full_account_details, read_directory,
-    update_account, warm_up_gpg,
+    Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
+    read_directory, update_account, warm_up_gpg,
 };
 use gtk4::pango::EllipsizeMode;
 use gtk4::{
@@ -80,123 +80,27 @@ pub fn open_vault_with_gate(content_area: &Box, vault_name: &str) {
     let vault_name = vault_name.to_string();
     let content_area = content_area.clone();
 
-    // Check if TOTP is required for this vault
-    if is_totp_required(&vault_name) {
-        show_totp_verification_dialog(&content_area, &vault_name);
-    } else {
         // No TOTP required, proceed with gate warm-up
         proceed_with_gate_warmup(&content_area, &vault_name);
-    }
-}
-
-/// Shows TOTP verification dialog
-fn show_totp_verification_dialog(content_area: &Box, vault_name: &str) {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("Two-Factor Authentication"));
-    dialog.set_modal(true);
-    dialog.set_default_size(400, 200);
-
-    // Get the main window to set as transient parent
-    if let Some(window) = content_area
-        .root()
-        .and_then(|root| root.downcast::<gtk4::Window>().ok())
-    {
-        dialog.set_transient_for(Some(&window));
-    }
-
-    let content_box = Box::new(Orientation::Vertical, 16);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
-
-    // Title and description
-    let title = Label::new(Some("Enter 2FA Code"));
-    title.add_css_class("title-3");
-    title.set_halign(gtk4::Align::Center);
-
-    let description = Label::new(Some(&format!(
-        "Enter the 6-digit code from your authenticator app for vault '{}'",
-        vault_name
-    )));
-    description.set_wrap(true);
-    description.set_halign(gtk4::Align::Center);
-    description.add_css_class("dim-label");
-
-    // TOTP code entry
-    let code_entry = Entry::new();
-    code_entry.set_placeholder_text(Some("000000"));
-    code_entry.set_max_length(8);
-    code_entry.set_input_purpose(gtk4::InputPurpose::Digits);
-    code_entry.set_halign(gtk4::Align::Center);
-    code_entry.set_size_request(150, -1);
-
-    // Error label (initially hidden)
-    let error_label = Label::new(None);
-    error_label.add_css_class("error");
-    error_label.set_halign(gtk4::Align::Center);
-    error_label.set_visible(false);
-
-    content_box.append(&title);
-    content_box.append(&description);
-    content_box.append(&code_entry);
-    content_box.append(&error_label);
-
-    dialog.set_child(Some(&content_box));
-
-    // Add buttons
-    dialog.add_button("Cancel", ResponseType::Cancel);
-    let verify_button = dialog.add_button("Verify", ResponseType::Accept);
-    verify_button.add_css_class("suggested-action");
-
-    // Set up response handling
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    let code_entry_clone = code_entry.clone();
-    let error_label_clone = error_label.clone();
-
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Accept {
-            let code = code_entry_clone.text().to_string();
-
-            match verify_totp_code(&vault_name_clone, &code) {
-                Ok(true) => {
-                    // TOTP verification successful
-                    dialog.close();
-                    proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
-                }
-                Ok(false) => {
-                    // Invalid TOTP code
-                    error_label_clone.set_text("Invalid code. Please try again.");
-                    error_label_clone.set_visible(true);
-                    code_entry_clone.set_text("");
-                    return; // Don't close dialog
-                }
-                Err(e) => {
-                    // Error during verification
-                    error_label_clone.set_text(&format!("Error: {}", e));
-                    error_label_clone.set_visible(true);
-                    return; // Don't close dialog
-                }
-            }
-        } else {
-            // Cancel pressed
-            dialog.close();
-        }
-    });
-
-    // Focus the entry and allow Enter to submit
-    code_entry.grab_focus();
-    let dialog_clone = dialog.clone();
-    code_entry.connect_activate(move |_| {
-        dialog_clone.response(ResponseType::Accept);
-    });
-
-    dialog.present();
 }
 
 /// Proceeds with gate warm-up and then shows the vault view
 fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
+    // Check if TOTP is required for this vault
+    if is_totp_required(vault_name) {
+        // Show TOTP verification dialog
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
+        
+    } else {
+        // No TOTP required, proceed directly with GPG warm-up
+        proceed_with_gpg_warmup(content_area, vault_name);
+    }
+}
+
+/// Proceeds with GPG warm-up after TOTP verification (if required)
+fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
     // Attempt to warm up GPG by decrypting the gate file
     match warm_up_gpg(vault_name) {
         Ok(()) => {
@@ -556,6 +460,46 @@ fn create_account_header(
         let delete_button = Button::new();
         delete_button.set_label("Delete");
         delete_button.add_css_class("destructive-action");
+
+        // Connect delete functionality with confirmation dialog
+        let content_area_delete = content_area.clone();
+        let vault_name_delete = vault_name.to_string();
+        let account_name_delete = account_name.to_string();
+        delete_button.connect_clicked(move |_| {
+            let message = format!(
+                "Are you sure you want to delete the account '{}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.",
+                account_name_delete
+            );
+            
+            let content_area_confirm = content_area_delete.clone();
+            let vault_name_confirm = vault_name_delete.clone();
+            let account_name_confirm = account_name_delete.clone();
+            
+            show_confirmation_dialog(
+                "Delete Account",
+                &message,
+                "Delete",
+                None::<&gtk4::Window>,
+                move || {
+                    // Perform the deletion
+                    match delete_account(&vault_name_confirm, &account_name_confirm) {
+                        Ok(()) => {
+                            // Navigate back to home view after successful deletion
+                            show_home_view(&content_area_confirm);
+                            
+                            // Refresh the sidebar to update the account list
+                            // Note: This would ideally trigger a sidebar refresh, but we don't have 
+                            // direct access to the sidebar here. The user will see the updated 
+                            // list when they navigate to a vault again.
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to delete account '{}': {}", account_name_confirm, e);
+                            // TODO: Show error dialog to user
+                        }
+                    }
+                },
+            );
+        });
 
         actions_box.append(&edit_button);
         actions_box.append(&delete_button);

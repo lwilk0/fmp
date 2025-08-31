@@ -21,7 +21,7 @@ use crate::models::Account;
 use crate::storage::{Locations, Store};
 use anyhow::Error;
 use gpgme::{Context, Protocol};
-use std::fs::File;
+use std::fs::{File, remove_dir_all};
 use std::io::{BufReader, Read, Write};
 
 /// Retrieves the full account details for a specific account in a vault.
@@ -150,5 +150,27 @@ pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
 
     ctx.decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
+    Ok(())
+}
+
+/// Deletes an account from the specified vault.
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault containing the account.
+/// * `account_name` - The name of the account to delete.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
+///
+/// # Errors
+/// * If the vault does not exist, if the account does not exist, or if the account directory cannot be removed.
+pub fn delete_account(vault_name: &str, account_name: &str) -> Result<(), Error> {
+    let store = Store::new(vault_name, account_name)?;
+    store.locations.does_vault_exist()?;
+    store.locations.does_account_exist()?;
+
+    // Remove the entire account directory
+    remove_dir_all(&store.locations.account)?;
+
     Ok(())
 }

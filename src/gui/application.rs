@@ -1,6 +1,10 @@
 use adw::prelude::*;
 
-use crate::gui::{content::show_home_view, sidebar::create_paned_layout_with_callbacks};
+use crate::gui::{
+    content::show_home_view,
+    dialogs::{is_first_run, show_welcome_dialog},
+    sidebar::create_paned_layout_with_callbacks,
+};
 use adw::{Application, ApplicationWindow, HeaderBar};
 use gtk4::{Box, CssProvider, Label, Orientation, StyleContext, gdk};
 
@@ -45,6 +49,11 @@ fn run_ui(app: &Application) {
         .build();
 
     window.present();
+
+    // Show welcome dialog on first run
+    if is_first_run() {
+        show_welcome_dialog();
+    }
 }
 
 fn load_css() {

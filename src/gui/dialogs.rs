@@ -1,12 +1,20 @@
 use adw::prelude::*;
 
 use crate::password::{PasswordConfig, generate_password};
+use crate::totp::{disable_totp, enable_totp, get_totp_qr_info, is_totp_enabled, verify_totp_code};
 use crate::vault::Account;
+use gtk4::Box as GtkBox;
+use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
+use gtk4::glib::Bytes;
 use gtk4::{
-    Adjustment, Box, Button, CheckButton, Dialog, Entry, Label, Orientation, PolicyType,
-    ScrolledWindow, SpinButton, TextView,
+    Adjustment, Button, CheckButton, Dialog, Entry, Image, Label, Orientation, PolicyType,
+    ResponseType, ScrolledWindow, SpinButton, TextView,
 };
+use image::{DynamicImage, ImageBuffer, Luma};
+use qrcode::QrCode;
 use std::cell::RefCell;
+use std::fs::{File, create_dir_all};
+use std::path::PathBuf;
 use std::rc::Rc;
 /// Shows the password generator dialog and updates the provided entry field and account
 pub fn show_password_generator_dialog(entry: &Entry, account_rc: &Rc<RefCell<Account>>) {
@@ -16,7 +24,7 @@ pub fn show_password_generator_dialog(entry: &Entry, account_rc: &Rc<RefCell<Acc
     dialog.set_default_size(500, 600);
 
     // Create main content box
-    let content_box = Box::new(Orientation::Vertical, 16);
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
     content_box.set_margin_top(20);
     content_box.set_margin_bottom(20);
     content_box.set_margin_start(20);
@@ -54,15 +62,15 @@ pub fn show_password_generator_dialog(entry: &Entry, account_rc: &Rc<RefCell<Acc
 }
 
 /// Creates the password length configuration section
-fn create_length_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
-    let section = Box::new(Orientation::Vertical, 8);
+fn create_length_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section = GtkBox::new(Orientation::Vertical, 8);
 
     let title = Label::new(Some("Password Length"));
     title.add_css_class("title-4");
     title.set_halign(gtk4::Align::Start);
     section.append(&title);
 
-    let length_box = Box::new(Orientation::Horizontal, 12);
+    let length_box = GtkBox::new(Orientation::Horizontal, 12);
 
     // Spin button for length
     let adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
@@ -86,8 +94,8 @@ fn create_length_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
 }
 
 /// Creates the character types configuration section
-fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
-    let section = Box::new(Orientation::Vertical, 8);
+fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section = GtkBox::new(Orientation::Vertical, 8);
 
     let title = Label::new(Some("Character Types"));
     title.add_css_class("title-4");
@@ -132,8 +140,8 @@ fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
 }
 
 /// Creates the custom characters configuration section
-fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Box {
-    let section = Box::new(Orientation::Vertical, 8);
+fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section = GtkBox::new(Orientation::Vertical, 8);
 
     let title = Label::new(Some("Custom Characters"));
     title.add_css_class("title-4");
@@ -141,7 +149,7 @@ fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Box
     section.append(&title);
 
     // Additional characters
-    let additional_box = Box::new(Orientation::Vertical, 4);
+    let additional_box = GtkBox::new(Orientation::Vertical, 4);
     let additional_label = Label::new(Some("Additional characters to include:"));
     additional_label.add_css_class("dim-label");
     additional_label.set_halign(gtk4::Align::Start);
@@ -160,7 +168,7 @@ fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Box
     section.append(&additional_box);
 
     // Excluded characters
-    let excluded_box = Box::new(Orientation::Vertical, 4);
+    let excluded_box = GtkBox::new(Orientation::Vertical, 4);
     let excluded_label = Label::new(Some("Characters to exclude:"));
     excluded_label.add_css_class("dim-label");
     excluded_label.set_halign(gtk4::Align::Start);
@@ -187,8 +195,8 @@ fn create_password_display_section(
     entry: Option<&Entry>,
     account_rc: Option<&Rc<RefCell<Account>>>,
     dialog: Option<&Dialog>,
-) -> Box {
-    let section = Box::new(Orientation::Vertical, 8);
+) -> GtkBox {
+    let section = GtkBox::new(Orientation::Vertical, 8);
 
     let title = Label::new(Some("Generated Password"));
     title.add_css_class("title-4");
@@ -215,7 +223,7 @@ fn create_password_display_section(
     section.append(&scrolled);
 
     // Button container
-    let button_box = Box::new(Orientation::Horizontal, 8);
+    let button_box = GtkBox::new(Orientation::Horizontal, 8);
     button_box.set_halign(gtk4::Align::Center);
 
     // Generate button
@@ -284,4 +292,292 @@ fn create_password_display_section(
 
     section.append(&button_box);
     section
+}
+
+/// Checks if this is the first run of the application
+pub fn is_first_run() -> bool {
+    let config_path = get_config_file_path();
+    !config_path.exists()
+}
+
+/// Creates the first-run marker file
+pub fn mark_first_run_complete() -> Result<(), std::io::Error> {
+    let config_path = get_config_file_path();
+
+    // Create the config directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        create_dir_all(parent)?;
+    }
+
+    // Create the marker file
+    File::create(&config_path)?;
+
+    Ok(())
+}
+
+/// Gets the path to the first-run marker file
+fn get_config_file_path() -> PathBuf {
+    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+    config_dir.join("fmp").join("fmp-ran")
+}
+
+/// Shows the welcome dialog for first-time users
+pub fn show_welcome_dialog() {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Welcome to Forgot My Password"));
+    dialog.set_modal(true);
+    dialog.set_default_size(650, 550);
+    dialog.add_css_class("welcome-dialog");
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 24);
+    content_box.set_margin_top(32);
+    content_box.set_margin_bottom(32);
+    content_box.set_margin_start(32);
+    content_box.set_margin_end(32);
+
+    // Welcome title with icon
+    let title_box = GtkBox::new(Orientation::Horizontal, 12);
+    title_box.set_halign(gtk4::Align::Center);
+
+    let icon = Label::new(Some("🔐"));
+    icon.add_css_class("title-1");
+
+    let title = Label::new(Some("Welcome to Forgot My Password!"));
+    title.add_css_class("title-1");
+
+    title_box.append(&icon);
+    title_box.append(&title);
+    content_box.append(&title_box);
+
+    // Welcome message
+    let welcome_text = "Thank you for choosing Forgot My Password (FMP) - your secure password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
+
+    let message_label = Label::new(Some(welcome_text));
+    message_label.set_wrap(true);
+    message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
+    message_label.set_justify(gtk4::Justification::Left);
+    message_label.set_halign(gtk4::Align::Fill);
+    message_label.set_valign(gtk4::Align::Start);
+    message_label.add_css_class("body");
+
+    // Create scrolled window for the message
+    let scrolled = ScrolledWindow::new();
+    scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled.set_child(Some(&message_label));
+    scrolled.set_size_request(-1, 320);
+    scrolled.add_css_class("card");
+    scrolled.set_margin_top(8);
+    scrolled.set_margin_bottom(8);
+
+    content_box.append(&scrolled);
+
+    // Button box
+    let button_box = GtkBox::new(Orientation::Horizontal, 16);
+    button_box.set_halign(gtk4::Align::Center);
+    button_box.set_margin_top(8);
+
+    // Learn More about GPG button
+    let learn_more_button = Button::new();
+    learn_more_button.set_label("Learn More about GPG");
+    learn_more_button.add_css_class("flat");
+    learn_more_button.set_size_request(180, -1);
+
+    learn_more_button.connect_clicked(move |_| {
+        show_gpg_info_dialog();
+    });
+
+    // Get Started button
+    let get_started_button = Button::new();
+    get_started_button.set_label("Get Started");
+    get_started_button.add_css_class("suggested-action");
+    get_started_button.add_css_class("pill");
+    get_started_button.set_size_request(140, -1);
+
+    let dialog_clone = dialog.clone();
+    get_started_button.connect_clicked(move |_| {
+        // Mark first run as complete
+        if let Err(e) = mark_first_run_complete() {
+            eprintln!("Failed to mark first run complete: {}", e);
+        }
+        dialog_clone.close();
+    });
+
+    button_box.append(&learn_more_button);
+    button_box.append(&get_started_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows the GPG information dialog with setup instructions
+fn show_gpg_info_dialog() {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("GPG Setup Information"));
+    dialog.set_modal(true);
+    dialog.set_default_size(550, 400);
+    dialog.add_css_class("info-dialog");
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 20);
+    content_box.set_margin_top(24);
+    content_box.set_margin_bottom(24);
+    content_box.set_margin_start(24);
+    content_box.set_margin_end(24);
+
+    // Title with icon
+    let title_box = GtkBox::new(Orientation::Horizontal, 12);
+    title_box.set_halign(gtk4::Align::Center);
+
+    let icon = Label::new(Some("🔑"));
+    icon.add_css_class("title-2");
+
+    let title = Label::new(Some("Setting up GPG"));
+    title.add_css_class("title-2");
+
+    title_box.append(&icon);
+    title_box.append(&title);
+    content_box.append(&title_box);
+
+    // GPG instructions with better formatting
+    let instructions_box = GtkBox::new(Orientation::Vertical, 16);
+
+    let intro_text =
+        "You'll need to install GPG (GNU Privacy Guard) if it's not already on your system.";
+    let intro_label = Label::new(Some(intro_text));
+    intro_label.set_wrap(true);
+    intro_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
+    intro_label.set_justify(gtk4::Justification::Left);
+    intro_label.set_halign(gtk4::Align::Start);
+    intro_label.add_css_class("body");
+
+    let commands_title = Label::new(Some("Common GPG Commands:"));
+    commands_title.add_css_class("title-4");
+    commands_title.set_halign(gtk4::Align::Start);
+    commands_title.set_margin_top(8);
+
+    let commands_text = "• Generate a new key: `gpg --full-generate-key`\n• Use an existing key from your keyring\n• Import a key: `gpg --import your-key.asc`\n• List keys: `gpg --list-keys`";
+    let commands_label = Label::new(Some(commands_text));
+    commands_label.set_wrap(true);
+    commands_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
+    commands_label.set_justify(gtk4::Justification::Left);
+    commands_label.set_halign(gtk4::Align::Start);
+    commands_label.add_css_class("body");
+    commands_label.add_css_class("monospace");
+
+    instructions_box.append(&intro_label);
+    instructions_box.append(&commands_title);
+    instructions_box.append(&commands_label);
+
+    // Create scrolled window for the instructions
+    let scrolled = ScrolledWindow::new();
+    scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled.set_child(Some(&instructions_box));
+    scrolled.set_size_request(-1, 200);
+    scrolled.add_css_class("card");
+    scrolled.set_margin_top(8);
+    scrolled.set_margin_bottom(8);
+
+    content_box.append(&scrolled);
+
+    // Button box
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::Center);
+
+    // Close button
+    let close_button = Button::new();
+    close_button.set_label("Close");
+    close_button.add_css_class("suggested-action");
+
+    let dialog_clone = dialog.clone();
+    close_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    button_box.append(&close_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows a confirmation dialog for dangerous actions
+/// Takes a callback that will be executed if the user confirms the action
+pub fn show_confirmation_dialog<F>(
+    title: &str,
+    message: &str,
+    confirm_label: &str,
+    parent: Option<&impl IsA<gtk4::Window>>,
+    on_confirm: F,
+) where
+    F: Fn() + 'static,
+{
+    let dialog = Dialog::new();
+    dialog.set_title(Some(title));
+    dialog.set_modal(true);
+    dialog.set_default_size(450, 250);
+    dialog.add_css_class("confirmation-dialog");
+
+    if let Some(parent_window) = parent {
+        dialog.set_transient_for(Some(parent_window));
+    }
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Warning icon and message
+    let message_box = GtkBox::new(Orientation::Horizontal, 12);
+    message_box.set_halign(gtk4::Align::Center);
+
+    // Warning icon
+    let icon = Label::new(Some("⚠️"));
+    icon.add_css_class("title-2");
+    message_box.append(&icon);
+
+    // Message text
+    let message_label = Label::new(Some(message));
+    message_label.set_wrap(true);
+    message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
+    message_label.set_justify(gtk4::Justification::Center);
+    message_label.add_css_class("body");
+    message_box.append(&message_label);
+
+    content_box.append(&message_box);
+
+    // Button box
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::Center);
+
+    // Cancel button
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.add_css_class("flat");
+
+    // Confirm button
+    let confirm_button = Button::new();
+    confirm_button.set_label(confirm_label);
+    confirm_button.add_css_class("destructive-action");
+
+    let dialog_cancel = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_cancel.close();
+    });
+
+    let dialog_confirm = dialog.clone();
+    confirm_button.connect_clicked(move |_| {
+        on_confirm();
+        dialog_confirm.close();
+    });
+
+    button_box.append(&cancel_button);
+    button_box.append(&confirm_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
 }

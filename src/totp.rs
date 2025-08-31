@@ -106,6 +106,32 @@ pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
     Ok((secret_b32, otpauth_uri))
 }
 
+/// Gets the existing TOTP secret and URI for a vault that already has 2FA enabled
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(String, String), Error>` - Returns a tuple containing the base32-encoded secret and the otpauth URI on success, or an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to decrypt the existing TOTP secret or if 2FA is not enabled for the vault.
+pub fn get_totp_qr_info(vault_name: &str) -> Result<(String, String), Error> {
+    let secret_bytes = decrypt_secret(vault_name)?;
+    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret_bytes);
+
+    let issuer = "FMP";
+    let label = format!("{issuer}:{vault_name}");
+    let otpauth_uri = format!(
+        "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
+        urlencoding::encode(&label),
+        secret_b32,
+        urlencoding::encode(issuer)
+    );
+
+    Ok((secret_b32, otpauth_uri))
+}
+
 /// Turns off TOTP for a vault
 ///
 /// # Arguments:
