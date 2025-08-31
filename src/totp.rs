@@ -72,25 +72,22 @@ pub fn is_totp_required(vault_name: &str) -> bool {
     false
 }
 
-/// Enable 2FA for a vault.
+/// Prepare 2FA setup for a vault without immediately enabling it.
+/// This generates the secret and URI but doesn't store anything until confirmed.
 ///
 /// # Arguments:
 /// * `vault_name` - The name of the vault.
 ///
 /// # Returns:
-/// * `Result<(String, String), Error>` - Returns a Base32-encoded secret and an otp URI on success, and an `Error` of failure.
+/// * `Result<(Vec<u8>, String, String), Error>` - Returns the raw secret, Base32-encoded secret and an otp URI on success, and an `Error` of failure.
 ///
 /// # Errors:
-/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, check if a gate exists or add a vault to the ledger.
-pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
-    let locations = Locations::new(vault_name, "");
+/// * Fails when unable to check if a gate exists.
+pub fn prepare_totp_setup(vault_name: &str) -> Result<(Vec<u8>, String, String), Error> {
+    ensure_gate_exists(vault_name)?;
 
     let mut secret = [0u8; 20];
     rng().fill(&mut secret);
-
-    encrypt_and_store_secret(&locations, &secret)?;
-    ensure_gate_exists(vault_name)?;
-    ledger_add(vault_name)?;
 
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
 
@@ -103,6 +100,42 @@ pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
         urlencoding::encode(issuer)
     );
 
+    Ok((secret.to_vec(), secret_b32, otpauth_uri))
+}
+
+/// Confirm and finalize 2FA setup for a vault using a prepared secret.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+/// * `secret` - The raw secret bytes to store.
+///
+/// # Returns:
+/// * `Result<(), Error>` - Returns `Ok(())` on success, and an `Error` of failure.
+///
+/// # Errors:
+/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, or add a vault to the ledger.
+pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> {
+    let locations = Locations::new(vault_name, "");
+
+    encrypt_and_store_secret(&locations, secret)?;
+    ledger_add(vault_name)?;
+
+    Ok(())
+}
+
+/// Enable 2FA for a vault.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(String, String), Error>` - Returns a Base32-encoded secret and an otp URI on success, and an `Error` of failure.
+///
+/// # Errors:
+/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, check if a gate exists or add a vault to the ledger.
+pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
+    let (secret, secret_b32, otpauth_uri) = prepare_totp_setup(vault_name)?;
+    confirm_totp_setup(vault_name, &secret)?;
     Ok((secret_b32, otpauth_uri))
 }
 
@@ -192,6 +225,47 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
     }
 
     secret.zeroize();
+    Ok(valid)
+}
+
+/// Verify a user-provided 6-digit TOTP code using a prepared secret (for setup verification).
+///
+/// # Arguments:
+/// * `secret` - The raw secret bytes.
+/// * `code` - The user imputed 2FA code.
+///
+/// # Returns:
+/// * `Result<bool, Error>` - Returns a `bool` indicating if the code is valid on success, and an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to calculate the time since the Unix Epoch.
+pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
+    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
+    if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
+        return Ok(false);
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow::anyhow!("System time error: {}", e))?
+        .as_secs() as i64;
+
+    let step = 30i64;
+    let digits = 6u32;
+
+    let mut valid = false;
+    for skew in [-1i64, 0, 1] {
+        #[allow(clippy::cast_sign_loss)]
+        let counter = ((now / step) + skew) as u64;
+        let hotp_val = hotp(secret, counter, digits);
+        let candidate = format!("{:0width$}", hotp_val, width = digits as usize);
+        if candidate == code {
+            valid = true;
+            break;
+        }
+    }
+
     Ok(valid)
 }
 

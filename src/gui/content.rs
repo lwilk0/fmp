@@ -1,10 +1,11 @@
 use adw::ButtonContent;
 use adw::prelude::*;
 
-use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog};
-use crate::gui::sidebar::refresh_vaults_section;
+use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog, show_totp_setup_dialog, show_totp_management_dialog, show_backup_vault_dialog, show_restore_vault_dialog, show_delete_backup_dialog, show_rename_vault_dialog, show_delete_vault_dialog, show_rename_account_dialog};
+
 use crate::password::{PasswordConfig, generate_password};
 use crate::totp::{is_totp_required, verify_totp_code, is_totp_enabled};
+use crate::storage::filesystem::{create_backup, install_backup, delete_vault, rename_vault, rename_account, backup_exists, delete_backup, list_backups};
 use crate::vault::{
     Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
     read_directory, update_account, warm_up_gpg,
@@ -177,6 +178,14 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     header_box.append(&title);
     header_box.append(&subtitle);
     main_box.append(&header_box);
+
+    // 2FA Management section
+    let totp_section = create_totp_management_section(content_area, vault_name);
+    main_box.append(&totp_section);
+
+    // Vault Management section
+    let vault_management_section = create_vault_management_section(content_area, vault_name);
+    main_box.append(&vault_management_section);
 
     // Accounts section
     let accounts_section = create_accounts_grid(content_area, vault_name);
@@ -457,6 +466,10 @@ fn create_account_header(
             );
         });
 
+        let rename_button = Button::new();
+        rename_button.set_label("Rename");
+        rename_button.add_css_class("flat");
+
         let delete_button = Button::new();
         delete_button.set_label("Delete");
         delete_button.add_css_class("destructive-action");
@@ -501,7 +514,16 @@ fn create_account_header(
             );
         });
 
+        // Connect rename functionality
+        let content_area_rename = content_area.clone();
+        let vault_name_rename = vault_name.to_string();
+        let account_name_rename = account_name.to_string();
+        rename_button.connect_clicked(move |_| {
+            show_rename_account_dialog(&vault_name_rename, &account_name_rename, &content_area_rename);
+        });
+
         actions_box.append(&edit_button);
+        actions_box.append(&rename_button);
         actions_box.append(&delete_button);
     }
 
@@ -1445,7 +1467,7 @@ fn show_create_vault_view(content_area: &Box) {
                                 .start_child()
                                 .and_then(|child| child.downcast::<Box>().ok())
                             {
-                                refresh_vaults_section(&sidebar, &content_area_clone);
+                                crate::gui::sidebar::refresh_vaults_section(&sidebar, &content_area_clone);
                             }
                         }
                     }
@@ -1558,4 +1580,260 @@ fn find_password_text_view(section: &Box) -> Option<TextView> {
         child = widget.next_sibling();
     }
     None
+}
+
+/// Creates the TOTP (2FA) management section for the vault view
+fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Box {
+    let section = Box::new(Orientation::Vertical, 16);
+    section.set_margin_bottom(20);
+    section.add_css_class("totp-management-section");
+
+    // Check if TOTP is enabled for this vault
+    let is_enabled = is_totp_enabled(vault_name);
+    
+    if is_enabled {
+        // 2FA is enabled - show status card
+        let status_card = Box::new(Orientation::Vertical, 12);
+        status_card.add_css_class("totp-status-card");
+        status_card.add_css_class("totp-enabled");
+        
+        // Header with icon and title
+        let header_box = Box::new(Orientation::Horizontal, 12);
+        
+        let icon_box = Box::new(Orientation::Horizontal, 8);
+        let status_icon = Label::new(Some("🔐"));
+        status_icon.add_css_class("title-2");
+        
+        let title_box = Box::new(Orientation::Vertical, 4);
+        let totp_title = Label::new(Some("Two-Factor Authentication"));
+        totp_title.add_css_class("title-4");
+        totp_title.set_halign(gtk4::Align::Start);
+        
+        let status_label = Label::new(Some("✅ Enabled and active"));
+        status_label.add_css_class("success");
+        status_label.add_css_class("caption");
+        status_label.set_halign(gtk4::Align::Start);
+        
+        title_box.append(&totp_title);
+        title_box.append(&status_label);
+        
+        icon_box.append(&status_icon);
+        icon_box.append(&title_box);
+        icon_box.set_hexpand(true);
+        
+        let manage_button = Button::new();
+        manage_button.set_label("Manage");
+        manage_button.add_css_class("flat");
+        manage_button.set_halign(gtk4::Align::End);
+        manage_button.set_valign(gtk4::Align::Center);
+        
+        // Connect manage button
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        manage_button.connect_clicked(move |_| {
+            show_totp_management_dialog(&vault_name_clone, &content_area_clone);
+        });
+        
+        header_box.append(&icon_box);
+        header_box.append(&manage_button);
+        status_card.append(&header_box);
+        
+        section.append(&status_card);
+    } else {
+        // 2FA is not enabled - show setup card
+        let setup_card = Box::new(Orientation::Vertical, 12);
+        setup_card.add_css_class("totp-status-card");
+        setup_card.add_css_class("totp-disabled");
+        
+        // Header with icon and title
+        let header_box = Box::new(Orientation::Horizontal, 12);
+        
+        let icon_box = Box::new(Orientation::Horizontal, 8);
+        let status_icon = Label::new(Some("🔓"));
+        status_icon.add_css_class("title-2");
+        
+        let title_box = Box::new(Orientation::Vertical, 4);
+        let totp_title = Label::new(Some("Two-Factor Authentication"));
+        totp_title.add_css_class("title-4");
+        totp_title.set_halign(gtk4::Align::Start);
+        
+        let status_label = Label::new(Some("Not enabled"));
+        status_label.add_css_class("dim-label");
+        status_label.add_css_class("caption");
+        status_label.set_halign(gtk4::Align::Start);
+        
+        title_box.append(&totp_title);
+        title_box.append(&status_label);
+        
+        icon_box.append(&status_icon);
+        icon_box.append(&title_box);
+        icon_box.set_hexpand(true);
+        
+        let enable_button = Button::new();
+        enable_button.set_label("Enable 2FA");
+        enable_button.add_css_class("suggested-action");
+        enable_button.set_halign(gtk4::Align::End);
+        enable_button.set_valign(gtk4::Align::Center);
+        
+        // Connect enable button
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        enable_button.connect_clicked(move |_| {
+            show_totp_setup_dialog(&vault_name_clone, &content_area_clone);
+        });
+        
+        header_box.append(&icon_box);
+        header_box.append(&enable_button);
+        setup_card.append(&header_box);
+        
+        // Add description
+        let description = Label::new(Some("Add an extra layer of security to your vault with two-factor authentication"));
+        description.add_css_class("dim-label");
+        description.add_css_class("caption");
+        description.set_halign(gtk4::Align::Start);
+        description.set_wrap(true);
+        description.set_max_width_chars(60);
+        setup_card.append(&description);
+        
+        section.append(&setup_card);
+    }
+
+    // Add separator
+    let separator = Separator::new(Orientation::Horizontal);
+    separator.set_margin_top(8);
+    separator.add_css_class("totp-separator");
+    section.append(&separator);
+
+    section
+}
+
+/// Creates the vault management section with backup and vault operations
+fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Box {
+    let section = Box::new(Orientation::Vertical, 16);
+    section.set_margin_bottom(20);
+    section.add_css_class("vault-management-section");
+
+    // Vault Management Card
+    let management_card = Box::new(Orientation::Vertical, 12);
+    management_card.add_css_class("vault-management-card");
+    
+    // Header with icon and title
+    let header_box = Box::new(Orientation::Horizontal, 12);
+    
+    let icon_box = Box::new(Orientation::Horizontal, 8);
+    let vault_icon = Label::new(Some("🗄️"));
+    vault_icon.add_css_class("title-2");
+    
+    let title_box = Box::new(Orientation::Vertical, 4);
+    let vault_title = Label::new(Some("Vault Management"));
+    vault_title.add_css_class("title-4");
+    vault_title.set_halign(gtk4::Align::Start);
+    
+    let description = Label::new(Some("Backup, restore, rename, and delete vault operations"));
+    description.add_css_class("dim-label");
+    description.add_css_class("caption");
+    description.set_halign(gtk4::Align::Start);
+    
+    title_box.append(&vault_title);
+    title_box.append(&description);
+    
+    icon_box.append(&vault_icon);
+    icon_box.append(&title_box);
+    icon_box.set_hexpand(true);
+    
+    header_box.append(&icon_box);
+    management_card.append(&header_box);
+    
+    // Buttons section
+    let buttons_section = Box::new(Orientation::Vertical, 12);
+    
+    // Backup operations row
+    let backup_row = Box::new(Orientation::Horizontal, 8);
+    backup_row.set_homogeneous(true);
+    
+    let backup_button = Button::new();
+    backup_button.set_label("Create Backup");
+    backup_button.add_css_class("flat");
+    backup_button.set_tooltip_text(Some("Create a backup of this vault"));
+    
+    let restore_button = Button::new();
+    restore_button.set_label("Restore Backup");
+    restore_button.add_css_class("flat");
+    restore_button.set_tooltip_text(Some("Restore vault from backup"));
+    
+    let delete_backup_button = Button::new();
+    delete_backup_button.set_label("Delete Backup");
+    delete_backup_button.add_css_class("flat");
+    delete_backup_button.set_tooltip_text(Some("Delete vault backup"));
+    
+    // Check if backup exists to enable/disable buttons
+    let has_backup = backup_exists(vault_name);
+    restore_button.set_sensitive(has_backup);
+    delete_backup_button.set_sensitive(has_backup);
+    
+    backup_row.append(&backup_button);
+    backup_row.append(&restore_button);
+    backup_row.append(&delete_backup_button);
+    
+    // Vault operations row
+    let vault_row = Box::new(Orientation::Horizontal, 8);
+    vault_row.set_homogeneous(true);
+    
+    let rename_vault_button = Button::new();
+    rename_vault_button.set_label("Rename Vault");
+    rename_vault_button.add_css_class("flat");
+    rename_vault_button.set_tooltip_text(Some("Rename this vault"));
+    
+    let delete_vault_button = Button::new();
+    delete_vault_button.set_label("Delete Vault");
+    delete_vault_button.add_css_class("destructive-action");
+    delete_vault_button.set_tooltip_text(Some("Permanently delete this vault"));
+    
+    vault_row.append(&rename_vault_button);
+    vault_row.append(&delete_vault_button);
+    
+    buttons_section.append(&backup_row);
+    buttons_section.append(&vault_row);
+    management_card.append(&buttons_section);
+    
+    // Connect button signals
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    backup_button.connect_clicked(move |_| {
+        show_backup_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+    
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    restore_button.connect_clicked(move |_| {
+        show_restore_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+    
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    delete_backup_button.connect_clicked(move |_| {
+        show_delete_backup_dialog(&vault_name_clone, &content_area_clone);
+    });
+    
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    rename_vault_button.connect_clicked(move |_| {
+        show_rename_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+    
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    delete_vault_button.connect_clicked(move |_| {
+        show_delete_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+    
+    section.append(&management_card);
+    
+    // Add separator
+    let separator = Separator::new(Orientation::Horizontal);
+    separator.set_margin_top(8);
+    separator.add_css_class("vault-separator");
+    section.append(&separator);
+
+    section
 }
