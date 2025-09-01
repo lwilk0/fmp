@@ -447,7 +447,7 @@ toast.info-toast {
 }
 
 .settings-card {
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: @headerbar_bg_color;
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -482,25 +482,54 @@ toast.info-toast {
 
 /* Loading Overlay Styling */
 .loading-overlay {
-    background-color: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 32px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    min-width: 200px;
-    min-height: 120px;
-}
-
-@media (prefers-color-scheme: dark) {
-    .loading-overlay {
-        background-color: rgba(0, 0, 0, 0.85);
-        border-color: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    }
+    background-color: transparent;
+    border-radius: 16px;
+    padding: 48px;
+    min-width: 280px;
+    min-height: 200px;
+    margin: auto;
 }
 
 .loading-spinner {
-    opacity: 0.8;
+    opacity: 0.9;
+    margin: 0 auto;
+}
+
+/* Custom circular outline spinner animation */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* GTK4 Spinner styling with circular outline */
+spinner {
+    background: transparent;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top: 3px solid @accent_bg_color;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    opacity: 1;
+    /* Hide the default GTK spinner content */
+    color: transparent;
+    -gtk-icon-source: none;
+}
+
+spinner:disabled {
+    opacity: 0.5;
+    animation-play-state: paused;
+}
+
+/* Dark mode spinner styling */
+@media (prefers-color-scheme: dark) {
+    spinner {
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top: 3px solid @accent_bg_color;
+    }
 }
 
 /* Loading Button Styling */
@@ -595,5 +624,28 @@ progressbar trough {
 @media (prefers-color-scheme: dark) {
     progressbar trough {
         background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* GPG Entry Validation Styles */
+entry.success {
+    border-color: #26a269;
+    box-shadow: 0 0 0 1px #26a269;
+}
+
+entry.error {
+    border-color: #e01b24;
+    box-shadow: 0 0 0 1px #e01b24;
+}
+
+@media (prefers-color-scheme: dark) {
+    entry.success {
+        border-color: #2ec27e;
+        box-shadow: 0 0 0 1px #2ec27e;
+    }
+
+    entry.error {
+        border-color: #f66151;
+        box-shadow: 0 0 0 1px #f66151;
     }
 }

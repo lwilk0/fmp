@@ -1,4 +1,4 @@
-use crate::gui::content::{open_vault_with_gate, show_home_view, show_settings_view};
+use crate::gui::content::{open_vault_with_gate, show_home_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
@@ -105,11 +105,9 @@ fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
 
     // Create and pack navigation buttons
     let home_button = create_icon_button("go-home");
-    let settings_button = create_icon_button("settings");
     let search_button = create_icon_button("system-search-symbolic");
 
     header_bar.pack_start(&home_button);
-    header_bar.pack_start(&settings_button);
     header_bar.pack_end(&search_button);
 
     // Connect button callbacks
@@ -119,9 +117,6 @@ fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
     });
 
     let content_area_settings = content_area.clone();
-    settings_button.connect_clicked(move |_| {
-        show_settings_view(&content_area_settings);
-    });
 
     // Search button toggles filter bar visibility
     let filter_bar_clone = filter_bar.clone();
@@ -313,24 +308,4 @@ pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
             }
         }
     }
-}
-
-/// Creates a clickable navigation row
-fn create_clickable_row(label: &str) -> ListBoxRow {
-    let row = ListBoxRow::new();
-    row.set_activatable(true);
-    row.set_selectable(true);
-
-    let box_container = Box::new(Orientation::Horizontal, 8);
-    box_container.set_margin_top(8);
-    box_container.set_margin_bottom(8);
-    box_container.set_margin_start(12);
-    box_container.set_margin_end(12);
-
-    let text_label = Label::new(Some(label));
-    text_label.set_halign(gtk4::Align::Start);
-    box_container.append(&text_label);
-
-    row.set_child(Some(&box_container));
-    row
 }

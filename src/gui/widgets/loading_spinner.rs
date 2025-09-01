@@ -13,19 +13,23 @@ pub struct LoadingOverlay {
 impl LoadingOverlay {
     /// Create a new loading overlay
     pub fn new() -> Self {
-        let overlay_box = Box::new(Orientation::Vertical, 12);
+        let overlay_box = Box::new(Orientation::Vertical, 16);
         overlay_box.set_halign(gtk4::Align::Center);
         overlay_box.set_valign(gtk4::Align::Center);
+        overlay_box.set_hexpand(true);
+        overlay_box.set_vexpand(true);
         overlay_box.add_css_class("loading-overlay");
         overlay_box.set_visible(false);
 
         let spinner = Spinner::new();
-        spinner.set_size_request(48, 48);
+        spinner.set_size_request(64, 64);
         spinner.add_css_class("loading-spinner");
+        spinner.set_halign(gtk4::Align::Center);
 
         let message_label = Label::new(Some("Loading..."));
         message_label.add_css_class("title-4");
         message_label.add_css_class("dim-label");
+        message_label.set_halign(gtk4::Align::Center);
 
         overlay_box.append(&spinner);
         overlay_box.append(&message_label);
