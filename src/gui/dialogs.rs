@@ -1644,3 +1644,451 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
     dialog.set_child(Some(&content_box));
     dialog.present();
 }
+
+/// Shows the add field dialog for adding additional fields to an account
+pub fn show_add_field_dialog(
+    account_rc: &Rc<RefCell<Account>>,
+    content_area: &GtkBox,
+    vault_name: &str,
+) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Add Additional Field"));
+    dialog.set_modal(true);
+    dialog.set_default_size(400, 300);
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title
+    let title_label = Label::new(Some("Add a new field to this account"));
+    title_label.add_css_class("title-4");
+    content_box.append(&title_label);
+
+    // Field name input
+    let name_label = Label::new(Some("Field Name:"));
+    name_label.set_halign(gtk4::Align::Start);
+    name_label.add_css_class("dim-label");
+    content_box.append(&name_label);
+
+    let name_entry = Entry::new();
+    name_entry.set_placeholder_text(Some("e.g., Security Question, PIN, etc."));
+    name_entry.set_hexpand(true);
+    content_box.append(&name_entry);
+
+    // Field value input
+    let value_label = Label::new(Some("Field Value:"));
+    value_label.set_halign(gtk4::Align::Start);
+    value_label.add_css_class("dim-label");
+    value_label.set_margin_top(8);
+    content_box.append(&value_label);
+
+    let value_entry = Entry::new();
+    value_entry.set_placeholder_text(Some("Enter the field value"));
+    value_entry.set_hexpand(true);
+    content_box.append(&value_entry);
+
+    // Buttons
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::End);
+    button_box.set_margin_top(20);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+
+    let add_button = Button::new();
+    add_button.set_label("Add Field");
+    add_button.add_css_class("suggested-action");
+
+    // Connect cancel button
+    let dialog_clone = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    // Connect add button
+    let dialog_clone = dialog.clone();
+    let account_rc_clone = account_rc.clone();
+    let name_entry_clone = name_entry.clone();
+    let value_entry_clone = value_entry.clone();
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    add_button.connect_clicked(move |_| {
+        let field_name = name_entry_clone.text().to_string().trim().to_string();
+        let field_value = value_entry_clone.text().to_string().trim().to_string();
+
+        if !field_name.is_empty() && !field_value.is_empty() {
+            // Check if field name already exists
+            let mut account = account_rc_clone.borrow_mut();
+            if account.additional_fields.contains_key(&field_name) {
+                // Show error - field already exists
+                drop(account); // Release the borrow
+                show_error_dialog(
+                    "Field Already Exists",
+                    &format!(
+                        "A field named \"{}\" already exists. Please choose a different name.",
+                        field_name
+                    ),
+                );
+                return;
+            }
+
+            // Add the new field
+            account.additional_fields.insert(field_name, field_value);
+            account.update_modified_time();
+            let account_name = account.name.clone();
+
+            // Save the account to disk
+            match crate::vault::update_account(&vault_name_clone, &*account) {
+                Ok(()) => {
+                    drop(account); // Release the borrow
+                    dialog_clone.close();
+
+                    // Refresh the account view to show the new field
+                    crate::gui::content::show_account_view_with_mode(
+                        &content_area_clone,
+                        &vault_name_clone,
+                        &account_name,
+                        true, // Keep in edit mode
+                    );
+                }
+                Err(e) => {
+                    drop(account);
+                    eprintln!("Failed to save account: {}", e);
+                    show_error_dialog(
+                        "Save Error",
+                        "Failed to save the new field. Please try again.",
+                    );
+                }
+            }
+        } else {
+            // Show error - empty fields
+            show_error_dialog("Invalid Input", "Both field name and value are required.");
+        }
+    });
+
+    // Allow Enter key to trigger add
+    let add_button_clone = add_button.clone();
+    value_entry.connect_activate(move |_| {
+        add_button_clone.emit_clicked();
+    });
+
+    button_box.append(&cancel_button);
+    button_box.append(&add_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows a simple error dialog
+fn show_error_dialog(title: &str, message: &str) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some(title));
+    dialog.set_modal(true);
+    dialog.set_default_size(300, 150);
+
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    let message_label = Label::new(Some(message));
+    message_label.set_wrap(true);
+    message_label.set_halign(gtk4::Align::Center);
+    content_box.append(&message_label);
+
+    let ok_button = Button::new();
+    ok_button.set_label("OK");
+    ok_button.add_css_class("suggested-action");
+    ok_button.set_halign(gtk4::Align::Center);
+
+    let dialog_clone = dialog.clone();
+    ok_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    content_box.append(&ok_button);
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows the edit field dialog for editing an additional field's name and value
+pub fn show_edit_field_dialog(
+    account_rc: &Rc<RefCell<Account>>,
+    content_area: &GtkBox,
+    vault_name: &str,
+    field_name: &str,
+) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Edit Field"));
+    dialog.set_modal(true);
+    dialog.set_default_size(400, 300);
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title
+    let title_label = Label::new(Some("Edit Field"));
+    title_label.add_css_class("title-4");
+    content_box.append(&title_label);
+
+    // Get current field value
+    let current_value = {
+        let account = account_rc.borrow();
+        account
+            .additional_fields
+            .get(field_name)
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    // Field name section
+    let name_section = GtkBox::new(Orientation::Vertical, 8);
+    let name_label = Label::new(Some("Field Name:"));
+    name_label.add_css_class("dim-label");
+    name_label.set_halign(gtk4::Align::Start);
+
+    let name_entry = Entry::new();
+    name_entry.set_text(field_name);
+    name_entry.set_hexpand(true);
+
+    name_section.append(&name_label);
+    name_section.append(&name_entry);
+    content_box.append(&name_section);
+
+    // Field value section
+    let value_section = GtkBox::new(Orientation::Vertical, 8);
+    let value_label = Label::new(Some("Field Value:"));
+    value_label.add_css_class("dim-label");
+    value_label.set_halign(gtk4::Align::Start);
+
+    let value_entry = Entry::new();
+    value_entry.set_text(&current_value);
+    value_entry.set_hexpand(true);
+
+    value_section.append(&value_label);
+    value_section.append(&value_entry);
+    content_box.append(&value_section);
+
+    // Buttons
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::End);
+    button_box.set_margin_top(20);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+
+    let save_button = Button::new();
+    save_button.set_label("Save");
+    save_button.add_css_class("suggested-action");
+
+    // Connect cancel button
+    let dialog_clone = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    // Connect save button
+    let dialog_clone = dialog.clone();
+    let account_rc_clone = account_rc.clone();
+    let name_entry_clone = name_entry.clone();
+    let value_entry_clone = value_entry.clone();
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    let old_field_name = field_name.to_string();
+    save_button.connect_clicked(move |_| {
+        let new_field_name = name_entry_clone.text().to_string().trim().to_string();
+        let new_field_value = value_entry_clone.text().to_string().trim().to_string();
+
+        if !new_field_name.is_empty() && !new_field_value.is_empty() {
+            let mut account = account_rc_clone.borrow_mut();
+
+            // Check if new field name already exists (and it's different from the old name)
+            if new_field_name != old_field_name
+                && account.additional_fields.contains_key(&new_field_name)
+            {
+                drop(account);
+                show_error_dialog(
+                    "Field Already Exists",
+                    &format!(
+                        "A field named '{}' already exists. Please choose a different name.",
+                        new_field_name
+                    ),
+                );
+                return;
+            }
+
+            // Remove the old field if the name changed
+            if new_field_name != old_field_name {
+                account.additional_fields.remove(&old_field_name);
+            }
+
+            // Add/update the field with the new name and value
+            account
+                .additional_fields
+                .insert(new_field_name, new_field_value);
+            account.update_modified_time();
+            let account_name = account.name.clone();
+
+            // Save the account to disk
+            match crate::vault::update_account(&vault_name_clone, &*account) {
+                Ok(()) => {
+                    drop(account);
+                    dialog_clone.close();
+
+                    // Refresh the account view
+                    crate::gui::content::show_account_view_with_mode(
+                        &content_area_clone,
+                        &vault_name_clone,
+                        &account_name,
+                        true, // Keep in edit mode
+                    );
+                }
+                Err(e) => {
+                    drop(account);
+                    eprintln!("Failed to save account: {}", e);
+                    show_error_dialog(
+                        "Save Error",
+                        "Failed to save the field changes. Please try again.",
+                    );
+                }
+            }
+        } else {
+            show_error_dialog("Invalid Input", "Both field name and value are required.");
+        }
+    });
+
+    // Allow Enter key to trigger save from either entry
+    let save_button_clone = save_button.clone();
+    name_entry.connect_activate(move |_| {
+        save_button_clone.emit_clicked();
+    });
+
+    let save_button_clone2 = save_button.clone();
+    value_entry.connect_activate(move |_| {
+        save_button_clone2.emit_clicked();
+    });
+
+    button_box.append(&cancel_button);
+    button_box.append(&save_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows the delete field confirmation dialog
+pub fn show_delete_field_dialog(
+    account_rc: &Rc<RefCell<Account>>,
+    content_area: &GtkBox,
+    vault_name: &str,
+    field_name: &str,
+) {
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Delete Field"));
+    dialog.set_modal(true);
+    dialog.set_default_size(400, 200);
+
+    // Create main content box
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Warning icon and title
+    let title_box = GtkBox::new(Orientation::Horizontal, 12);
+    title_box.set_halign(gtk4::Align::Center);
+
+    let warning_icon = Label::new(Some("⚠️"));
+    warning_icon.add_css_class("title-2");
+
+    let title_label = Label::new(Some("Delete Field"));
+    title_label.add_css_class("title-3");
+
+    title_box.append(&warning_icon);
+    title_box.append(&title_label);
+    content_box.append(&title_box);
+
+    // Confirmation message
+    let message = format!(
+        "Are you sure you want to delete the field '{}'?\n\nThis action cannot be undone.",
+        field_name
+    );
+    let message_label = Label::new(Some(&message));
+    message_label.set_wrap(true);
+    message_label.set_halign(gtk4::Align::Center);
+    message_label.set_justify(gtk4::Justification::Center);
+    content_box.append(&message_label);
+
+    // Buttons
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::Center);
+    button_box.set_margin_top(20);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+
+    let delete_button = Button::new();
+    delete_button.set_label("Delete");
+    delete_button.add_css_class("destructive-action");
+
+    // Connect cancel button
+    let dialog_clone = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    // Connect delete button
+    let dialog_clone = dialog.clone();
+    let account_rc_clone = account_rc.clone();
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    let field_name_owned = field_name.to_string();
+    delete_button.connect_clicked(move |_| {
+        let mut account = account_rc_clone.borrow_mut();
+        account.additional_fields.remove(&field_name_owned);
+        account.update_modified_time();
+        let account_name = account.name.clone();
+
+        // Save the account to disk
+        match crate::vault::update_account(&vault_name_clone, &*account) {
+            Ok(()) => {
+                drop(account);
+                dialog_clone.close();
+
+                // Refresh the account view
+                crate::gui::content::show_account_view_with_mode(
+                    &content_area_clone,
+                    &vault_name_clone,
+                    &account_name,
+                    true, // Keep in edit mode
+                );
+            }
+            Err(e) => {
+                drop(account);
+                eprintln!("Failed to save account: {}", e);
+                show_error_dialog(
+                    "Save Error",
+                    "Failed to delete the field. Please try again.",
+                );
+            }
+        }
+    });
+
+    button_box.append(&cancel_button);
+    button_box.append(&delete_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
