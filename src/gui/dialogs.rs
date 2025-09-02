@@ -24,93 +24,97 @@ use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
 use std::rc::Rc;
 /// Shows the password generator dialog and updates the provided entry field and account
-pub fn show_password_generator_dialog(entry: &Entry, account_rc: &Rc<RefCell<Account>>) {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("Password Generator"));
-    dialog.set_modal(true);
-    dialog.set_default_size(500, 600);
+pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
+    let generator_dialog = Dialog::new();
+    generator_dialog.set_title(Some("Password Generator"));
+    generator_dialog.set_modal(true);
+    generator_dialog.set_default_size(500, 600);
 
     // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 16);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
+    let main_container = GtkBox::new(Orientation::Vertical, 16);
+    main_container.set_margin_top(20);
+    main_container.set_margin_bottom(20);
+    main_container.set_margin_start(20);
+    main_container.set_margin_end(20);
 
     // Title
-    let title = Label::new(Some("Generate Secure Password"));
-    title.add_css_class("title-2");
-    title.set_halign(gtk4::Align::Center);
-    content_box.append(&title);
+    let dialog_title = Label::new(Some("Generate Secure Password"));
+    dialog_title.add_css_class("title-2");
+    dialog_title.set_halign(gtk4::Align::Center);
+    main_container.append(&dialog_title);
 
     // Password configuration
-    let config = Rc::new(RefCell::new(PasswordConfig::default()));
+    let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
 
     // Length section
-    let length_section = create_length_section(&config);
-    content_box.append(&length_section);
+    let length_section = create_password_length_section(&password_config);
+    main_container.append(&length_section);
 
     // Character types section
-    let char_types_section = create_character_types_section(&config);
-    content_box.append(&char_types_section);
+    let char_types_section = create_character_types_section(&password_config);
+    main_container.append(&char_types_section);
 
     // Additional/Excluded characters section
-    let custom_chars_section = create_custom_characters_section(&config);
-    content_box.append(&custom_chars_section);
+    let custom_chars_section = create_custom_characters_section(&password_config);
+    main_container.append(&custom_chars_section);
 
     // Generated password display
-    let password_display_section =
-        create_password_display_section(&config, Some(entry), Some(account_rc), Some(&dialog));
-    content_box.append(&password_display_section);
+    let password_display_section = create_password_display_section(
+        &password_config,
+        Some(target_entry),
+        Some(account_ref),
+        Some(&generator_dialog),
+    );
+    main_container.append(&password_display_section);
 
-    dialog.set_child(Some(&content_box));
+    generator_dialog.set_child(Some(&main_container));
 
-    dialog.present();
+    generator_dialog.present();
 }
 
 /// Creates the password length configuration section
-fn create_length_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
+fn create_password_length_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section_container = GtkBox::new(Orientation::Vertical, 8);
 
-    let title = Label::new(Some("Password Length"));
-    title.add_css_class("title-4");
-    title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+    let section_title = Label::new(Some("Password Length"));
+    section_title.add_css_class("title-4");
+    section_title.set_halign(gtk4::Align::Start);
+    section_container.append(&section_title);
 
-    let length_box = GtkBox::new(Orientation::Horizontal, 12);
+    let controls_container = GtkBox::new(Orientation::Horizontal, 12);
 
     // Spin button for length
-    let adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
-    let spin_button = SpinButton::new(Some(&adjustment), 1.0, 0);
-    spin_button.set_value(16.0);
+    let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
+    let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);
+    length_spinner.set_value(16.0);
 
-    let config_clone = config.clone();
-    spin_button.connect_value_changed(move |spin| {
-        let mut config = config_clone.borrow_mut();
-        config.length = spin.value() as usize;
+    let config_ref = password_config.clone();
+    length_spinner.connect_value_changed(move |spinner| {
+        let mut config = config_ref.borrow_mut();
+        config.length = spinner.value() as usize;
     });
 
-    let length_label = Label::new(Some("characters"));
-    length_label.add_css_class("dim-label");
+    let units_label = Label::new(Some("characters"));
+    units_label.add_css_class("dim-label");
 
-    length_box.append(&spin_button);
-    length_box.append(&length_label);
-    section.append(&length_box);
+    controls_container.append(&length_spinner);
+    controls_container.append(&units_label);
+    section_container.append(&controls_container);
 
-    section
+    section_container
 }
 
 /// Creates the character types configuration section
-fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
+fn create_character_types_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section_container = GtkBox::new(Orientation::Vertical, 8);
 
-    let title = Label::new(Some("Character Types"));
-    title.add_css_class("title-4");
-    title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+    let section_title = Label::new(Some("Character Types"));
+    section_title.add_css_class("title-4");
+    section_title.set_halign(gtk4::Align::Start);
+    section_container.append(&section_title);
 
     // Create checkboxes for each character type
-    let checkboxes = vec![
+    let character_type_options = vec![
         ("Lowercase letters (a-z)", "include_lowercase", true),
         ("Uppercase letters (A-Z)", "include_uppercase", true),
         ("Numbers (0-9)", "include_numbers", true),
@@ -119,44 +123,44 @@ fn create_character_types_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBo
         ("Extended characters (áéíóú...)", "include_extended", false),
     ];
 
-    for (label_text, field_name, default_value) in checkboxes {
-        let checkbox = CheckButton::new();
-        checkbox.set_label(Some(label_text));
-        checkbox.set_active(default_value);
+    for (option_label, field_name, default_enabled) in character_type_options {
+        let option_checkbox = CheckButton::new();
+        option_checkbox.set_label(Some(option_label));
+        option_checkbox.set_active(default_enabled);
 
-        let config_clone = config.clone();
-        let field_name = field_name.to_string();
-        checkbox.connect_toggled(move |cb| {
-            let mut config = config_clone.borrow_mut();
-            let active = cb.is_active();
-            match field_name.as_str() {
-                "include_lowercase" => config.include_lowercase = active,
-                "include_uppercase" => config.include_uppercase = active,
-                "include_numbers" => config.include_numbers = active,
-                "include_symbols" => config.include_symbols = active,
-                "include_spaces" => config.include_spaces = active,
-                "include_extended" => config.include_extended = active,
+        let config_ref = password_config.clone();
+        let field_name_owned = field_name.to_string();
+        option_checkbox.connect_toggled(move |checkbox| {
+            let mut config = config_ref.borrow_mut();
+            let is_active = checkbox.is_active();
+            match field_name_owned.as_str() {
+                "include_lowercase" => config.include_lowercase = is_active,
+                "include_uppercase" => config.include_uppercase = is_active,
+                "include_numbers" => config.include_numbers = is_active,
+                "include_symbols" => config.include_symbols = is_active,
+                "include_spaces" => config.include_spaces = is_active,
+                "include_extended" => config.include_extended = is_active,
                 _ => {}
             }
         });
 
-        section.append(&checkbox);
+        section_container.append(&option_checkbox);
     }
 
-    section
+    section_container
 }
 
 /// Creates the custom characters configuration section
-fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
+fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
+    let section_container = GtkBox::new(Orientation::Vertical, 8);
 
-    let title = Label::new(Some("Custom Characters"));
-    title.add_css_class("title-4");
-    title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+    let section_title = Label::new(Some("Custom Characters"));
+    section_title.add_css_class("title-4");
+    section_title.set_halign(gtk4::Align::Start);
+    section_container.append(&section_title);
 
     // Additional characters
-    let additional_box = GtkBox::new(Orientation::Vertical, 4);
+    let additional_container = GtkBox::new(Orientation::Vertical, 4);
     let additional_label = Label::new(Some("Additional characters to include:"));
     additional_label.add_css_class("dim-label");
     additional_label.set_halign(gtk4::Align::Start);
@@ -164,18 +168,18 @@ fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Gtk
     let additional_entry = Entry::new();
     additional_entry.set_placeholder_text(Some("e.g., @#$"));
 
-    let config_clone = config.clone();
+    let config_ref = password_config.clone();
     additional_entry.connect_changed(move |entry| {
-        let mut config = config_clone.borrow_mut();
+        let mut config = config_ref.borrow_mut();
         config.additional_characters = entry.text().to_string();
     });
 
-    additional_box.append(&additional_label);
-    additional_box.append(&additional_entry);
-    section.append(&additional_box);
+    additional_container.append(&additional_label);
+    additional_container.append(&additional_entry);
+    section_container.append(&additional_container);
 
     // Excluded characters
-    let excluded_box = GtkBox::new(Orientation::Vertical, 4);
+    let excluded_container = GtkBox::new(Orientation::Vertical, 4);
     let excluded_label = Label::new(Some("Characters to exclude:"));
     excluded_label.add_css_class("dim-label");
     excluded_label.set_halign(gtk4::Align::Start);
@@ -183,103 +187,106 @@ fn create_custom_characters_section(config: &Rc<RefCell<PasswordConfig>>) -> Gtk
     let excluded_entry = Entry::new();
     excluded_entry.set_placeholder_text(Some("e.g., 0O1l"));
 
-    let config_clone = config.clone();
+    let config_ref = password_config.clone();
     excluded_entry.connect_changed(move |entry| {
-        let mut config = config_clone.borrow_mut();
+        let mut config = config_ref.borrow_mut();
         config.excluded_characters = entry.text().to_string();
     });
 
-    excluded_box.append(&excluded_label);
-    excluded_box.append(&excluded_entry);
-    section.append(&excluded_box);
+    excluded_container.append(&excluded_label);
+    excluded_container.append(&excluded_entry);
+    section_container.append(&excluded_container);
 
-    section
+    section_container
 }
 
 /// Creates the password display section
 fn create_password_display_section(
-    config: &Rc<RefCell<PasswordConfig>>,
-    entry: Option<&Entry>,
-    account_rc: Option<&Rc<RefCell<Account>>>,
-    dialog: Option<&Dialog>,
+    password_config: &Rc<RefCell<PasswordConfig>>,
+    target_entry: Option<&Entry>,
+    account_ref: Option<&Rc<RefCell<Account>>>,
+    parent_dialog: Option<&Dialog>,
 ) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
+    let section_container = GtkBox::new(Orientation::Vertical, 8);
 
-    let title = Label::new(Some("Generated Password"));
-    title.add_css_class("title-4");
-    title.set_halign(gtk4::Align::Start);
-    section.append(&title);
+    let section_title = Label::new(Some("Generated Password"));
+    section_title.add_css_class("title-4");
+    section_title.set_halign(gtk4::Align::Start);
+    section_container.append(&section_title);
 
     // Text view for password display
-    let text_view = TextView::new();
-    text_view.set_editable(false);
-    text_view.set_cursor_visible(false);
-    text_view.set_wrap_mode(gtk4::WrapMode::Char);
-    text_view.set_size_request(-1, 80);
-    text_view.add_css_class("password-display");
+    let password_display = TextView::new();
+    password_display.set_editable(false);
+    password_display.set_cursor_visible(false);
+    password_display.set_wrap_mode(gtk4::WrapMode::Char);
+    password_display.set_size_request(-1, 80);
+    password_display.add_css_class("password-display");
 
-    // Set monospace font
-    let buffer = text_view.buffer();
-    buffer.set_text("Click 'Generate Password' to create a password");
+    // Set initial text
+    let display_buffer = password_display.buffer();
+    display_buffer.set_text("Click 'Generate Password' to create a password");
 
-    let scrolled = ScrolledWindow::new();
-    scrolled.set_policy(PolicyType::Automatic, PolicyType::Automatic);
-    scrolled.set_child(Some(&text_view));
-    scrolled.set_size_request(-1, 100);
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Automatic, PolicyType::Automatic);
+    scrolled_window.set_child(Some(&password_display));
+    scrolled_window.set_size_request(-1, 100);
 
-    section.append(&scrolled);
+    section_container.append(&scrolled_window);
 
     // Button container
-    let button_box = GtkBox::new(Orientation::Horizontal, 8);
-    button_box.set_halign(gtk4::Align::Center);
+    let button_container = GtkBox::new(Orientation::Horizontal, 8);
+    button_container.set_halign(gtk4::Align::Center);
 
     // Generate button
     let generate_button = Button::new();
     generate_button.set_label("Generate Password");
     generate_button.add_css_class("suggested-action");
 
-    let text_view_clone = text_view.clone();
-    let config_clone = config.clone();
+    let display_ref = password_display.clone();
+    let config_ref = password_config.clone();
     generate_button.connect_clicked(move |_| {
-        let config = config_clone.borrow();
+        let config = config_ref.borrow();
         match generate_password(&*config) {
-            Ok(password) => {
-                let buffer = text_view_clone.buffer();
-                buffer.set_text(&password);
+            Ok(generated_password) => {
+                let buffer = display_ref.buffer();
+                buffer.set_text(&generated_password);
             }
-            Err(e) => {
-                eprintln!("Failed to generate password: {}", e);
-                let buffer = text_view_clone.buffer();
+            Err(error_message) => {
+                eprintln!("Failed to generate password: {}", error_message);
+                let buffer = display_ref.buffer();
                 buffer.set_text("Error generating password");
             }
         }
     });
 
-    button_box.append(&generate_button);
+    button_container.append(&generate_button);
 
     // Add Use and Cancel buttons only if we have the necessary parameters
-    if let (Some(entry), Some(account_rc), Some(dialog)) = (entry, account_rc, dialog) {
+    if let (Some(entry), Some(account_rc), Some(dialog)) =
+        (target_entry, account_ref, parent_dialog)
+    {
         // Use button
         let use_button = Button::new();
         use_button.set_label("Use");
         use_button.add_css_class("flat");
 
-        let text_view_use = text_view.clone();
-        let entry_clone = entry.clone();
-        let account_rc_clone = account_rc.clone();
-        let dialog_clone = dialog.clone();
+        let display_use_ref = password_display.clone();
+        let entry_ref = entry.clone();
+        let account_use_ref = account_rc.clone();
+        let dialog_ref = dialog.clone();
         use_button.connect_clicked(move |_| {
-            let buffer = text_view_use.buffer();
-            let start = buffer.start_iter();
-            let end = buffer.end_iter();
-            let password = buffer.text(&start, &end, false);
+            let buffer = display_use_ref.buffer();
+            let start_iter = buffer.start_iter();
+            let end_iter = buffer.end_iter();
+            let generated_password = buffer.text(&start_iter, &end_iter, false);
 
-            if !password.is_empty() && password != "Click 'Generate Password' to create a password"
+            if !generated_password.is_empty()
+                && generated_password != "Click 'Generate Password' to create a password"
             {
-                entry_clone.set_text(&password);
-                let mut account = account_rc_clone.borrow_mut();
-                account.password.update(password.to_string());
-                dialog_clone.close();
+                entry_ref.set_text(&generated_password);
+                let mut account = account_use_ref.borrow_mut();
+                account.password.update(generated_password.to_string());
+                dialog_ref.close();
             }
         });
 
@@ -288,17 +295,17 @@ fn create_password_display_section(
         cancel_button.set_label("Cancel");
         cancel_button.add_css_class("flat");
 
-        let dialog_cancel = dialog.clone();
+        let dialog_cancel_ref = dialog.clone();
         cancel_button.connect_clicked(move |_| {
-            dialog_cancel.close();
+            dialog_cancel_ref.close();
         });
 
-        button_box.append(&use_button);
-        button_box.append(&cancel_button);
+        button_container.append(&use_button);
+        button_container.append(&cancel_button);
     }
 
-    section.append(&button_box);
-    section
+    section_container.append(&button_container);
+    section_container
 }
 
 /// Checks if this is the first run of the application
@@ -330,59 +337,59 @@ fn get_config_file_path() -> PathBuf {
 
 /// Shows the welcome dialog for first-time users
 pub fn show_welcome_dialog() {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("Welcome to Forgot My Password"));
-    dialog.set_modal(true);
-    dialog.set_default_size(650, 550);
-    dialog.add_css_class("welcome-dialog");
+    let welcome_dialog = Dialog::new();
+    welcome_dialog.set_title(Some("Welcome to Forgot My Password"));
+    welcome_dialog.set_modal(true);
+    welcome_dialog.set_default_size(650, 550);
+    welcome_dialog.add_css_class("welcome-dialog");
 
     // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 24);
-    content_box.set_margin_top(32);
-    content_box.set_margin_bottom(32);
-    content_box.set_margin_start(32);
-    content_box.set_margin_end(32);
+    let main_container = GtkBox::new(Orientation::Vertical, 24);
+    main_container.set_margin_top(32);
+    main_container.set_margin_bottom(32);
+    main_container.set_margin_start(32);
+    main_container.set_margin_end(32);
 
     // Welcome title with icon
-    let title_box = GtkBox::new(Orientation::Horizontal, 12);
-    title_box.set_halign(gtk4::Align::Center);
+    let title_container = GtkBox::new(Orientation::Horizontal, 12);
+    title_container.set_halign(gtk4::Align::Center);
 
-    let icon = Label::new(Some("🔐"));
-    icon.add_css_class("title-1");
+    let title_icon = Label::new(Some("🔐"));
+    title_icon.add_css_class("title-1");
 
-    let title = Label::new(Some("Welcome to Forgot My Password!"));
-    title.add_css_class("title-1");
+    let dialog_title = Label::new(Some("Welcome to Forgot My Password!"));
+    dialog_title.add_css_class("title-1");
 
-    title_box.append(&icon);
-    title_box.append(&title);
-    content_box.append(&title_box);
+    title_container.append(&title_icon);
+    title_container.append(&dialog_title);
+    main_container.append(&title_container);
 
     // Welcome message
-    let welcome_text = "Thank you for choosing Forgot My Password (FMP) - your secure password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
+    let welcome_message_text = "Thank you for choosing Forgot My Password (FMP) - your secure password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
 
-    let message_label = Label::new(Some(welcome_text));
-    message_label.set_wrap(true);
-    message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    message_label.set_justify(gtk4::Justification::Left);
-    message_label.set_halign(gtk4::Align::Fill);
-    message_label.set_valign(gtk4::Align::Start);
-    message_label.add_css_class("body");
+    let welcome_message_label = Label::new(Some(welcome_message_text));
+    welcome_message_label.set_wrap(true);
+    welcome_message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
+    welcome_message_label.set_justify(gtk4::Justification::Left);
+    welcome_message_label.set_halign(gtk4::Align::Fill);
+    welcome_message_label.set_valign(gtk4::Align::Start);
+    welcome_message_label.add_css_class("body");
 
     // Create scrolled window for the message
-    let scrolled = ScrolledWindow::new();
-    scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled.set_child(Some(&message_label));
-    scrolled.set_size_request(-1, 320);
-    scrolled.add_css_class("card");
-    scrolled.set_margin_top(8);
-    scrolled.set_margin_bottom(8);
+    let message_scrolled_window = ScrolledWindow::new();
+    message_scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    message_scrolled_window.set_child(Some(&welcome_message_label));
+    message_scrolled_window.set_size_request(-1, 320);
+    message_scrolled_window.add_css_class("card");
+    message_scrolled_window.set_margin_top(8);
+    message_scrolled_window.set_margin_bottom(8);
 
-    content_box.append(&scrolled);
+    main_container.append(&message_scrolled_window);
 
     // Button box
-    let button_box = GtkBox::new(Orientation::Horizontal, 16);
-    button_box.set_halign(gtk4::Align::Center);
-    button_box.set_margin_top(8);
+    let button_container = GtkBox::new(Orientation::Horizontal, 16);
+    button_container.set_halign(gtk4::Align::Center);
+    button_container.set_margin_top(8);
 
     // Learn More about GPG button
     let learn_more_button = Button::new();
@@ -401,51 +408,51 @@ pub fn show_welcome_dialog() {
     get_started_button.add_css_class("pill");
     get_started_button.set_size_request(140, -1);
 
-    let dialog_clone = dialog.clone();
+    let dialog_ref = welcome_dialog.clone();
     get_started_button.connect_clicked(move |_| {
         // Mark first run as complete
-        if let Err(e) = mark_first_run_complete() {
-            eprintln!("Failed to mark first run complete: {}", e);
+        if let Err(error_message) = mark_first_run_complete() {
+            eprintln!("Failed to mark first run complete: {}", error_message);
         }
-        dialog_clone.close();
+        dialog_ref.close();
     });
 
-    button_box.append(&learn_more_button);
-    button_box.append(&get_started_button);
-    content_box.append(&button_box);
+    button_container.append(&learn_more_button);
+    button_container.append(&get_started_button);
+    main_container.append(&button_container);
 
-    dialog.set_child(Some(&content_box));
-    dialog.present();
+    welcome_dialog.set_child(Some(&main_container));
+    welcome_dialog.present();
 }
 
 /// Shows the GPG information dialog with setup instructions
 fn show_gpg_info_dialog() {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("GPG Setup Information"));
-    dialog.set_modal(true);
-    dialog.set_default_size(550, 400);
-    dialog.add_css_class("info-dialog");
+    let info_dialog = Dialog::new();
+    info_dialog.set_title(Some("GPG Setup Information"));
+    info_dialog.set_modal(true);
+    info_dialog.set_default_size(550, 400);
+    info_dialog.add_css_class("info-dialog");
 
     // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 20);
-    content_box.set_margin_top(24);
-    content_box.set_margin_bottom(24);
-    content_box.set_margin_start(24);
-    content_box.set_margin_end(24);
+    let main_container = GtkBox::new(Orientation::Vertical, 20);
+    main_container.set_margin_top(24);
+    main_container.set_margin_bottom(24);
+    main_container.set_margin_start(24);
+    main_container.set_margin_end(24);
 
     // Title with icon
-    let title_box = GtkBox::new(Orientation::Horizontal, 12);
-    title_box.set_halign(gtk4::Align::Center);
+    let title_container = GtkBox::new(Orientation::Horizontal, 12);
+    title_container.set_halign(gtk4::Align::Center);
 
-    let icon = Label::new(Some("🔑"));
-    icon.add_css_class("title-2");
+    let title_icon = Label::new(Some("🔑"));
+    title_icon.add_css_class("title-2");
 
-    let title = Label::new(Some("Setting up GPG"));
-    title.add_css_class("title-2");
+    let dialog_title = Label::new(Some("Setting up GPG"));
+    dialog_title.add_css_class("title-2");
 
-    title_box.append(&icon);
-    title_box.append(&title);
-    content_box.append(&title_box);
+    title_container.append(&title_icon);
+    title_container.append(&dialog_title);
+    main_container.append(&title_container);
 
     // GPG instructions with better formatting
     let instructions_box = GtkBox::new(Orientation::Vertical, 16);
@@ -486,7 +493,7 @@ fn show_gpg_info_dialog() {
     scrolled.set_margin_top(8);
     scrolled.set_margin_bottom(8);
 
-    content_box.append(&scrolled);
+    main_container.append(&scrolled);
 
     // Button box
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
@@ -497,16 +504,16 @@ fn show_gpg_info_dialog() {
     close_button.set_label("Close");
     close_button.add_css_class("suggested-action");
 
-    let dialog_clone = dialog.clone();
+    let info_dialog_clone = info_dialog.clone();
     close_button.connect_clicked(move |_| {
-        dialog_clone.close();
+        info_dialog_clone.close();
     });
 
     button_box.append(&close_button);
-    content_box.append(&button_box);
+    main_container.append(&button_box);
 
-    dialog.set_child(Some(&content_box));
-    dialog.present();
+    info_dialog.set_child(Some(&main_container));
+    info_dialog.present();
 }
 
 /// Shows a confirmation dialog for dangerous actions

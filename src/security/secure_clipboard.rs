@@ -21,30 +21,31 @@ use crate::crypto::{lock_memory, secure_overwrite, unlock_memory};
 
 /// A secure string wrapper specifically for clipboard operations
 pub struct SecureClipboardString {
-    inner: String,
+    inner_content: String,
 }
 
 impl SecureClipboardString {
-    pub(crate) fn new(password: String) -> Self {
-        lock_memory(password.as_bytes());
-        Self { inner: password }
+    pub(crate) fn new(clipboard_content: String) -> Self {
+        lock_memory(clipboard_content.as_bytes());
+        Self {
+            inner_content: clipboard_content,
+        }
     }
 
     pub fn as_str(&self) -> &str {
-        &self.inner
+        &self.inner_content
     }
 }
 
 impl Drop for SecureClipboardString {
     fn drop(&mut self) {
         // Unlock memory before zeroization
-        unlock_memory(self.inner.as_bytes());
+        unlock_memory(self.inner_content.as_bytes());
 
-        // The ZeroizeOnDrop will handle the actual zeroization
-        // but we add extra security measures
+        // Add extra security measures for secure overwriting
         unsafe {
-            let bytes = self.inner.as_bytes_mut();
-            secure_overwrite(bytes);
+            let content_bytes = self.inner_content.as_bytes_mut();
+            secure_overwrite(content_bytes);
         }
     }
 }
@@ -53,6 +54,6 @@ impl std::ops::Deref for SecureClipboardString {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.inner_content
     }
 }

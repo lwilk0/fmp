@@ -192,7 +192,7 @@
 }
 
 .qr-container {
-    background-color: @card_bg_color;
+    background-color: @headerbar_bg_color;
     border-radius: 12px;
     padding: 12px;
     margin: 8px;
@@ -246,7 +246,7 @@
 }
 
 .totp-status-card {
-    background-color: @card_bg_color;
+    background-color: @headerbar_bg_color;
     border-radius: 12px;
     padding: 16px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -395,7 +395,7 @@ button.flat:hover {
 }
 
 .vault-management-card {
-    background-color: @card_bg_color;
+    background-color: @headerbar_bg_color;
     border-radius: 12px;
     padding: 16px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);

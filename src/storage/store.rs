@@ -29,8 +29,8 @@ use zeroize::Zeroize;
 
 /// Handles GPG encryption and decryption operations for account data
 pub struct Store {
-    pub ctx: Context,
-    pub locations: Locations,
+    pub gpg_context: Context,
+    pub storage_locations: Locations,
 }
 
 impl Store {
@@ -46,10 +46,13 @@ impl Store {
     /// # Errors
     /// * If the GPGME context cannot be created or if the locations cannot be initialized, an error is returned.
     pub fn new(vault_name: &str, account_name: &str) -> Result<Self, Error> {
-        let ctx = Context::from_protocol(Protocol::OpenPgp)?;
-        let locations = Locations::new(vault_name, account_name);
+        let gpg_context = Context::from_protocol(Protocol::OpenPgp)?;
+        let storage_locations = Locations::new(vault_name, account_name);
 
-        Ok(Self { ctx, locations })
+        Ok(Self {
+            gpg_context,
+            storage_locations,
+        })
     }
 
     /// Encrypts an `Account` struct and writes it to the data.gpg file in the vault.
@@ -62,46 +65,46 @@ impl Store {
     ///
     /// # Errors
     /// * If the recipient cannot be found, if the file cannot be created, or if encryption fails.
-    pub fn encrypt_account_to_file(&mut self, account: &Account) -> Result<(), Error> {
+    pub fn encrypt_account_to_file(&mut self, account_data: &Account) -> Result<(), Error> {
         // Serialize the account to JSON
-        let json_data = serde_json::to_string(account)?;
-        let mut data = json_data.into_bytes();
+        let serialized_json = serde_json::to_string(account_data)?;
+        let mut account_bytes = serialized_json.into_bytes();
 
-        lock_memory(data.as_slice());
+        lock_memory(account_bytes.as_slice());
 
-        let recipient = read_to_string(&self.locations.recipient)?
+        let recipient_id = read_to_string(&self.storage_locations.recipient)?
             .trim()
             .to_string();
-        let recipient_key = self.ctx.get_key(&recipient).map_err(|e| {
+        let recipient_key = self.gpg_context.get_key(&recipient_id).map_err(|error| {
             anyhow::anyhow!(
                 "Failed to find recipient `{}` for encryption. Error: {}",
-                recipient,
-                e
+                recipient_id,
+                error
             )
         })?;
 
-        let mut file = File::create(&self.locations.data)?;
+        let mut output_file = File::create(&self.storage_locations.data)?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+            output_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
         }
 
-        let mut output = Vec::new();
-        self.ctx
-            .encrypt([&recipient_key], &data, &mut output)
-            .map_err(|e| {
+        let mut encrypted_output = Vec::new();
+        self.gpg_context
+            .encrypt([&recipient_key], &account_bytes, &mut encrypted_output)
+            .map_err(|encryption_error| {
                 anyhow::anyhow!(
                     "Failed to encrypt data for recipient `{}`. Error: {}",
-                    recipient,
-                    e
+                    recipient_id,
+                    encryption_error
                 )
             })?;
 
-        file.write_all(&output)?;
+        output_file.write_all(&encrypted_output)?;
 
-        data.zeroize();
+        account_bytes.zeroize();
 
         Ok(())
     }
@@ -114,27 +117,29 @@ impl Store {
     /// # Errors
     /// * If the file cannot be opened, if decryption fails, or if JSON parsing fails.
     pub fn decrypt_account_from_file(&mut self) -> Result<Account, Error> {
-        let mut encrypted_data = Vec::new();
-        let file = File::open(&self.locations.data)?;
+        let mut encrypted_file_data = Vec::new();
+        let input_file = File::open(&self.storage_locations.data)?;
 
-        let mut reader = BufReader::new(file);
-        reader.read_to_end(&mut encrypted_data)?;
+        let mut file_reader = BufReader::new(input_file);
+        file_reader.read_to_end(&mut encrypted_file_data)?;
 
-        let mut output = Vec::new();
-        self.ctx
-            .decrypt(&encrypted_data, &mut output)
-            .map_err(|e| anyhow::anyhow!("Failed to decrypt data. Error: {}", e))?;
+        let mut decrypted_output = Vec::new();
+        self.gpg_context
+            .decrypt(&encrypted_file_data, &mut decrypted_output)
+            .map_err(|decryption_error| {
+                anyhow::anyhow!("Failed to decrypt data. Error: {}", decryption_error)
+            })?;
 
         // Lock the decrypted buffer to reduce swap risk
-        lock_memory(&output);
+        lock_memory(&decrypted_output);
 
         // Try to parse as JSON first (new format)
-        let account = if let Ok(json_str) = String::from_utf8(output.clone()) {
-            if let Ok(account) = serde_json::from_str::<Account>(&json_str) {
-                account
+        let account_data = if let Ok(json_string) = String::from_utf8(decrypted_output.clone()) {
+            if let Ok(parsed_account) = serde_json::from_str::<Account>(&json_string) {
+                parsed_account
             } else {
                 // Fallback to old format parsing
-                self.parse_legacy_format(&output)?
+                self.parse_legacy_format(&decrypted_output)?
             }
         } else {
             return Err(anyhow::anyhow!(
@@ -143,33 +148,33 @@ impl Store {
         };
 
         // Zeroize decrypted buffer
-        output.zeroize();
+        decrypted_output.zeroize();
 
-        Ok(account)
+        Ok(account_data)
     }
 
     /// Parses legacy format (username:password) into an Account struct
-    fn parse_legacy_format(&self, data: &[u8]) -> Result<Account, Error> {
+    fn parse_legacy_format(&self, legacy_data: &[u8]) -> Result<Account, Error> {
         // Parse "username:password" using the first ':' only
-        let sep = data
+        let separator_position = legacy_data
             .iter()
-            .position(|&b| b == b':')
+            .position(|&byte| byte == b':')
             .ok_or_else(|| anyhow::anyhow!("Decrypted data is malformed: missing separator"))?;
 
-        let username_bytes = &data[..sep];
-        let password_bytes = &data[sep + 1..];
+        let username_bytes = &legacy_data[..separator_position];
+        let password_bytes = &legacy_data[separator_position + 1..];
 
-        let username = String::from_utf8(username_bytes.to_vec())?;
-        let mut password = String::from_utf8(password_bytes.to_vec())?;
+        let parsed_username = String::from_utf8(username_bytes.to_vec())?;
+        let mut parsed_password = String::from_utf8(password_bytes.to_vec())?;
 
-        let mut account = Account::default();
-        account.username = username;
-        account.password = SecurePassword::new(password.clone());
-        account.name = "Migrated Account".to_string();
+        let mut migrated_account = Account::default();
+        migrated_account.username = parsed_username;
+        migrated_account.password = SecurePassword::new(parsed_password.clone());
+        migrated_account.name = "Migrated Account".to_string();
 
         // Zeroize the temporary password string
-        password.zeroize();
+        parsed_password.zeroize();
 
-        Ok(account)
+        Ok(migrated_account)
     }
 }

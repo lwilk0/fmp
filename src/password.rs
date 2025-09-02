@@ -36,60 +36,60 @@ impl Default for PasswordConfig {
 /// Generates a random password based on the provided configuration.
 ///
 /// # Arguments
-/// * `config` - The password generation configuration
+/// * `password_config` - The password generation configuration
 ///
 /// # Returns
 /// * `Result<String, String>` - The generated password or an error message
-pub fn generate_password(config: &PasswordConfig) -> Result<String, String> {
-    let mut pool = String::new();
+pub fn generate_password(password_config: &PasswordConfig) -> Result<String, String> {
+    let mut character_pool = String::new();
 
-    if config.include_lowercase {
-        pool.push_str("abcdefghijklmnopqrstuvwxyz");
+    if password_config.include_lowercase {
+        character_pool.push_str("abcdefghijklmnopqrstuvwxyz");
     }
-    if config.include_uppercase {
-        pool.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    if password_config.include_uppercase {
+        character_pool.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
     }
-    if config.include_numbers {
-        pool.push_str("0123456789");
+    if password_config.include_numbers {
+        character_pool.push_str("0123456789");
     }
-    if config.include_symbols {
-        pool.push_str("!\"#%&'()*+,-./:;<=>?@[\\]^_`{|}-");
+    if password_config.include_symbols {
+        character_pool.push_str("!\"#%&'()*+,-./:;<=>?@[\\]^_`{|}-");
     }
-    if config.include_spaces {
-        pool.push(' ');
+    if password_config.include_spaces {
+        character_pool.push(' ');
     }
-    if config.include_extended {
-        pool.push_str("áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ");
+    if password_config.include_extended {
+        character_pool.push_str("áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ");
     }
 
-    let mut base: HashSet<char> = pool.chars().collect();
-    let include: HashSet<char> = config.additional_characters.chars().collect();
-    let exclude: HashSet<char> = config.excluded_characters.chars().collect();
+    let mut base_character_set: HashSet<char> = character_pool.chars().collect();
+    let additional_chars: HashSet<char> = password_config.additional_characters.chars().collect();
+    let excluded_chars: HashSet<char> = password_config.excluded_characters.chars().collect();
 
     // Remove excluded characters
-    for ch in &exclude {
-        base.remove(ch);
+    for character in &excluded_chars {
+        base_character_set.remove(character);
     }
 
     // Add additional characters
-    for &ch in &include {
-        base.insert(ch);
+    for &character in &additional_chars {
+        base_character_set.insert(character);
     }
 
-    let pool_vec: Vec<char> = base.into_iter().collect();
+    let available_characters: Vec<char> = base_character_set.into_iter().collect();
 
-    if pool_vec.is_empty() {
+    if available_characters.is_empty() {
         return Err("No characters available for password generation".to_string());
     }
 
-    if config.length == 0 {
+    if password_config.length == 0 {
         return Err("Password length must be greater than 0".to_string());
     }
 
-    let mut rng = thread_rng();
-    let password: String = (0..config.length)
-        .map(|_| *pool_vec.choose(&mut rng).unwrap())
+    let mut random_generator = thread_rng();
+    let generated_password: String = (0..password_config.length)
+        .map(|_| *available_characters.choose(&mut random_generator).unwrap())
         .collect();
 
-    Ok(password)
+    Ok(generated_password)
 }

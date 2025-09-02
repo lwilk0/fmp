@@ -37,8 +37,8 @@ use std::io::{BufReader, Read, Write};
 /// * If the vault does not exist, if the account does not exist, or if decryption fails.
 pub fn get_full_account_details(vault_name: &str, account_name: &str) -> Result<Account, Error> {
     let mut store = Store::new(vault_name, account_name)?;
-    store.locations.does_vault_exist()?;
-    store.locations.does_account_exist()?;
+    store.storage_locations.does_vault_exist()?;
+    store.storage_locations.does_account_exist()?;
 
     let account = store.decrypt_account_from_file()?;
     Ok(account)
@@ -57,8 +57,8 @@ pub fn get_full_account_details(vault_name: &str, account_name: &str) -> Result<
 /// * If the vault does not exist, if the account directory cannot be created, or if encryption fails.
 pub fn create_account(vault_name: &str, account: &Account) -> Result<(), Error> {
     let mut store = Store::new(vault_name, &account.name)?;
-    store.locations.does_vault_exist()?;
-    store.locations.create_account_directory()?;
+    store.storage_locations.does_vault_exist()?;
+    store.storage_locations.create_account_directory()?;
     store.encrypt_account_to_file(account)?;
     Ok(())
 }
@@ -76,8 +76,8 @@ pub fn create_account(vault_name: &str, account: &Account) -> Result<(), Error> 
 /// * If the vault does not exist, if the account does not exist, or if encryption fails.
 pub fn update_account(vault_name: &str, account: &Account) -> Result<(), Error> {
     let mut store = Store::new(vault_name, &account.name)?;
-    store.locations.does_vault_exist()?;
-    store.locations.does_account_exist()?;
+    store.storage_locations.does_vault_exist()?;
+    store.storage_locations.does_account_exist()?;
     store.encrypt_account_to_file(account)?;
     Ok(())
 }
@@ -166,11 +166,11 @@ pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
 /// * If the vault does not exist, if the account does not exist, or if the account directory cannot be removed.
 pub fn delete_account(vault_name: &str, account_name: &str) -> Result<(), Error> {
     let store = Store::new(vault_name, account_name)?;
-    store.locations.does_vault_exist()?;
-    store.locations.does_account_exist()?;
+    store.storage_locations.does_vault_exist()?;
+    store.storage_locations.does_account_exist()?;
 
     // Remove the entire account directory
-    remove_dir_all(&store.locations.account)?;
+    remove_dir_all(&store.storage_locations.account)?;
 
     Ok(())
 }
