@@ -78,7 +78,7 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     let scrollable_content = Box::new(Orientation::Vertical, 0);
 
     // Add sidebar title and divider to scrollable content
-    let title_section = create_title_section(content_area);
+    let title_section = create_title_section();
     scrollable_content.append(&title_section);
 
     // Add filter bar to scrollable content
@@ -116,8 +116,6 @@ fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
         show_home_view(&content_area_home);
     });
 
-    let content_area_settings = content_area.clone();
-
     // Search button toggles filter bar visibility
     let filter_bar_clone = filter_bar.clone();
     search_button.connect_clicked(move |_| {
@@ -129,7 +127,7 @@ fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
 }
 
 /// Creates a title section with divider and add vault button
-fn create_title_section(content_area: &Box) -> Box {
+fn create_title_section() -> Box {
     let title_box = Box::new(Orientation::Vertical, 0);
 
     // Header with title and add button

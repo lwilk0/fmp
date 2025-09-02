@@ -160,11 +160,11 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
 
     // Vault title with description
     let header_box = Box::new(Orientation::Vertical, 8);
-    let title = Label::new(Some(vault_name));
+    let title = Label::new(Some(&format!("🔐 {}", vault_name)));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Start);
 
-    let subtitle = Label::new(Some("Manage your accounts and passwords"));
+    let subtitle = Label::new(Some("Secure vault for managing your accounts and passwords"));
     subtitle.add_css_class("dim-label");
     subtitle.set_halign(gtk4::Align::Start);
 
@@ -461,6 +461,7 @@ fn create_account_header(
     if !edit_mode {
         let edit_button = Button::new();
         edit_button.set_label("Edit");
+        edit_button.set_tooltip_text(Some("Edit account"));
         edit_button.add_css_class("suggested-action");
 
         // Connect edit functionality
@@ -478,10 +479,12 @@ fn create_account_header(
 
         let rename_button = Button::new();
         rename_button.set_label("Rename");
-        rename_button.add_css_class("flat");
+        rename_button.set_tooltip_text(Some("Rename account"));
+        rename_button.add_css_class("suggested-action");
 
         let delete_button = Button::new();
         delete_button.set_label("Delete");
+        delete_button.set_tooltip_text(Some("Delete account"));
         delete_button.add_css_class("destructive-action");
 
         // Connect delete functionality with confirmation dialog
@@ -555,12 +558,18 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     header_box.set_margin_start(24);
     header_box.set_margin_end(24);
 
-    // Section title
+    // Section title with subtitle
     let title = Label::new(Some("Account Details"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
 
+    let subtitle = Label::new(Some("Basic account information and credentials"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
     header_box.append(&title);
+    header_box.append(&subtitle);
     section.append(&header_box);
 
     // Details grid
@@ -615,15 +624,27 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     header_box.set_margin_start(24);
     header_box.set_margin_end(24);
 
+    let title_box = Box::new(Orientation::Vertical, 4);
+    title_box.set_hexpand(true);
+
     let title = Label::new(Some("Password"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
 
+    let subtitle = Label::new(Some("Account password and security"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    title_box.append(&title);
+    title_box.append(&subtitle);
+
     let generate_button = Button::new();
     generate_button.set_label("Generate New");
-    generate_button.add_css_class("flat");
+    generate_button.add_css_class("suggested-action");
+    generate_button.set_valign(gtk4::Align::Center);
 
-    header_box.append(&title);
+    header_box.append(&title_box);
     if edit_mode {
         header_box.append(&generate_button);
     }
@@ -750,6 +771,7 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     section
 }
 
+#[allow(clippy::too_many_lines)]
 /// Creates the additional fields section
 fn create_additional_fields_section(
     account_rc: &Rc<RefCell<Account>>, 
@@ -761,20 +783,32 @@ fn create_additional_fields_section(
     section.add_css_class("account-section");
     section.set_margin_top(16);
 
-    // Section title with add button
-    let header_box = Box::new(Orientation::Vertical, 12);
+    // Section title with add button in horizontal layout
+    let header_box = Box::new(Orientation::Horizontal, 12);
     header_box.set_margin_top(20);
     header_box.set_margin_bottom(0);
     header_box.set_margin_start(24);
     header_box.set_margin_end(24);
 
+    let title_box = Box::new(Orientation::Vertical, 4);
+    title_box.set_hexpand(true);
+
     let title = Label::new(Some("Additional Fields"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
 
+    let subtitle = Label::new(Some("Custom fields for additional account information"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    title_box.append(&title);
+    title_box.append(&subtitle);
+
     let add_button = Button::new();
     add_button.set_label("Add Field");
-    add_button.add_css_class("flat");
+    add_button.add_css_class("suggested-action");
+    add_button.set_valign(gtk4::Align::Center);
 
     // Connect the add field button
     if edit_mode {
@@ -786,15 +820,15 @@ fn create_additional_fields_section(
         });
     }
 
-    header_box.append(&title);
+    header_box.append(&title_box);
     if edit_mode {
         header_box.append(&add_button);
     }
 
     section.append(&header_box);
 
-    // Additional fields from account data
-    let fields_box = Box::new(Orientation::Vertical, 12);
+    // Additional fields with styling similar to password panel
+    let fields_box = Box::new(Orientation::Vertical, 8);
     fields_box.set_margin_bottom(20);
     fields_box.set_margin_start(24);
     fields_box.set_margin_end(24);
@@ -802,26 +836,122 @@ fn create_additional_fields_section(
 
     let account = account_rc.borrow();
     for (field_name, field_value) in &account.additional_fields {
-        let field_row = if edit_mode {
-            create_editable_additional_field_row(
-                field_name, 
-                field_value, 
-                &account_rc, 
-                content_area, 
-                vault_name
-            )
-        } else {
-            create_field_row(field_name, field_value, true)
-        };
-        fields_box.append(&field_row);
+        // Create a vertical box for each field (field name + field controls)
+        let field_container = Box::new(Orientation::Vertical, 4);
+        
+        // Field name label
+        let field_label = Label::new(Some(field_name));
+        field_label.add_css_class("field-label");
+        field_label.set_halign(gtk4::Align::Start);
+        field_label.set_margin_start(4);
+        
+        // Create a horizontal box for the field controls (similar to password_box)
+        let field_box = Box::new(Orientation::Horizontal, 8);
+        field_box.set_halign(gtk4::Align::Center);
+
+        let field_entry = Entry::new();
+        field_entry.set_text(field_value);
+        field_entry.set_editable(edit_mode);
+        field_entry.set_hexpand(true);
+        field_entry.add_css_class("password-field");
+        field_entry.set_placeholder_text(Some(&format!("Enter {}", field_name.to_lowercase())));
+
+        // Connect field changes in edit mode
+        if edit_mode {
+            let account_rc_field = account_rc.clone();
+            let field_name_clone = field_name.clone();
+            field_entry.connect_changed(move |entry| {
+                let text = entry.text().to_string();
+                let mut account = account_rc_field.borrow_mut();
+                account.additional_fields.insert(field_name_clone.clone(), text);
+            });
+        }
+
+        // Copy button for the field
+        let copy_button = Button::new();
+        let copy_button_content = ButtonContent::builder()
+            .icon_name("edit-copy-symbolic")
+            .build();
+        copy_button.set_child(Some(&copy_button_content));
+        copy_button.add_css_class("flat");
+        copy_button.set_tooltip_text(Some(&format!("Copy {}", field_name)));
+
+        // Add copy functionality
+        let field_value_copy = field_value.clone();
+        copy_button.connect_clicked(move |button| {
+            let display = button.display();
+            let clipboard = display.clipboard();
+            clipboard.set_text(&field_value_copy);
+
+            // Schedule clipboard clearing after 30 seconds for security
+            let clipboard_clone = clipboard.clone();
+            glib::timeout_add_seconds_local(30, move || {
+                clipboard_clone.set_text("");
+                glib::ControlFlow::Break
+            });
+        });
+
+        field_box.append(&field_entry);
+        field_box.append(&copy_button);
+
+        // Add edit/delete buttons in edit mode
+        if edit_mode {
+            let edit_button = Button::new();
+            let edit_button_content = ButtonContent::builder()
+                .icon_name("document-edit-symbolic")
+                .build();
+            edit_button.set_child(Some(&edit_button_content));
+            edit_button.add_css_class("flat");
+            edit_button.set_tooltip_text(Some("Edit field"));
+
+            let delete_button = Button::new();
+            let delete_button_content = ButtonContent::builder()
+                .icon_name("user-trash-symbolic")
+                .build();
+            delete_button.set_child(Some(&delete_button_content));
+            delete_button.add_css_class("flat");
+            delete_button.add_css_class("destructive-action");
+            delete_button.set_tooltip_text(Some("Delete field"));
+
+            // Connect edit functionality
+            let account_rc_edit = account_rc.clone();
+            let content_area_edit = content_area.clone();
+            let vault_name_edit = vault_name.to_string();
+            let field_name_edit = field_name.clone();
+            edit_button.connect_clicked(move |_| {
+                show_edit_field_dialog(&account_rc_edit, &content_area_edit, &field_name_edit, &vault_name_edit);
+            });
+
+            // Connect delete functionality
+            let account_rc_delete = account_rc.clone();
+            let content_area_delete = content_area.clone();
+            let vault_name_delete = vault_name.to_string();
+            let field_name_delete = field_name.clone();
+            delete_button.connect_clicked(move |_| {
+                show_delete_field_dialog(&account_rc_delete, &content_area_delete, &field_name_delete, &vault_name_delete);
+            });
+
+            field_box.append(&edit_button);
+            field_box.append(&delete_button);
+        }
+
+        field_container.append(&field_label);
+        field_container.append(&field_box);
+        fields_box.append(&field_container);
     }
 
     // If no additional fields, show a placeholder
     if account.additional_fields.is_empty() {
+        let placeholder_box = Box::new(Orientation::Horizontal, 8);
+        placeholder_box.set_halign(gtk4::Align::Center);
+        
         let placeholder = Label::new(Some("No additional fields"));
         placeholder.add_css_class("dim-label");
         placeholder.set_halign(gtk4::Align::Start);
-        fields_box.append(&placeholder);
+        placeholder.set_hexpand(true);
+        
+        placeholder_box.append(&placeholder);
+        fields_box.append(&placeholder_box);
     }
 
     section.append(&fields_box);
@@ -844,7 +974,13 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
 
+    let subtitle = Label::new(Some("Additional notes and information"));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+
     header_box.append(&title);
+    header_box.append(&subtitle);
     section.append(&header_box);
 
     let notes_box = Box::new(Orientation::Vertical, 12);
@@ -1364,7 +1500,7 @@ fn create_welcome_section() -> Box {
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Center);
 
-    let subtitle = Label::new(Some("Secure Password Manager"));
+    let subtitle = Label::new(Some("A Safe, Secure Password Manager"));
     subtitle.add_css_class("title-3");
     subtitle.add_css_class("dim-label");
     subtitle.set_halign(gtk4::Align::Center);
@@ -1850,12 +1986,6 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Box {
         
         section.append(&setup_card);
     }
-
-    // Add separator
-    let separator = Separator::new(Orientation::Horizontal);
-    separator.set_margin_top(8);
-    separator.add_css_class("totp-separator");
-    section.append(&separator);
 
     section
 }

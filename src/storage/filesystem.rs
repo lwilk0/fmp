@@ -157,6 +157,9 @@ pub fn delete_vault(vault_name: &str) -> Result<(), Error> {
         remove_dir_all(&backup_path)?;
     }
 
+    // Remove vault from stats file
+    remove_vault_from_stats(vault_name)?;
+
     Ok(())
 }
 
@@ -323,6 +326,35 @@ pub fn delete_backup(vault_name: &str) -> Result<(), Error> {
     }
 
     remove_dir_all(&backup_path)?;
+
+    Ok(())
+}
+
+/// Removes a vault from the vault statistics file
+///
+/// # Arguments
+/// * `vault_name` - The name of the vault to remove from stats
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure
+fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
+    use std::fs;
+
+    let locations = Locations::new("", "");
+    let stats_file = locations.fmp.join("vault_stats.txt");
+
+    if !stats_file.exists() {
+        return Ok(()); // No stats file, nothing to remove
+    }
+
+    let content = fs::read_to_string(&stats_file)?;
+    let updated_content: String = content
+        .lines()
+        .filter(|line| !line.starts_with(&format!("{}:", vault_name)))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    fs::write(&stats_file, updated_content)?;
 
     Ok(())
 }
