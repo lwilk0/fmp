@@ -160,7 +160,7 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
 
     // Vault title with description
     let header_box = Box::new(Orientation::Vertical, 8);
-    let title = Label::new(Some(&format!("🔐 {}", vault_name)));
+    let title = Label::new(Some(vault_name));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Start);
 
@@ -1131,126 +1131,6 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     row_box
 }
 
-/// Creates an editable additional field row with edit and delete functionality
-fn create_editable_additional_field_row(
-    field_name: &str,
-    field_value: &str,
-    account_rc: &Rc<RefCell<Account>>,
-    content_area: &Box,
-    vault_name: &str,
-) -> Box {
-    let row_box = Box::new(Orientation::Horizontal, 12);
-    row_box.set_halign(gtk4::Align::Fill);
-
-    // Field name label
-    let name_label = Label::new(Some(field_name));
-    name_label.add_css_class("dim-label");
-    name_label.set_halign(gtk4::Align::Start);
-    name_label.set_size_request(150, -1);
-
-    // Value entry (editable)
-    let value_entry = Entry::new();
-    value_entry.set_text(field_value);
-    value_entry.set_hexpand(true);
-
-    // Update the field value when changed (in memory only)
-    let account_rc_clone = account_rc.clone();
-    let field_name_owned = field_name.to_string();
-    value_entry.connect_changed(move |entry| {
-        let mut account = account_rc_clone.borrow_mut();
-        let new_value = entry.text().to_string();
-        account.additional_fields.insert(field_name_owned.clone(), new_value);
-    });
-
-    // Save when Enter is pressed
-    let account_rc_clone2 = account_rc.clone();
-    let field_name_owned2 = field_name.to_string();
-    let vault_name_owned = vault_name.to_string();
-    value_entry.connect_activate(move |entry| {
-        let mut account = account_rc_clone2.borrow_mut();
-        let new_value = entry.text().to_string();
-        account.additional_fields.insert(field_name_owned2.clone(), new_value);
-        account.update_modified_time();
-        
-        // Save the account to disk
-        if let Err(e) = crate::vault::update_account(&vault_name_owned, &*account) {
-            eprintln!("Failed to save account field change: {}", e);
-        }
-    });
-
-    // Action buttons container
-    let actions_box = Box::new(Orientation::Horizontal, 4);
-
-    // Copy button
-    let copy_button = Button::new();
-    let copy_button_content = ButtonContent::builder()
-        .icon_name("edit-copy-symbolic")
-        .build();
-    copy_button.set_child(Some(&copy_button_content));
-    copy_button.add_css_class("flat");
-    copy_button.set_tooltip_text(Some("Copy to clipboard"));
-
-    let value_entry_clone = value_entry.clone();
-    copy_button.connect_clicked(move |button| {
-        let display = button.display();
-        let clipboard = display.clipboard();
-        let text = value_entry_clone.text().to_string();
-        clipboard.set_text(&text);
-
-        // Schedule clipboard clearing after 60 seconds
-        let clipboard_clone = clipboard.clone();
-        glib::timeout_add_seconds_local(60, move || {
-            clipboard_clone.set_text("");
-            glib::ControlFlow::Break
-        });
-    });
-
-    // Edit button (to rename the field)
-    let edit_button = Button::new();
-    let edit_button_content = ButtonContent::builder()
-        .icon_name("document-edit-symbolic")
-        .build();
-    edit_button.set_child(Some(&edit_button_content));
-    edit_button.add_css_class("flat");
-    edit_button.set_tooltip_text(Some("Edit field name"));
-
-    let account_rc_clone = account_rc.clone();
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    let field_name_owned = field_name.to_string();
-    edit_button.connect_clicked(move |_| {
-        show_edit_field_dialog(&account_rc_clone, &content_area_clone, &vault_name_clone, &field_name_owned);
-    });
-
-    // Delete button
-    let delete_button = Button::new();
-    let delete_button_content = ButtonContent::builder()
-        .icon_name("user-trash-symbolic")
-        .build();
-    delete_button.set_child(Some(&delete_button_content));
-    delete_button.add_css_class("flat");
-    delete_button.add_css_class("destructive-action");
-    delete_button.set_tooltip_text(Some("Delete field"));
-
-    let account_rc_clone = account_rc.clone();
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    let field_name_owned = field_name.to_string();
-    delete_button.connect_clicked(move |_| {
-        show_delete_field_dialog(&account_rc_clone, &content_area_clone, &vault_name_clone, &field_name_owned);
-    });
-
-    actions_box.append(&copy_button);
-    actions_box.append(&edit_button);
-    actions_box.append(&delete_button);
-
-    row_box.append(&name_label);
-    row_box.append(&value_entry);
-    row_box.append(&actions_box);
-
-    row_box
-}
-
 /// Creates a password field row with show/hide functionality for account creation
 fn create_password_field_row(
     label_text: &str,
@@ -1777,23 +1657,6 @@ fn show_create_vault_view(content_area: &Box) {
     content_area.append(&main_box);
 }
 
-/// Gets the usage count for a specific vault
-fn get_vault_usage_count(vault_name: &str) -> u32 {
-    let stats_file = get_vault_stats_file();
-
-    if let Ok(content) = fs::read_to_string(&stats_file) {
-        for line in content.lines() {
-            if let Some((name, count_str)) = line.split_once(':') {
-                if name == vault_name {
-                    return count_str.parse().unwrap_or(0);
-                }
-            }
-        }
-    }
-
-    0
-}
-
 /// Increments the usage count for a vault
 pub fn increment_vault_usage(vault_name: &str) {
     let stats_file = get_vault_stats_file();
@@ -1857,24 +1720,10 @@ fn get_most_used_vault() -> String {
     }
 }
 
-/// Helper function to find the password text view in the display section
-fn find_password_text_view(section: &Box) -> Option<TextView> {
-    let mut child = section.first_child();
-    while let Some(widget) = child {
-        if let Ok(scrolled) = widget.clone().downcast::<ScrolledWindow>() {
-            if let Some(text_view) = scrolled.child().and_then(|c| c.downcast::<TextView>().ok()) {
-                return Some(text_view);
-            }
-        }
-        child = widget.next_sibling();
-    }
-    None
-}
 
 /// Creates the TOTP (2FA) management section for the vault view
 fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
-    section.set_margin_bottom(20);
     section.add_css_class("totp-management-section");
 
     // Check if TOTP is enabled for this vault

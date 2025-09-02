@@ -242,7 +242,7 @@
 }
 
 .totp-management-section {
-    margin-bottom: 16px;
+    margin-bottom: 0px;
 }
 
 .totp-status-card {
@@ -251,14 +251,6 @@
     padding: 16px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.totp-status-card.totp-enabled {
-    border-left: 4px solid @success_color;
-}
-
-.totp-status-card.totp-disabled {
-    border-left: 4px solid @warning_color;
 }
 
 .dialog-title-container {
