@@ -536,3 +536,26 @@ fn ledger_remove(vault: &str) -> Result<(), Error> {
     }
     Ok(())
 }
+
+/// Updates the TOTP ledgers when a vault is renamed
+///
+/// # Arguments:
+/// * `old_name` - The old name of the vault
+/// * `new_name` - The new name of the vault
+///
+/// # Returns:
+/// * `Result<(), Error>` - Ok on success, Err for IO errors
+///
+/// # Errors:
+/// * Returns an error if a ledger file or directory cannot be written/created
+pub fn update_totp_ledgers_on_rename(old_name: &str, new_name: &str) -> Result<(), Error> {
+    for p in [ledger_path_config(), ledger_path_data()] {
+        let mut set = load_ledger_at(&p);
+        if set.remove(old_name) {
+            // Only add the new name if the old name was present
+            set.insert(new_name.to_string());
+            save_ledger_at(&p, &set)?;
+        }
+    }
+    Ok(())
+}

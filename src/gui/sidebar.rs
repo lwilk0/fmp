@@ -2,7 +2,7 @@ use crate::gui::content::{open_vault_with_gate, show_home_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
-use adw::{ButtonContent, HeaderBar};
+use adw::{ButtonContent, HeaderBar, ToastOverlay};
 use gtk4::{
     Box, Button, Entry, Label, ListBoxRow, Orientation, Paned, PolicyType, ScrolledWindow,
     Separator,
@@ -21,10 +21,19 @@ fn get_vaults_directory() -> PathBuf {
 /// Reads available vaults from the vaults directory
 pub fn get_available_vaults() -> Vec<String> {
     let vaults_dir = get_vaults_directory();
-    read_directory(&vaults_dir).unwrap_or_else(|_| {
-        eprintln!("Failed to read vaults directory: {}", vaults_dir.display());
+    println!("Reading vaults from directory: {}", vaults_dir.display());
+
+    let result = read_directory(&vaults_dir).unwrap_or_else(|e| {
+        eprintln!(
+            "Failed to read vaults directory: {} - Error: {}",
+            vaults_dir.display(),
+            e
+        );
         Vec::new()
-    })
+    });
+
+    println!("Found {} vaults: {:?}", result.len(), result);
+    result
 }
 
 /// Creates a paned layout with sidebar that can update the main content
@@ -208,6 +217,8 @@ pub fn create_icon_button(icon_name: &str) -> Button {
 
 /// Creates a section with buttons for each available vault
 fn create_vaults_section(content_area: &Box, filter: &str) -> Box {
+    println!("create_vaults_section called with filter: '{}'", filter);
+
     let vaults_box = Box::new(Orientation::Vertical, 4);
     vaults_box.set_margin_top(8);
     vaults_box.set_margin_start(16);
@@ -218,12 +229,15 @@ fn create_vaults_section(content_area: &Box, filter: &str) -> Box {
     let all_vaults = get_available_vaults();
     let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
 
+    println!("After filtering: {} vaults", filtered_vaults.len());
+
     if filtered_vaults.is_empty() {
         let message = if filter.is_empty() {
             "No vaults found"
         } else {
             "No vaults match your search"
         };
+        println!("Showing empty message: {}", message);
         let no_vaults_label = Label::new(Some(message));
         no_vaults_label.add_css_class("dim-label");
         no_vaults_label.add_css_class("sidebar-empty-message");
@@ -231,6 +245,7 @@ fn create_vaults_section(content_area: &Box, filter: &str) -> Box {
         no_vaults_label.set_margin_top(16);
         vaults_box.append(&no_vaults_label);
     } else {
+        println!("Creating buttons for vaults: {:?}", filtered_vaults);
         for vault_name in filtered_vaults {
             let vault_button = create_vault_button(vault_name, content_area);
             vaults_box.append(&vault_button);
@@ -268,6 +283,39 @@ fn create_vault_button(vault_name: &str, content_area: &Box) -> Button {
     button
 }
 
+/// Finds the sidebar widget from the content area by traversing up the widget hierarchy
+pub fn find_sidebar_from_content_area(content_area: &Box) -> Option<Box> {
+    // Traverse up: content_area -> main_content -> paned -> get start_child (sidebar)
+    if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok()) {
+        if let Some(paned) = main_content
+            .parent()
+            .and_then(|p| p.downcast::<Paned>().ok())
+        {
+            if let Some(sidebar) = paned.start_child().and_then(|c| c.downcast::<Box>().ok()) {
+                return Some(sidebar);
+            }
+        }
+    }
+    None
+}
+
+/// Refreshes the sidebar from the content area (convenience function)
+pub fn refresh_sidebar_from_content_area(content_area: &Box) {
+    // Find the paned widget and replace the sidebar entirely
+    if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok()) {
+        if let Some(paned) = main_content
+            .parent()
+            .and_then(|p| p.downcast::<Paned>().ok())
+        {
+            // Create a new sidebar
+            let new_sidebar = create_sidebar_with_callbacks(content_area);
+
+            // Replace the old sidebar with the new one
+            paned.set_start_child(Some(&new_sidebar));
+        }
+    }
+}
+
 /// Refreshes the vaults section in the sidebar
 pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
     // Find the scrolled window in the sidebar
@@ -279,6 +327,23 @@ pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
         {
+            // Find the filter bar to get current filter text
+            let mut current_filter = String::new();
+            let mut filter_child = scrollable_content.first_child();
+            while let Some(widget) = filter_child {
+                if let Some(filter_box) = widget.clone().downcast::<Box>().ok() {
+                    // Check if this box contains an Entry (filter bar)
+                    if let Some(entry) = filter_box
+                        .first_child()
+                        .and_then(|child| child.downcast::<Entry>().ok())
+                    {
+                        current_filter = entry.text().to_string();
+                        break;
+                    }
+                }
+                filter_child = widget.next_sibling();
+            }
+
             // Find the vaults section (should be the last child)
             if let Some(vaults_section) = scrollable_content
                 .last_child()
@@ -286,24 +351,36 @@ pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
             {
                 // Clear existing vault buttons
                 let mut child = vaults_section.first_child();
+                let mut removed_count = 0;
                 while let Some(widget) = child {
                     let next_child = widget.next_sibling();
                     vaults_section.remove(&widget);
+                    removed_count += 1;
                     child = next_child;
                 }
+                println!("Removed {} existing vault widgets", removed_count);
 
-                // Recreate the vault buttons with updated vault list
-                let new_vaults_section = create_vaults_section(content_area, "");
+                // Recreate the vault buttons with updated vault list, preserving filter
+                let new_vaults_section = create_vaults_section(content_area, &current_filter);
 
                 // Move all children from new_vaults_section to vaults_section
                 let mut new_child = new_vaults_section.first_child();
+                let mut added_count = 0;
                 while let Some(widget) = new_child {
                     let next_child = widget.next_sibling();
                     new_vaults_section.remove(&widget);
                     vaults_section.append(&widget);
+                    added_count += 1;
                     new_child = next_child;
                 }
+                println!("Added {} new vault widgets", added_count);
+            } else {
+                println!("Could not find vaults section");
             }
+        } else {
+            println!("Could not find scrollable content");
         }
+    } else {
+        println!("Could not find scrolled window");
     }
 }

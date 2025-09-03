@@ -18,6 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::storage::locations::Locations;
+use crate::totp::update_totp_ledgers_on_rename;
 use anyhow::Error;
 use fs_extra::dir::{CopyOptions, copy};
 use std::fs::{create_dir_all, read_dir, remove_dir_all, rename};
@@ -198,6 +199,12 @@ pub fn rename_vault(old_name: &str, new_name: &str) -> Result<(), Error> {
         rename(&old_backup, &new_backup)?;
     }
 
+    // Update vault stats file to reflect the new name
+    update_vault_stats_on_rename(old_name, new_name)?;
+
+    // Update TOTP ledgers to reflect the new name
+    update_totp_ledgers_on_rename(old_name, new_name)?;
+
     Ok(())
 }
 
@@ -351,6 +358,42 @@ fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
     let updated_content: String = content
         .lines()
         .filter(|line| !line.starts_with(&format!("{}:", vault_name)))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    fs::write(&stats_file, updated_content)?;
+
+    Ok(())
+}
+
+/// Updates the vault statistics file when a vault is renamed
+///
+/// # Arguments
+/// * `old_name` - The old name of the vault
+/// * `new_name` - The new name of the vault
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure
+fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Error> {
+    use std::fs;
+
+    let locations = Locations::new("", "");
+    let stats_file = locations.fmp.join("vault_stats.txt");
+
+    if !stats_file.exists() {
+        return Ok(()); // No stats file, nothing to update
+    }
+
+    let content = fs::read_to_string(&stats_file)?;
+    let updated_content: String = content
+        .lines()
+        .map(|line| {
+            if line.starts_with(&format!("{}:", old_name)) {
+                line.replace(&format!("{}:", old_name), &format!("{}:", new_name))
+            } else {
+                line.to_string()
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
 

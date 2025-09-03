@@ -779,6 +779,8 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                             match disable_totp(&vault_name_clone2) {
                                 Ok(()) => {
                                     dialog_clone2.close();
+                                    // Refresh sidebar to update 2FA status indicator
+                                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2);
                                     // Refresh the vault view to update 2FA status
                                     crate::gui::content::show_vault_view(&content_area_clone2, &vault_name_clone2);
                                 }
@@ -1454,9 +1456,10 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match rename_vault(&vault_name_clone, &new_name) {
                 Ok(()) => {
                     dialog_clone.close();
+                    // Refresh sidebar to show new name
+                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
                     // Navigate to the renamed vault
                     crate::gui::content::show_vault_view(&content_area_clone, &new_name);
-                    // TODO: Refresh sidebar to show new name
                 }
                 Err(e) => {
                     eprintln!("Failed to rename vault: {}", e);
@@ -1550,9 +1553,10 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match delete_vault(&vault_name_clone) {
                 Ok(()) => {
                     dialog_clone.close();
+                    // Refresh sidebar to remove deleted vault
+                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
                     // Navigate back to home view
                     crate::gui::content::show_home_view(&content_area_clone);
-                    // TODO: Refresh sidebar to remove deleted vault
                 }
                 Err(e) => {
                     eprintln!("Failed to delete vault: {}", e);

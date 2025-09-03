@@ -23,10 +23,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+// Global counter for tracking vault loading operations
+static VAULT_LOADING_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Shows the home view in the content area
 pub fn show_home_view(content_area: &Box) {
     clear_content(content_area);
+    
+    // Cancel any pending vault loading operations
+    VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst);
 
     // Create scrolled window for the home content
     let scrolled_window = ScrolledWindow::new();
@@ -139,6 +146,9 @@ fn show_error_message(content_area: &Box, title: &str, message: &str) {
 pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     clear_content(content_area);
 
+    // Increment the loading counter to cancel any previous loading operations
+    let current_loading_id = VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
+
     // Increment usage count for this vault
     increment_vault_usage(vault_name);
 
@@ -191,6 +201,14 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     let loading_overlay_clone = loading_overlay.clone();
     
     glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+        // Check if this loading operation is still the current one
+        let current_counter = VAULT_LOADING_COUNTER.load(Ordering::SeqCst);
+        if current_loading_id != current_counter {
+            // This loading operation has been superseded, cancel it
+            loading_overlay_clone.hide();
+            return glib::ControlFlow::Break;
+        }
+
         // Accounts section
         let accounts_section = create_accounts_grid(&content_area_clone, &vault_name_clone);
         main_box_clone.append(&accounts_section);
@@ -1621,22 +1639,8 @@ fn show_create_vault_view(content_area: &Box) {
             move || {
                 match create_vault(&vault_name, &recipient) {
                     Ok(()) => {
-                        // Try to refresh the sidebar
-                        if let Some(window) = content_area_clone
-                            .root()
-                            .and_then(|root| root.downcast::<gtk4::Window>().ok())
-                        {
-                            if let Some(child) = window.child() {
-                                if let Some(paned) = child.downcast::<gtk4::Paned>().ok() {
-                                    if let Some(sidebar) = paned
-                                        .start_child()
-                                        .and_then(|child| child.downcast::<Box>().ok())
-                                    {
-                                        crate::gui::sidebar::refresh_vaults_section(&sidebar, &content_area_clone);
-                                    }
-                                }
-                            }
-                        }
+                        // Refresh sidebar to show new vault
+                        crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
                         // Show the new vault with gate logic
                         open_vault_with_gate(&content_area_clone, &vault_name);
                     }
