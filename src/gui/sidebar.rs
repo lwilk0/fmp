@@ -36,7 +36,7 @@ pub fn get_available_vaults() -> Vec<String> {
     result
 }
 
-/// Creates a paned layout with sidebar that can update the main content
+/// Creates a responsive paned layout with sidebar that can update the main content
 pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box) -> Paned {
     let sidebar = create_sidebar_with_callbacks(content_area);
 
@@ -45,7 +45,8 @@ pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box
     paned.set_end_child(Some(main_content));
     paned.set_position(SIDEBAR_WIDTH);
     paned.set_shrink_start_child(false);
-    paned.set_resize_start_child(false);
+    paned.set_resize_start_child(true); // Allow sidebar to be resized
+    paned.set_wide_handle(true); // Make the handle easier to grab
 
     paned
 }
@@ -61,14 +62,15 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     // Create vault buttons section (initially unfiltered)
     let vaults_section = create_vaults_section(content_area, "");
 
-    // Create filter bar (visible by default)
+    // Create filter bar (visible by default) - responsive to sidebar width
     let filter_bar = create_filter_bar("", "Search vaults...", true);
     filter_bar.set_visible(true);
-    filter_bar.set_margin_start(16);
-    filter_bar.set_margin_end(16);
+    filter_bar.set_margin_start(12);
+    filter_bar.set_margin_end(12);
     filter_bar.set_margin_top(8);
     filter_bar.set_margin_bottom(8);
     filter_bar.set_halign(gtk4::Align::Fill);
+    filter_bar.set_hexpand(true);
 
     // Connect filter bar to update vaults section
     connect_filter_to_vaults(&filter_bar, &vaults_section, content_area);

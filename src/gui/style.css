@@ -2,7 +2,8 @@
 .sidebar {
     background-color: #2d3142;
     border-right: 1px solid #4f5b66;
-    min-width: 250px;
+    min-width: 200px;
+    max-width: 400px;
 }
 
 .sidebar-title {
@@ -28,6 +29,8 @@
     padding: 10px 14px;
     font-size: 0.95em;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    min-width: 180px;
+    transition: all 0.2s ease;
 }
 
 .sidebar-search-entry:focus {
@@ -39,6 +42,10 @@
 
 .sidebar-search-entry placeholder {
     color: rgba(255, 255, 255, 0.65);
+}
+
+.sidebar-filter-bar {
+    transition: all 0.2s ease;
 }
 
 /* Vault Button Styling */
@@ -118,6 +125,82 @@
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 6px;
     padding: 8px;
+}
+
+/* Password field styling */
+.password-field {
+    font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
+    font-size: 1.1em;
+    min-height: 44px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: @headerbar_bg_color;
+    transition: all 0.2s ease;
+}
+
+.password-field:focus {
+    border-color: @accent_color;
+    box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.2);
+}
+
+/* Notes field styling */
+.notes-field {
+    font-size: 1.05em;
+    min-height: 44px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: @headerbar_bg_color;
+    transition: all 0.2s ease;
+}
+
+.notes-field:focus {
+    border-color: @accent_color;
+    box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.2);
+}
+
+/* Password generator dialog styling */
+.password-generator-dialog {
+    border-radius: 12px;
+    animation: dialog-fade-in 0.2s ease-out;
+}
+
+@keyframes dialog-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Password strength indicator styling */
+.password-strength {
+    border-radius: 6px;
+    min-height: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.strength-weak {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.strength-fair {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.strength-good {
+    background: linear-gradient(90deg, #f1c40f, #f39c12);
+}
+
+.strength-strong {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
 }
 
 /* 2FA/TOTP Styling */
@@ -337,6 +420,96 @@ button.flat {
 button.flat:hover {
     background-color: rgba(0, 0, 0, 0.05);
     transform: translateY(-1px);
+}
+
+button.success {
+    background: linear-gradient(135deg, @success_color, shade(@success_color, 0.9));
+    color: white;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+/* Account card styling */
+.account-card {
+    transition: all 0.2s ease;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.account-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.account-card label {
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.account-card .title-4 {
+    line-height: 1.3;
+    margin-bottom: 6px;
+    padding: 0 4px;
+}
+
+.account-card .caption {
+    font-size: 0.9em;
+    line-height: 1.2;
+    padding: 0 4px;
+}
+
+/* Field row styling for better text layout */
+.account-section entry.flat {
+    background-color: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 44px;
+    font-size: 1.1em;
+    transition: all 0.2s ease;
+}
+
+.account-section entry.flat:focus {
+    border-color: @accent_color;
+    box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.2);
+}
+
+.account-section label {
+    font-weight: 500;
+    min-width: 160px;
+    font-size: 1.05em;
+    padding: 4px 0;
+}
+
+/* Responsive text handling */
+.title-1 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.title-4 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.dim-label {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.caption {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.body {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 
 /* Step-by-step styling for 2FA setup */

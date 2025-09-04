@@ -133,9 +133,10 @@ fn show_error_message(content_area: &Box, title: &str, message: &str) {
 
     let error_message = Label::new(Some(message));
     error_message.set_wrap(true);
-    error_message.set_max_width_chars(60);
+    error_message.set_max_width_chars(80); // Increased from 60
     error_message.set_halign(gtk4::Align::Center);
     error_message.add_css_class("dim-label");
+    error_message.set_justify(gtk4::Justification::Center);
 
     main_box.append(&error_title);
     main_box.append(&error_message);
@@ -200,7 +201,8 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     let scrolled_window_clone = scrolled_window.clone();
     let loading_overlay_clone = loading_overlay.clone();
     
-    glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+    // Use idle_add for better performance instead of timeout
+    glib::idle_add_local(move || {
         // Check if this loading operation is still the current one
         let current_counter = VAULT_LOADING_COUNTER.load(Ordering::SeqCst);
         if current_loading_id != current_counter {
@@ -258,13 +260,16 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> Box {
         let empty_state = create_empty_state();
         container.append(&empty_state);
     } else {
-        // Create flow box for responsive grid layout
+        // Create responsive flow box for account cards
         let flow_box = FlowBox::new();
-        flow_box.set_max_children_per_line(4);
+        flow_box.set_max_children_per_line(5);
         flow_box.set_min_children_per_line(1);
-        flow_box.set_row_spacing(12);
-        flow_box.set_column_spacing(12);
+        flow_box.set_row_spacing(16);
+        flow_box.set_column_spacing(16);
         flow_box.set_selection_mode(SelectionMode::None);
+        flow_box.set_homogeneous(true);
+        flow_box.set_halign(gtk4::Align::Fill);
+        flow_box.set_valign(gtk4::Align::Start);
 
         for account_name in all_accounts {
             let account_card = create_account_card(account_name.as_str(), content_area, vault_name);
@@ -324,12 +329,14 @@ fn create_account_card(account_name: &str, content_area: &Box, vault_name: &str)
     let button = Button::new();
     button.add_css_class("card");
     button.add_css_class("account-card");
-    button.set_size_request(200, 120);
+    button.set_size_request(200, 130); // Increased size to fit more text
+    button.set_hexpand(true);
+    button.set_vexpand(false);
 
-    // Create card content
-    let card_box = Box::new(Orientation::Vertical, 8);
-    card_box.set_margin_top(16);
-    card_box.set_margin_bottom(16);
+    // Create card content with better spacing
+    let card_box = Box::new(Orientation::Vertical, 10);
+    card_box.set_margin_top(18);
+    card_box.set_margin_bottom(18);
     card_box.set_margin_start(16);
     card_box.set_margin_end(16);
 
@@ -338,18 +345,26 @@ fn create_account_card(account_name: &str, content_area: &Box, vault_name: &str)
     icon_label.add_css_class("title-2");
     icon_label.set_halign(gtk4::Align::Center);
 
-    // Account name
+    // Account name - better text fitting with more space
     let name_label = Label::new(Some(account_name));
     name_label.add_css_class("title-4");
     name_label.set_halign(gtk4::Align::Center);
     name_label.set_ellipsize(EllipsizeMode::End);
-    name_label.set_max_width_chars(20);
+    name_label.set_max_width_chars(25); // Increased from 15
+    name_label.set_lines(2);
+    name_label.set_wrap(true);
+    name_label.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
+    name_label.set_justify(gtk4::Justification::Center);
+    name_label.set_tooltip_text(Some(account_name)); // Show full text on hover
 
-    // Account type/description (placeholder)
+    // Account type/description (placeholder) - better text fitting
     let type_label = Label::new(Some("Password Account"));
     type_label.add_css_class("dim-label");
     type_label.add_css_class("caption");
     type_label.set_halign(gtk4::Align::Center);
+    type_label.set_ellipsize(EllipsizeMode::End);
+    type_label.set_max_width_chars(28); // Increased from 18
+    type_label.set_tooltip_text(Some("Password Account"));
 
     card_box.append(&icon_label);
     card_box.append(&name_label);
@@ -465,10 +480,18 @@ fn create_account_header(
     let title = Label::new(Some(&account.name));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Start);
+    title.set_ellipsize(EllipsizeMode::End);
+    title.set_max_width_chars(50); // Increased from 30
+    title.set_tooltip_text(Some(&account.name));
+    title.set_wrap(true);
+    title.set_lines(2);
 
     let subtitle = Label::new(Some(&account.account_type));
     subtitle.add_css_class("dim-label");
     subtitle.set_halign(gtk4::Align::Start);
+    subtitle.set_ellipsize(EllipsizeMode::End);
+    subtitle.set_max_width_chars(55); // Increased from 35
+    subtitle.set_tooltip_text(Some(&account.account_type));
 
     info_box.append(&title);
     info_box.append(&subtitle);
@@ -565,9 +588,9 @@ fn create_account_header(
 
 /// Creates the account details section
 fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
-    let section = Box::new(Orientation::Vertical, 16);
+    let section = Box::new(Orientation::Vertical, 20);
     section.add_css_class("account-section");
-    section.set_margin_top(16);
+    section.set_margin_top(20);
 
     // Section header
     let header_box = Box::new(Orientation::Vertical, 8);
@@ -590,9 +613,9 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     header_box.append(&subtitle);
     section.append(&header_box);
 
-    // Details grid
-    let details_box = Box::new(Orientation::Vertical, 12);
-    details_box.set_margin_bottom(16);
+    // Details grid - increased spacing for bigger fields
+    let details_box = Box::new(Orientation::Vertical, 18);
+    details_box.set_margin_bottom(20);
     details_box.set_margin_start(24);
     details_box.set_margin_end(24);
     details_box.set_halign(gtk4::Align::Center);
@@ -631,9 +654,9 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
 #[allow(clippy::too_many_lines)]
 /// Creates the password section
 fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
-    let section = Box::new(Orientation::Vertical, 16);
+    let section = Box::new(Orientation::Vertical, 20);
     section.add_css_class("account-section");
-    section.set_margin_top(16);
+    section.set_margin_top(20);
 
     // Section title with generate button
     let header_box = Box::new(Orientation::Horizontal, 12);
@@ -669,9 +692,9 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
     section.append(&header_box);
 
-    // Password field with reveal/copy buttons
-    let password_box = Box::new(Orientation::Horizontal, 8);
-    password_box.set_margin_bottom(20);
+    // Password field with reveal/copy buttons - bigger spacing
+    let password_box = Box::new(Orientation::Horizontal, 12);
+    password_box.set_margin_bottom(24);
     password_box.set_margin_start(24);
     password_box.set_margin_end(24);
     password_box.set_halign(gtk4::Align::Center);
@@ -978,9 +1001,9 @@ fn create_additional_fields_section(
 
 /// Creates the notes section
 fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> Box {
-    let section = Box::new(Orientation::Vertical, 16);
+    let section = Box::new(Orientation::Vertical, 20);
     section.add_css_class("account-section");
-    section.set_margin_top(16);
+    section.set_margin_top(20);
 
     let header_box = Box::new(Orientation::Vertical, 8);
     header_box.set_margin_top(20);
@@ -1001,8 +1024,8 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
     header_box.append(&subtitle);
     section.append(&header_box);
 
-    let notes_box = Box::new(Orientation::Vertical, 12);
-    notes_box.set_margin_bottom(20);
+    let notes_box = Box::new(Orientation::Vertical, 16);
+    notes_box.set_margin_bottom(24);
     notes_box.set_margin_start(24);
     notes_box.set_margin_end(24);
     notes_box.set_halign(gtk4::Align::Center);
@@ -1094,14 +1117,20 @@ fn create_account_actions_section(
 
 /// Creates a field row with label and value
 fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
-    let row_box = Box::new(Orientation::Horizontal, 12);
+    let row_box = Box::new(Orientation::Horizontal, 16);
     row_box.set_halign(gtk4::Align::Fill);
+    row_box.set_margin_top(4);
+    row_box.set_margin_bottom(4);
 
-    // Label
+    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
-    label.set_size_request(150, -1);
+    label.set_valign(gtk4::Align::Center);
+    label.set_size_request(160, -1); // Increased from 140
+    label.set_ellipsize(EllipsizeMode::End);
+    label.set_max_width_chars(25); // Increased from 18
+    label.set_tooltip_text(Some(label_text)); // Show full text on hover
 
     // Value container
     let value_box = Box::new(Orientation::Horizontal, 8);
@@ -1112,6 +1141,7 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     value_entry.set_editable(false);
     value_entry.set_hexpand(true);
     value_entry.add_css_class("flat");
+    value_entry.set_tooltip_text(Some(value_text)); // Show full text on hover
 
     value_box.append(&value_entry);
 
@@ -1155,14 +1185,20 @@ fn create_password_field_row(
     initial_value: &str,
     account_rc: &Rc<RefCell<Account>>,
 ) -> Box {
-    let row_box = Box::new(Orientation::Horizontal, 12);
+    let row_box = Box::new(Orientation::Horizontal, 16);
     row_box.set_halign(gtk4::Align::Fill);
+    row_box.set_margin_top(4);
+    row_box.set_margin_bottom(4);
 
-    // Label
+    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
-    label.set_size_request(150, -1);
+    label.set_valign(gtk4::Align::Center);
+    label.set_size_request(160, -1); // Increased from 140
+    label.set_ellipsize(EllipsizeMode::End);
+    label.set_max_width_chars(25); // Increased from 18
+    label.set_tooltip_text(Some(label_text)); // Show full text on hover
 
     // Password container
     let password_container = Box::new(Orientation::Horizontal, 8);
@@ -1350,14 +1386,20 @@ fn create_editable_field_row(
     account_rc: &Rc<RefCell<Account>>,
     field_name: &str,
 ) -> Box {
-    let row_box = Box::new(Orientation::Horizontal, 12);
+    let row_box = Box::new(Orientation::Horizontal, 16);
     row_box.set_halign(gtk4::Align::Fill);
+    row_box.set_margin_top(4);
+    row_box.set_margin_bottom(4);
 
-    // Label
+    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
-    label.set_size_request(150, -1);
+    label.set_valign(gtk4::Align::Center);
+    label.set_size_request(160, -1); // Increased from 140
+    label.set_ellipsize(EllipsizeMode::End);
+    label.set_max_width_chars(25); // Increased from 18
+    label.set_tooltip_text(Some(label_text)); // Show full text on hover
 
     // Entry field
     let entry = Entry::new();
@@ -1409,7 +1451,8 @@ fn create_welcome_section() -> Box {
     description.add_css_class("body");
     description.set_halign(gtk4::Align::Center);
     description.set_wrap(true);
-    description.set_max_width_chars(60);
+    description.set_max_width_chars(80); // Increased from 60
+    description.set_justify(gtk4::Justification::Center);
 
     section_box.append(&title);
     section_box.append(&subtitle);
@@ -1834,7 +1877,8 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Box {
         description.add_css_class("caption");
         description.set_halign(gtk4::Align::Start);
         description.set_wrap(true);
-        description.set_max_width_chars(60);
+        description.set_max_width_chars(80); // Increased from 60
+        description.set_justify(gtk4::Justification::Left);
         setup_card.append(&description);
         
         section.append(&setup_card);

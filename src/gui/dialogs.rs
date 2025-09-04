@@ -1,6 +1,9 @@
 use adw::prelude::*;
 
-use crate::password::{PasswordConfig, generate_password};
+use crate::password::{
+    PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,
+    get_strength_description,
+};
 use crate::storage::filesystem::{
     backup_exists, create_backup, delete_backup, delete_vault, install_backup, list_backups,
     rename_account, rename_vault,
@@ -15,20 +18,21 @@ use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib::{self, Bytes};
 use gtk4::{
     Adjustment, Button, CheckButton, Dialog, Entry, Frame, Image, Label, Orientation, PolicyType,
-    ResponseType, ScrolledWindow, SpinButton, TextView,
+    ProgressBar, ResponseType, ScrolledWindow, SpinButton, TextView, gdk,
 };
 use image::{DynamicImage, ImageBuffer, Luma};
 use qrcode::QrCode;
 use std::cell::RefCell;
 use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 /// Shows the password generator dialog and updates the provided entry field and account
 pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
     let generator_dialog = Dialog::new();
     generator_dialog.set_title(Some("Password Generator"));
     generator_dialog.set_modal(true);
     generator_dialog.set_default_size(500, 600);
+    generator_dialog.add_css_class("password-generator-dialog");
 
     // Create main content box
     let main_container = GtkBox::new(Orientation::Vertical, 16);
@@ -43,32 +47,27 @@ pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<Ref
     dialog_title.set_halign(gtk4::Align::Center);
     main_container.append(&dialog_title);
 
-    // Password configuration
+    // Password configuration - use single shared instance
     let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
 
-    // Length section
-    let length_section = create_password_length_section(&password_config);
-    main_container.append(&length_section);
+    // Create all sections
+    let sections = [
+        create_password_length_section(&password_config),
+        create_character_types_section(&password_config),
+        create_custom_characters_section(&password_config),
+        create_password_display_section(
+            &password_config,
+            Some(target_entry),
+            Some(account_ref),
+            Some(&generator_dialog),
+        ),
+    ];
 
-    // Character types section
-    let char_types_section = create_character_types_section(&password_config);
-    main_container.append(&char_types_section);
-
-    // Additional/Excluded characters section
-    let custom_chars_section = create_custom_characters_section(&password_config);
-    main_container.append(&custom_chars_section);
-
-    // Generated password display
-    let password_display_section = create_password_display_section(
-        &password_config,
-        Some(target_entry),
-        Some(account_ref),
-        Some(&generator_dialog),
-    );
-    main_container.append(&password_display_section);
+    for section in sections {
+        main_container.append(&section);
+    }
 
     generator_dialog.set_child(Some(&main_container));
-
     generator_dialog.present();
 }
 
@@ -87,11 +86,13 @@ fn create_password_length_section(password_config: &Rc<RefCell<PasswordConfig>>)
     let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
     let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);
     length_spinner.set_value(16.0);
+    length_spinner.set_tooltip_text(Some("Set the desired password length (1-128 characters)"));
 
-    let config_ref = password_config.clone();
+    let config_weak = Rc::downgrade(password_config);
     length_spinner.connect_value_changed(move |spinner| {
-        let mut config = config_ref.borrow_mut();
-        config.length = spinner.value() as usize;
+        if let Some(config_ref) = config_weak.upgrade() {
+            config_ref.borrow_mut().length = spinner.value() as usize;
+        }
     });
 
     let units_label = Label::new(Some("characters"));
@@ -128,21 +129,53 @@ fn create_character_types_section(password_config: &Rc<RefCell<PasswordConfig>>)
         option_checkbox.set_label(Some(option_label));
         option_checkbox.set_active(default_enabled);
 
-        let config_ref = password_config.clone();
-        let field_name_owned = field_name.to_string();
-        option_checkbox.connect_toggled(move |checkbox| {
-            let mut config = config_ref.borrow_mut();
-            let is_active = checkbox.is_active();
-            match field_name_owned.as_str() {
-                "include_lowercase" => config.include_lowercase = is_active,
-                "include_uppercase" => config.include_uppercase = is_active,
-                "include_numbers" => config.include_numbers = is_active,
-                "include_symbols" => config.include_symbols = is_active,
-                "include_spaces" => config.include_spaces = is_active,
-                "include_extended" => config.include_extended = is_active,
-                _ => {}
+        // Use weak reference to avoid circular references and reduce memory usage
+        let config_weak = Rc::downgrade(password_config);
+        match field_name {
+            "include_lowercase" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_lowercase = checkbox.is_active();
+                    }
+                });
             }
-        });
+            "include_uppercase" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_uppercase = checkbox.is_active();
+                    }
+                });
+            }
+            "include_numbers" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_numbers = checkbox.is_active();
+                    }
+                });
+            }
+            "include_symbols" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_symbols = checkbox.is_active();
+                    }
+                });
+            }
+            "include_spaces" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_spaces = checkbox.is_active();
+                    }
+                });
+            }
+            "include_extended" => {
+                option_checkbox.connect_toggled(move |checkbox| {
+                    if let Some(config_ref) = config_weak.upgrade() {
+                        config_ref.borrow_mut().include_extended = checkbox.is_active();
+                    }
+                });
+            }
+            _ => {}
+        }
 
         section_container.append(&option_checkbox);
     }
@@ -167,11 +200,15 @@ fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>
 
     let additional_entry = Entry::new();
     additional_entry.set_placeholder_text(Some("e.g., @#$"));
+    additional_entry.set_tooltip_text(Some(
+        "Add extra characters to include in password generation",
+    ));
 
-    let config_ref = password_config.clone();
+    let config_weak = Rc::downgrade(password_config);
     additional_entry.connect_changed(move |entry| {
-        let mut config = config_ref.borrow_mut();
-        config.additional_characters = entry.text().to_string();
+        if let Some(config_ref) = config_weak.upgrade() {
+            config_ref.borrow_mut().additional_characters = entry.text().to_string();
+        }
     });
 
     additional_container.append(&additional_label);
@@ -186,11 +223,15 @@ fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>
 
     let excluded_entry = Entry::new();
     excluded_entry.set_placeholder_text(Some("e.g., 0O1l"));
+    excluded_entry.set_tooltip_text(Some(
+        "Characters to exclude from password generation (useful for avoiding confusing characters)",
+    ));
 
-    let config_ref = password_config.clone();
+    let config_weak = Rc::downgrade(password_config);
     excluded_entry.connect_changed(move |entry| {
-        let mut config = config_ref.borrow_mut();
-        config.excluded_characters = entry.text().to_string();
+        if let Some(config_ref) = config_weak.upgrade() {
+            config_ref.borrow_mut().excluded_characters = entry.text().to_string();
+        }
     });
 
     excluded_container.append(&excluded_label);
@@ -200,7 +241,7 @@ fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>
     section_container
 }
 
-/// Creates the password display section
+/// Creates the password display section with auto-generation capability
 fn create_password_display_section(
     password_config: &Rc<RefCell<PasswordConfig>>,
     target_entry: Option<&Entry>,
@@ -222,9 +263,18 @@ fn create_password_display_section(
     password_display.set_size_request(-1, 80);
     password_display.add_css_class("password-display");
 
-    // Set initial text
+    // Set initial text and generate initial password
     let display_buffer = password_display.buffer();
-    display_buffer.set_text("Click 'Generate Password' to create a password");
+    let initial_config = password_config.borrow();
+    match generate_password(&*initial_config) {
+        Ok(initial_password) => {
+            display_buffer.set_text(&initial_password);
+        }
+        Err(_) => {
+            display_buffer.set_text("Click 'Generate Password' to create a password");
+        }
+    }
+    drop(initial_config);
 
     let scrolled_window = ScrolledWindow::new();
     scrolled_window.set_policy(PolicyType::Automatic, PolicyType::Automatic);
@@ -232,6 +282,45 @@ fn create_password_display_section(
     scrolled_window.set_size_request(-1, 100);
 
     section_container.append(&scrolled_window);
+
+    // Password strength indicator
+    let strength_container = GtkBox::new(Orientation::Vertical, 4);
+
+    let strength_label = Label::new(Some("Password Strength"));
+    strength_label.add_css_class("caption-heading");
+    strength_label.set_halign(gtk4::Align::Start);
+
+    let strength_progress = ProgressBar::new();
+    strength_progress.set_show_text(true);
+    strength_progress.add_css_class("password-strength");
+
+    let strength_description = Label::new(Some(""));
+    strength_description.add_css_class("caption");
+    strength_description.set_halign(gtk4::Align::Start);
+
+    strength_container.append(&strength_label);
+    strength_container.append(&strength_progress);
+    strength_container.append(&strength_description);
+    section_container.append(&strength_container);
+
+    // Update strength indicator for initial password
+    let buffer = password_display.buffer();
+    let start_iter = buffer.start_iter();
+    let end_iter = buffer.end_iter();
+    let initial_password = buffer.text(&start_iter, &end_iter, false);
+    if !initial_password.is_empty()
+        && initial_password != "Click 'Generate Password' to create a password"
+    {
+        let strength = calculate_password_strength(&initial_password);
+        strength_progress.set_fraction(strength as f64 / 100.0);
+        strength_progress.set_text(Some(&format!("{}%", strength)));
+        strength_description.set_text(get_strength_description(strength));
+        strength_progress.remove_css_class("strength-weak");
+        strength_progress.remove_css_class("strength-fair");
+        strength_progress.remove_css_class("strength-good");
+        strength_progress.remove_css_class("strength-strong");
+        strength_progress.add_css_class(get_strength_color_class(strength));
+    }
 
     // Button container
     let button_container = GtkBox::new(Orientation::Horizontal, 8);
@@ -241,25 +330,115 @@ fn create_password_display_section(
     let generate_button = Button::new();
     generate_button.set_label("Generate Password");
     generate_button.add_css_class("suggested-action");
+    generate_button.set_tooltip_text(Some("Generate a new password (Ctrl+G or F5)"));
 
     let display_ref = password_display.clone();
     let config_ref = password_config.clone();
+    let strength_progress_ref = strength_progress.clone();
+    let strength_desc_ref = strength_description.clone();
     generate_button.connect_clicked(move |_| {
         let config = config_ref.borrow();
         match generate_password(&*config) {
             Ok(generated_password) => {
                 let buffer = display_ref.buffer();
                 buffer.set_text(&generated_password);
+
+                // Update strength indicator
+                let strength = calculate_password_strength(&generated_password);
+                strength_progress_ref.set_fraction(strength as f64 / 100.0);
+                strength_progress_ref.set_text(Some(&format!("{}%", strength)));
+                strength_desc_ref.set_text(get_strength_description(strength));
+
+                // Update CSS classes for color
+                strength_progress_ref.remove_css_class("strength-weak");
+                strength_progress_ref.remove_css_class("strength-fair");
+                strength_progress_ref.remove_css_class("strength-good");
+                strength_progress_ref.remove_css_class("strength-strong");
+                strength_progress_ref.add_css_class(get_strength_color_class(strength));
             }
             Err(error_message) => {
                 eprintln!("Failed to generate password: {}", error_message);
                 let buffer = display_ref.buffer();
                 buffer.set_text("Error generating password");
+
+                // Reset strength indicator
+                strength_progress_ref.set_fraction(0.0);
+                strength_progress_ref.set_text(Some("0%"));
+                strength_desc_ref.set_text("");
+            }
+        }
+    });
+
+    // Copy button
+    let copy_button = Button::new();
+    copy_button.set_label("Copy");
+    copy_button.add_css_class("flat");
+    copy_button.set_tooltip_text(Some("Copy password to clipboard (Ctrl+C)"));
+
+    let display_copy_ref = password_display.clone();
+    let copy_button_ref = copy_button.clone();
+    copy_button.connect_clicked(move |_| {
+        let buffer = display_copy_ref.buffer();
+        let start_iter = buffer.start_iter();
+        let end_iter = buffer.end_iter();
+        let password_text = buffer.text(&start_iter, &end_iter, false);
+
+        if !password_text.is_empty()
+            && password_text != "Click 'Generate Password' to create a password"
+        {
+            if let Some(display) = gdk::Display::default() {
+                let clipboard = display.clipboard();
+                clipboard.set_text(&password_text);
+
+                // Visual feedback for copy action
+                let original_label = copy_button_ref.label().unwrap_or_default();
+                copy_button_ref.set_label("Copied!");
+                copy_button_ref.add_css_class("success");
+
+                let button_clone = copy_button_ref.clone();
+                glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
+                    button_clone.set_label(&original_label);
+                    button_clone.remove_css_class("success");
+                    glib::ControlFlow::Break
+                });
             }
         }
     });
 
     button_container.append(&generate_button);
+    button_container.append(&copy_button);
+
+    // Add keyboard shortcuts if we have a parent dialog
+    if let Some(dialog) = parent_dialog {
+        let key_controller = gtk4::EventControllerKey::new();
+        let dialog_ref = dialog.clone();
+        let generate_ref = generate_button.clone();
+        let copy_ref = copy_button.clone();
+        key_controller.connect_key_pressed(move |_, key, _, modifier| {
+            match key {
+                // Ctrl+G or F5 to generate
+                gdk::Key::g | gdk::Key::F5
+                    if modifier.contains(gdk::ModifierType::CONTROL_MASK)
+                        || key == gdk::Key::F5 =>
+                {
+                    generate_ref.emit_clicked();
+                    glib::Propagation::Stop
+                }
+                // Ctrl+C to copy
+                gdk::Key::c if modifier.contains(gdk::ModifierType::CONTROL_MASK) => {
+                    copy_ref.emit_clicked();
+                    glib::Propagation::Stop
+                }
+                // Escape to close
+                gdk::Key::Escape => {
+                    dialog_ref.close();
+                    glib::Propagation::Stop
+                }
+                _ => glib::Propagation::Proceed,
+            }
+        });
+        dialog.add_controller(key_controller);
+    }
 
     // Add Use and Cancel buttons only if we have the necessary parameters
     if let (Some(entry), Some(account_rc), Some(dialog)) =
@@ -616,10 +795,6 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
     title_container.set_halign(gtk4::Align::Center);
     title_container.add_css_class("dialog-title-container");
 
-    let icon = Label::new(Some("🔐"));
-    icon.add_css_class("dialog-icon");
-    icon.set_halign(gtk4::Align::Center);
-
     let title = Label::new(Some(&format!("Enable 2FA for \"{}\"", vault_name)));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Center);
@@ -628,7 +803,6 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
     subtitle.add_css_class("dim-label");
     subtitle.set_halign(gtk4::Align::Center);
 
-    title_container.append(&icon);
     title_container.append(&title);
     title_container.append(&subtitle);
     content_box.append(&title_container);
@@ -720,10 +894,6 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     title_container.set_halign(gtk4::Align::Center);
     title_container.add_css_class("dialog-title-container");
 
-    let icon = Label::new(Some("🔐"));
-    icon.add_css_class("dialog-icon");
-    icon.set_halign(gtk4::Align::Center);
-
     let title = Label::new(Some(&format!("2FA Settings for \"{}\"", vault_name)));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Center);
@@ -732,7 +902,6 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     subtitle.add_css_class("dim-label");
     subtitle.set_halign(gtk4::Align::Center);
 
-    title_container.append(&icon);
     title_container.append(&title);
     title_container.append(&subtitle);
     content_box.append(&title_container);

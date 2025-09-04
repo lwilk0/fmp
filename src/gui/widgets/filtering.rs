@@ -24,16 +24,16 @@ pub fn sort_vaults<'a>(names: &'a [String], filter: &str) -> Vec<&'a str> {
     view
 }
 
-/// Creates a simple filter bar with search entry
+/// Creates a responsive filter bar with search entry that adapts to sidebar width
 pub fn create_filter_bar(filter_text: &str, hint: &str, input_enabled: bool) -> Box {
     let container = Box::new(Orientation::Horizontal, 6);
-    container.set_halign(gtk4::Align::Center);
+    container.set_halign(gtk4::Align::Fill);
     container.add_css_class("sidebar-filter-bar");
 
-    // Search entry
+    // Search entry - make it expand to fill available space
     let entry = Entry::new();
     entry.set_placeholder_text(Some(hint));
-    entry.set_width_request(220);
+    entry.set_hexpand(true);
     entry.set_sensitive(input_enabled);
     entry.set_text(filter_text);
     entry.add_css_class("sidebar-search-entry");
