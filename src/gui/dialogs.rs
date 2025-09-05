@@ -13,12 +13,17 @@ use crate::totp::{
     prepare_totp_setup, verify_totp_code, verify_totp_code_with_secret,
 };
 use crate::vault::Account;
+use adw::{
+    ActionRow, ButtonContent, Clamp, HeaderBar, PreferencesGroup, PreferencesWindow,
+    Window as AdwWindow,
+};
 use gtk4::Box as GtkBox;
 use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
 use gtk4::glib::{self, Bytes};
 use gtk4::{
-    Adjustment, Button, CheckButton, Dialog, Entry, Frame, Image, Label, Orientation, PolicyType,
-    ProgressBar, ResponseType, ScrolledWindow, SpinButton, TextView, gdk,
+    Adjustment, Button, ButtonsType, CheckButton, Dialog, Entry, Frame, Image, Label,
+    MessageDialog, MessageType, Orientation, PolicyType, ProgressBar, ResponseType, ScrolledWindow,
+    SpinButton, Switch, TextView, gdk,
 };
 use image::{DynamicImage, ImageBuffer, Luma};
 use qrcode::QrCode;
@@ -28,65 +33,59 @@ use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 /// Shows the password generator dialog and updates the provided entry field and account
 pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
-    let generator_dialog = Dialog::new();
-    generator_dialog.set_title(Some("Password Generator"));
-    generator_dialog.set_modal(true);
-    generator_dialog.set_default_size(500, 600);
-    generator_dialog.add_css_class("password-generator-dialog");
-
-    // Create main content box
-    let main_container = GtkBox::new(Orientation::Vertical, 16);
-    main_container.set_margin_top(20);
-    main_container.set_margin_bottom(20);
-    main_container.set_margin_start(20);
-    main_container.set_margin_end(20);
-
-    // Title
-    let dialog_title = Label::new(Some("Generate Secure Password"));
-    dialog_title.add_css_class("title-2");
-    dialog_title.set_halign(gtk4::Align::Center);
-    main_container.append(&dialog_title);
+    let generator_window = PreferencesWindow::new();
+    generator_window.set_title(Some("Password Generator"));
+    generator_window.set_modal(true);
+    generator_window.set_default_size(560, 640);
+    generator_window.set_search_enabled(false);
 
     // Password configuration - use single shared instance
     let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
 
-    // Create all sections
-    let sections = [
-        create_password_length_section(&password_config),
-        create_character_types_section(&password_config),
-        create_custom_characters_section(&password_config),
-        create_password_display_section(
-            &password_config,
-            Some(target_entry),
-            Some(account_ref),
-            Some(&generator_dialog),
-        ),
-    ];
+    // Create preferences page
+    let page = adw::PreferencesPage::new();
+    page.set_title("Password Generator");
+    page.set_icon_name(Some("dialog-password-symbolic"));
 
-    for section in sections {
-        main_container.append(&section);
-    }
+    // Create all sections as preference groups
+    let length_group = create_password_length_preferences_group(&password_config);
+    let character_group = create_character_types_preferences_group(&password_config);
+    let custom_group = create_custom_characters_preferences_group(&password_config);
+    let display_group = create_password_display_preferences_group(
+        &password_config,
+        Some(target_entry),
+        Some(account_ref),
+        Some(&generator_window),
+    );
 
-    generator_dialog.set_child(Some(&main_container));
-    generator_dialog.present();
+    page.add(&length_group);
+    page.add(&character_group);
+    page.add(&custom_group);
+    page.add(&display_group);
+
+    generator_window.add(&page);
+    generator_window.present();
 }
 
-/// Creates the password length configuration section
-fn create_password_length_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section_container = GtkBox::new(Orientation::Vertical, 8);
+/// Creates the password length configuration preferences group
+fn create_password_length_preferences_group(
+    password_config: &Rc<RefCell<PasswordConfig>>,
+) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Password Length");
+    group.set_description(Some("Configure the length of generated passwords"));
 
-    let section_title = Label::new(Some("Password Length"));
-    section_title.add_css_class("title-4");
-    section_title.set_halign(gtk4::Align::Start);
-    section_container.append(&section_title);
-
-    let controls_container = GtkBox::new(Orientation::Horizontal, 12);
+    // Create action row for password length
+    let length_row = ActionRow::new();
+    length_row.set_title("Length");
+    length_row.set_subtitle("Number of characters in the password");
 
     // Spin button for length
     let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
     let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);
     length_spinner.set_value(16.0);
     length_spinner.set_tooltip_text(Some("Set the desired password length (1-128 characters)"));
+    length_spinner.set_valign(gtk4::Align::Center);
 
     let config_weak = Rc::downgrade(password_config);
     length_spinner.connect_value_changed(move |spinner| {
@@ -95,114 +94,148 @@ fn create_password_length_section(password_config: &Rc<RefCell<PasswordConfig>>)
         }
     });
 
-    let units_label = Label::new(Some("characters"));
-    units_label.add_css_class("dim-label");
+    length_row.add_suffix(&length_spinner);
+    group.add(&length_row);
 
-    controls_container.append(&length_spinner);
-    controls_container.append(&units_label);
-    section_container.append(&controls_container);
-
-    section_container
+    group
 }
 
-/// Creates the character types configuration section
-fn create_character_types_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section_container = GtkBox::new(Orientation::Vertical, 8);
+/// Creates the character types configuration preferences group
+fn create_character_types_preferences_group(
+    password_config: &Rc<RefCell<PasswordConfig>>,
+) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Character Types");
+    group.set_description(Some("Select which character types to include in passwords"));
 
-    let section_title = Label::new(Some("Character Types"));
-    section_title.add_css_class("title-4");
-    section_title.set_halign(gtk4::Align::Start);
-    section_container.append(&section_title);
-
-    // Create checkboxes for each character type
+    // Create action rows for each character type
     let character_type_options = vec![
-        ("Lowercase letters (a-z)", "include_lowercase", true),
-        ("Uppercase letters (A-Z)", "include_uppercase", true),
-        ("Numbers (0-9)", "include_numbers", true),
-        ("Symbols (!@#$%...)", "include_symbols", false),
-        ("Spaces", "include_spaces", false),
-        ("Extended characters (áéíóú...)", "include_extended", false),
+        (
+            "Lowercase Letters",
+            "Include lowercase letters (a-z)",
+            "include_lowercase",
+            true,
+        ),
+        (
+            "Uppercase Letters",
+            "Include uppercase letters (A-Z)",
+            "include_uppercase",
+            true,
+        ),
+        ("Numbers", "Include numbers (0-9)", "include_numbers", true),
+        (
+            "Symbols",
+            "Include symbols (!@#$%...)",
+            "include_symbols",
+            false,
+        ),
+        (
+            "Spaces",
+            "Include space characters",
+            "include_spaces",
+            false,
+        ),
+        (
+            "Extended Characters",
+            "Include extended characters (áéíóú...)",
+            "include_extended",
+            false,
+        ),
     ];
 
-    for (option_label, field_name, default_enabled) in character_type_options {
-        let option_checkbox = CheckButton::new();
-        option_checkbox.set_label(Some(option_label));
-        option_checkbox.set_active(default_enabled);
+    for (title, subtitle, field_name, default_enabled) in character_type_options {
+        let row = ActionRow::new();
+        row.set_title(title);
+        row.set_subtitle(subtitle);
+
+        let switch = Switch::new();
+        switch.set_active(default_enabled);
+        switch.set_valign(gtk4::Align::Center);
 
         // Use weak reference to avoid circular references and reduce memory usage
         let config_weak = Rc::downgrade(password_config);
         match field_name {
             "include_lowercase" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_lowercase = checkbox.is_active();
+                        config_ref.borrow_mut().include_lowercase = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             "include_uppercase" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_uppercase = checkbox.is_active();
+                        config_ref.borrow_mut().include_uppercase = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             "include_numbers" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_numbers = checkbox.is_active();
+                        config_ref.borrow_mut().include_numbers = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             "include_symbols" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_symbols = checkbox.is_active();
+                        config_ref.borrow_mut().include_symbols = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             "include_spaces" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_spaces = checkbox.is_active();
+                        config_ref.borrow_mut().include_spaces = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             "include_extended" => {
-                option_checkbox.connect_toggled(move |checkbox| {
+                switch.connect_state_set(move |_, state| {
                     if let Some(config_ref) = config_weak.upgrade() {
-                        config_ref.borrow_mut().include_extended = checkbox.is_active();
+                        config_ref.borrow_mut().include_extended = state;
                     }
+                    glib::Propagation::Proceed
                 });
             }
             _ => {}
         }
 
-        section_container.append(&option_checkbox);
+        row.add_suffix(&switch);
+        row.set_activatable_widget(Some(&switch));
+        group.add(&row);
     }
 
-    section_container
+    group
 }
 
-/// Creates the custom characters configuration section
-fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>>) -> GtkBox {
-    let section_container = GtkBox::new(Orientation::Vertical, 8);
+/// Creates the custom characters configuration preferences group
+fn create_custom_characters_preferences_group(
+    password_config: &Rc<RefCell<PasswordConfig>>,
+) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Custom Characters");
+    group.set_description(Some(
+        "Add or exclude specific characters from password generation",
+    ));
 
-    let section_title = Label::new(Some("Custom Characters"));
-    section_title.add_css_class("title-4");
-    section_title.set_halign(gtk4::Align::Start);
-    section_container.append(&section_title);
-
-    // Additional characters
-    let additional_container = GtkBox::new(Orientation::Vertical, 4);
-    let additional_label = Label::new(Some("Additional characters to include:"));
-    additional_label.add_css_class("dim-label");
-    additional_label.set_halign(gtk4::Align::Start);
+    // Additional characters row
+    let additional_row = ActionRow::new();
+    additional_row.set_title("Additional Characters");
+    additional_row.set_subtitle("Extra characters to include in passwords");
 
     let additional_entry = Entry::new();
     additional_entry.set_placeholder_text(Some("e.g., @#$"));
     additional_entry.set_tooltip_text(Some(
         "Add extra characters to include in password generation",
     ));
+    additional_entry.set_valign(gtk4::Align::Center);
+    additional_entry.set_size_request(200, -1);
 
     let config_weak = Rc::downgrade(password_config);
     additional_entry.connect_changed(move |entry| {
@@ -211,21 +244,19 @@ fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>
         }
     });
 
-    additional_container.append(&additional_label);
-    additional_container.append(&additional_entry);
-    section_container.append(&additional_container);
+    additional_row.add_suffix(&additional_entry);
+    group.add(&additional_row);
 
-    // Excluded characters
-    let excluded_container = GtkBox::new(Orientation::Vertical, 4);
-    let excluded_label = Label::new(Some("Characters to exclude:"));
-    excluded_label.add_css_class("dim-label");
-    excluded_label.set_halign(gtk4::Align::Start);
+    // Excluded characters row
+    let excluded_row = ActionRow::new();
+    excluded_row.set_title("Excluded Characters");
+    excluded_row.set_subtitle("Characters to avoid in passwords (e.g., confusing characters)");
 
     let excluded_entry = Entry::new();
     excluded_entry.set_placeholder_text(Some("e.g., 0O1l"));
-    excluded_entry.set_tooltip_text(Some(
-        "Characters to exclude from password generation (useful for avoiding confusing characters)",
-    ));
+    excluded_entry.set_tooltip_text(Some("Characters to exclude from password generation"));
+    excluded_entry.set_valign(gtk4::Align::Center);
+    excluded_entry.set_size_request(200, -1);
 
     let config_weak = Rc::downgrade(password_config);
     excluded_entry.connect_changed(move |entry| {
@@ -234,34 +265,37 @@ fn create_custom_characters_section(password_config: &Rc<RefCell<PasswordConfig>
         }
     });
 
-    excluded_container.append(&excluded_label);
-    excluded_container.append(&excluded_entry);
-    section_container.append(&excluded_container);
+    excluded_row.add_suffix(&excluded_entry);
+    group.add(&excluded_row);
 
-    section_container
+    group
 }
 
-/// Creates the password display section with auto-generation capability
-fn create_password_display_section(
+/// Creates the password display preferences group with auto-generation capability
+fn create_password_display_preferences_group(
     password_config: &Rc<RefCell<PasswordConfig>>,
     target_entry: Option<&Entry>,
     account_ref: Option<&Rc<RefCell<Account>>>,
-    parent_dialog: Option<&Dialog>,
-) -> GtkBox {
-    let section_container = GtkBox::new(Orientation::Vertical, 8);
+    parent_window: Option<&PreferencesWindow>,
+) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Generated Password");
+    group.set_description(Some("View and manage your generated password"));
 
-    let section_title = Label::new(Some("Generated Password"));
-    section_title.add_css_class("title-4");
-    section_title.set_halign(gtk4::Align::Start);
-    section_container.append(&section_title);
+    // Password display row
+    let password_row = ActionRow::new();
+    password_row.set_title("Password");
+    password_row.set_subtitle("Generated password will appear here");
 
-    // Text view for password display
+    // Text view for password display in a clamp
     let password_display = TextView::new();
     password_display.set_editable(false);
     password_display.set_cursor_visible(false);
     password_display.set_wrap_mode(gtk4::WrapMode::Char);
-    password_display.set_size_request(-1, 80);
+    password_display.set_size_request(-1, 60);
     password_display.add_css_class("password-display");
+    password_display.set_margin_top(8);
+    password_display.set_margin_bottom(8);
 
     // Set initial text and generate initial password
     let display_buffer = password_display.buffer();
@@ -279,29 +313,26 @@ fn create_password_display_section(
     let scrolled_window = ScrolledWindow::new();
     scrolled_window.set_policy(PolicyType::Automatic, PolicyType::Automatic);
     scrolled_window.set_child(Some(&password_display));
-    scrolled_window.set_size_request(-1, 100);
+    scrolled_window.set_size_request(-1, 80);
 
-    section_container.append(&scrolled_window);
+    // Create a container for the password display
+    let password_container = GtkBox::new(Orientation::Vertical, 8);
+    password_container.append(&scrolled_window);
 
-    // Password strength indicator
-    let strength_container = GtkBox::new(Orientation::Vertical, 4);
-
-    let strength_label = Label::new(Some("Password Strength"));
-    strength_label.add_css_class("caption-heading");
-    strength_label.set_halign(gtk4::Align::Start);
+    // Password strength row
+    let strength_row = ActionRow::new();
+    strength_row.set_title("Password Strength");
 
     let strength_progress = ProgressBar::new();
     strength_progress.set_show_text(true);
     strength_progress.add_css_class("password-strength");
+    strength_progress.set_valign(gtk4::Align::Center);
+    strength_progress.set_size_request(200, -1);
 
     let strength_description = Label::new(Some(""));
     strength_description.add_css_class("caption");
     strength_description.set_halign(gtk4::Align::Start);
-
-    strength_container.append(&strength_label);
-    strength_container.append(&strength_progress);
-    strength_container.append(&strength_description);
-    section_container.append(&strength_container);
+    strength_description.set_valign(gtk4::Align::Center);
 
     // Update strength indicator for initial password
     let buffer = password_display.buffer();
@@ -322,13 +353,26 @@ fn create_password_display_section(
         strength_progress.add_css_class(get_strength_color_class(strength));
     }
 
+    let strength_box = GtkBox::new(Orientation::Vertical, 4);
+    strength_box.append(&strength_progress);
+    strength_box.append(&strength_description);
+    strength_row.add_suffix(&strength_box);
+
+    // Actions row for buttons
+    let actions_row = ActionRow::new();
+    actions_row.set_title("Actions");
+    actions_row.set_subtitle("Generate, copy, or use the password");
+
     // Button container
     let button_container = GtkBox::new(Orientation::Horizontal, 8);
-    button_container.set_halign(gtk4::Align::Center);
+    button_container.set_halign(gtk4::Align::End);
 
-    // Generate button
+    // Generate button with icon
     let generate_button = Button::new();
-    generate_button.set_label("Generate Password");
+    let generate_content = ButtonContent::new();
+    generate_content.set_label("Generate");
+    generate_content.set_icon_name("view-refresh-symbolic");
+    generate_button.set_child(Some(&generate_content));
     generate_button.add_css_class("suggested-action");
     generate_button.set_tooltip_text(Some("Generate a new password (Ctrl+G or F5)"));
 
@@ -369,9 +413,12 @@ fn create_password_display_section(
         }
     });
 
-    // Copy button
+    // Copy button with icon
     let copy_button = Button::new();
-    copy_button.set_label("Copy");
+    let copy_content = ButtonContent::new();
+    copy_content.set_label("Copy");
+    copy_content.set_icon_name("edit-copy-symbolic");
+    copy_button.set_child(Some(&copy_content));
     copy_button.add_css_class("flat");
     copy_button.set_tooltip_text(Some("Copy password to clipboard (Ctrl+C)"));
 
@@ -391,13 +438,14 @@ fn create_password_display_section(
                 clipboard.set_text(&password_text);
 
                 // Visual feedback for copy action
-                let original_label = copy_button_ref.label().unwrap_or_default();
-                copy_button_ref.set_label("Copied!");
+                let copy_content_ref = copy_content.clone();
+                copy_content_ref.set_label("Copied!");
                 copy_button_ref.add_css_class("success");
 
                 let button_clone = copy_button_ref.clone();
+                let content_clone = copy_content.clone();
                 glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
-                    button_clone.set_label(&original_label);
+                    content_clone.set_label("Copy");
                     button_clone.remove_css_class("success");
                     glib::ControlFlow::Break
                 });
@@ -408,10 +456,10 @@ fn create_password_display_section(
     button_container.append(&generate_button);
     button_container.append(&copy_button);
 
-    // Add keyboard shortcuts if we have a parent dialog
-    if let Some(dialog) = parent_dialog {
+    // Add keyboard shortcuts if we have a parent window
+    if let Some(window) = parent_window {
         let key_controller = gtk4::EventControllerKey::new();
-        let dialog_ref = dialog.clone();
+        let window_ref = window.clone();
         let generate_ref = generate_button.clone();
         let copy_ref = copy_button.clone();
         key_controller.connect_key_pressed(move |_, key, _, modifier| {
@@ -431,28 +479,31 @@ fn create_password_display_section(
                 }
                 // Escape to close
                 gdk::Key::Escape => {
-                    dialog_ref.close();
+                    window_ref.close();
                     glib::Propagation::Stop
                 }
                 _ => glib::Propagation::Proceed,
             }
         });
-        dialog.add_controller(key_controller);
+        window.add_controller(key_controller);
     }
 
-    // Add Use and Cancel buttons only if we have the necessary parameters
-    if let (Some(entry), Some(account_rc), Some(dialog)) =
-        (target_entry, account_ref, parent_dialog)
+    // Add Use button only if we have the necessary parameters
+    if let (Some(entry), Some(account_rc), Some(window)) =
+        (target_entry, account_ref, parent_window)
     {
-        // Use button
+        // Use button with icon
         let use_button = Button::new();
-        use_button.set_label("Use");
-        use_button.add_css_class("flat");
+        let use_content = ButtonContent::new();
+        use_content.set_label("Use Password");
+        use_content.set_icon_name("emblem-ok-symbolic");
+        use_button.set_child(Some(&use_content));
+        use_button.add_css_class("suggested-action");
 
         let display_use_ref = password_display.clone();
         let entry_ref = entry.clone();
         let account_use_ref = account_rc.clone();
-        let dialog_ref = dialog.clone();
+        let window_ref = window.clone();
         use_button.connect_clicked(move |_| {
             let buffer = display_use_ref.buffer();
             let start_iter = buffer.start_iter();
@@ -465,26 +516,22 @@ fn create_password_display_section(
                 entry_ref.set_text(&generated_password);
                 let mut account = account_use_ref.borrow_mut();
                 account.password.update(generated_password.to_string());
-                dialog_ref.close();
+                window_ref.close();
             }
         });
 
-        // Cancel button
-        let cancel_button = Button::new();
-        cancel_button.set_label("Cancel");
-        cancel_button.add_css_class("flat");
-
-        let dialog_cancel_ref = dialog.clone();
-        cancel_button.connect_clicked(move |_| {
-            dialog_cancel_ref.close();
-        });
-
         button_container.append(&use_button);
-        button_container.append(&cancel_button);
     }
 
-    section_container.append(&button_container);
-    section_container
+    actions_row.add_suffix(&button_container);
+
+    // Add all rows to the group
+    password_row.set_child(Some(&password_container));
+    group.add(&password_row);
+    group.add(&strength_row);
+    group.add(&actions_row);
+
+    group
 }
 
 /// Checks if this is the first run of the application
@@ -516,18 +563,31 @@ fn get_config_file_path() -> PathBuf {
 
 /// Shows the welcome dialog for first-time users
 pub fn show_welcome_dialog() {
-    let welcome_dialog = Dialog::new();
-    welcome_dialog.set_title(Some("Welcome to Forgot My Password"));
-    welcome_dialog.set_modal(true);
-    welcome_dialog.set_default_size(650, 550);
-    welcome_dialog.add_css_class("welcome-dialog");
+    let welcome_window = AdwWindow::new();
+    welcome_window.set_title(Some("Welcome to Forgot My Password"));
+    welcome_window.set_modal(true);
+    welcome_window.set_default_size(600, 500);
+    welcome_window.add_css_class("welcome-dialog");
 
-    // Create main content box
-    let main_container = GtkBox::new(Orientation::Vertical, 24);
-    main_container.set_margin_top(32);
-    main_container.set_margin_bottom(32);
-    main_container.set_margin_start(32);
-    main_container.set_margin_end(32);
+    // Create header bar
+    let header_bar = HeaderBar::new();
+    header_bar.set_title_widget(Some(&Label::new(Some("Welcome"))));
+    header_bar.add_css_class("flat");
+
+    // Create main content with proper libadwaita layout
+    let main_container = GtkBox::new(Orientation::Vertical, 0);
+    main_container.append(&header_bar);
+
+    // Create clamp for content width
+    let clamp = Clamp::new();
+    clamp.set_maximum_size(500);
+    clamp.set_tightening_threshold(400);
+
+    let content_box = GtkBox::new(Orientation::Vertical, 24);
+    content_box.set_margin_top(32);
+    content_box.set_margin_bottom(32);
+    content_box.set_margin_start(24);
+    content_box.set_margin_end(24);
 
     // Welcome title with icon
     let title_container = GtkBox::new(Orientation::Horizontal, 12);
@@ -541,7 +601,7 @@ pub fn show_welcome_dialog() {
 
     title_container.append(&title_icon);
     title_container.append(&dialog_title);
-    main_container.append(&title_container);
+    content_box.append(&title_container);
 
     // Welcome message
     let welcome_message_text = "Thank you for choosing Forgot My Password (FMP) - your secure password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
@@ -558,15 +618,15 @@ pub fn show_welcome_dialog() {
     let message_scrolled_window = ScrolledWindow::new();
     message_scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
     message_scrolled_window.set_child(Some(&welcome_message_label));
-    message_scrolled_window.set_size_request(-1, 320);
+    message_scrolled_window.set_size_request(-1, 280);
     message_scrolled_window.add_css_class("card");
     message_scrolled_window.set_margin_top(8);
-    message_scrolled_window.set_margin_bottom(8);
+    message_scrolled_window.set_margin_bottom(16);
 
-    main_container.append(&message_scrolled_window);
+    content_box.append(&message_scrolled_window);
 
     // Button box
-    let button_container = GtkBox::new(Orientation::Horizontal, 16);
+    let button_container = GtkBox::new(Orientation::Horizontal, 12);
     button_container.set_halign(gtk4::Align::Center);
     button_container.set_margin_top(8);
 
@@ -574,7 +634,6 @@ pub fn show_welcome_dialog() {
     let learn_more_button = Button::new();
     learn_more_button.set_label("Learn More about GPG");
     learn_more_button.add_css_class("flat");
-    learn_more_button.set_size_request(180, -1);
 
     learn_more_button.connect_clicked(move |_| {
         show_gpg_info_dialog();
@@ -585,39 +644,54 @@ pub fn show_welcome_dialog() {
     get_started_button.set_label("Get Started");
     get_started_button.add_css_class("suggested-action");
     get_started_button.add_css_class("pill");
-    get_started_button.set_size_request(140, -1);
 
-    let dialog_ref = welcome_dialog.clone();
+    let window_ref = welcome_window.clone();
     get_started_button.connect_clicked(move |_| {
         // Mark first run as complete
         if let Err(error_message) = mark_first_run_complete() {
             eprintln!("Failed to mark first run complete: {}", error_message);
         }
-        dialog_ref.close();
+        window_ref.close();
     });
 
     button_container.append(&learn_more_button);
     button_container.append(&get_started_button);
-    main_container.append(&button_container);
+    content_box.append(&button_container);
 
-    welcome_dialog.set_child(Some(&main_container));
-    welcome_dialog.present();
+    clamp.set_child(Some(&content_box));
+    main_container.append(&clamp);
+
+    welcome_window.set_content(Some(&main_container));
+    welcome_window.present();
 }
 
 /// Shows the GPG information dialog with setup instructions
 fn show_gpg_info_dialog() {
-    let info_dialog = Dialog::new();
-    info_dialog.set_title(Some("GPG Setup Information"));
-    info_dialog.set_modal(true);
-    info_dialog.set_default_size(550, 400);
-    info_dialog.add_css_class("info-dialog");
+    let info_window = AdwWindow::new();
+    info_window.set_title(Some("GPG Setup Information"));
+    info_window.set_modal(true);
+    info_window.set_default_size(600, 500);
+    info_window.add_css_class("info-dialog");
 
-    // Create main content box
-    let main_container = GtkBox::new(Orientation::Vertical, 20);
-    main_container.set_margin_top(24);
-    main_container.set_margin_bottom(24);
-    main_container.set_margin_start(24);
-    main_container.set_margin_end(24);
+    // Create header bar
+    let header_bar = HeaderBar::new();
+    header_bar.set_title_widget(Some(&Label::new(Some("GPG Setup"))));
+    header_bar.add_css_class("flat");
+
+    // Create main content with proper libadwaita layout
+    let main_container = GtkBox::new(Orientation::Vertical, 0);
+    main_container.append(&header_bar);
+
+    // Create clamp for content width
+    let clamp = Clamp::new();
+    clamp.set_maximum_size(500);
+    clamp.set_tightening_threshold(400);
+
+    let content_box = GtkBox::new(Orientation::Vertical, 24);
+    content_box.set_margin_top(24);
+    content_box.set_margin_bottom(24);
+    content_box.set_margin_start(24);
+    content_box.set_margin_end(24);
 
     // Title with icon
     let title_container = GtkBox::new(Orientation::Horizontal, 12);
@@ -631,7 +705,7 @@ fn show_gpg_info_dialog() {
 
     title_container.append(&title_icon);
     title_container.append(&dialog_title);
-    main_container.append(&title_container);
+    content_box.append(&title_container);
 
     // GPG instructions with better formatting
     let instructions_box = GtkBox::new(Orientation::Vertical, 16);
@@ -670,9 +744,9 @@ fn show_gpg_info_dialog() {
     scrolled.set_size_request(-1, 200);
     scrolled.add_css_class("card");
     scrolled.set_margin_top(8);
-    scrolled.set_margin_bottom(8);
+    scrolled.set_margin_bottom(16);
 
-    main_container.append(&scrolled);
+    content_box.append(&scrolled);
 
     // Button box
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
@@ -683,16 +757,19 @@ fn show_gpg_info_dialog() {
     close_button.set_label("Close");
     close_button.add_css_class("suggested-action");
 
-    let info_dialog_clone = info_dialog.clone();
+    let window_clone = info_window.clone();
     close_button.connect_clicked(move |_| {
-        info_dialog_clone.close();
+        window_clone.close();
     });
 
     button_box.append(&close_button);
-    main_container.append(&button_box);
+    content_box.append(&button_box);
 
-    info_dialog.set_child(Some(&main_container));
-    info_dialog.present();
+    clamp.set_child(Some(&content_box));
+    main_container.append(&clamp);
+
+    info_window.set_content(Some(&main_container));
+    info_window.present();
 }
 
 /// Shows a confirmation dialog for dangerous actions
@@ -706,248 +783,260 @@ pub fn show_confirmation_dialog<F>(
 ) where
     F: Fn() + 'static,
 {
-    let dialog = Dialog::new();
+    let dialog = MessageDialog::new(
+        parent,
+        gtk4::DialogFlags::MODAL | gtk4::DialogFlags::DESTROY_WITH_PARENT,
+        MessageType::Warning,
+        ButtonsType::None,
+        message,
+    );
+
     dialog.set_title(Some(title));
-    dialog.set_modal(true);
-    dialog.set_default_size(450, 250);
     dialog.add_css_class("confirmation-dialog");
 
-    if let Some(parent_window) = parent {
-        dialog.set_transient_for(Some(parent_window));
+    // Add custom buttons
+    dialog.add_button("Cancel", ResponseType::Cancel);
+    dialog.add_button(confirm_label, ResponseType::Accept);
+
+    // Style the confirm button as destructive
+    if let Some(confirm_button) = dialog.widget_for_response(ResponseType::Accept) {
+        confirm_button.add_css_class("destructive-action");
     }
 
-    // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 16);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
+    dialog.set_default_response(ResponseType::Cancel);
 
-    // Warning icon and message
-    let message_box = GtkBox::new(Orientation::Horizontal, 12);
-    message_box.set_halign(gtk4::Align::Center);
-
-    // Warning icon
-    let icon = Label::new(Some("⚠️"));
-    icon.add_css_class("title-2");
-    message_box.append(&icon);
-
-    // Message text
-    let message_label = Label::new(Some(message));
-    message_label.set_wrap(true);
-    message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    message_label.set_justify(gtk4::Justification::Center);
-    message_label.add_css_class("body");
-    message_box.append(&message_label);
-
-    content_box.append(&message_box);
-
-    // Button box
-    let button_box = GtkBox::new(Orientation::Horizontal, 12);
-    button_box.set_halign(gtk4::Align::Center);
-
-    // Cancel button
-    let cancel_button = Button::new();
-    cancel_button.set_label("Cancel");
-    cancel_button.add_css_class("flat");
-
-    // Confirm button
-    let confirm_button = Button::new();
-    confirm_button.set_label(confirm_label);
-    confirm_button.add_css_class("destructive-action");
-
-    let dialog_cancel = dialog.clone();
-    cancel_button.connect_clicked(move |_| {
-        dialog_cancel.close();
+    // Connect response handler
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Accept {
+            on_confirm();
+        }
+        dialog.close();
     });
 
-    let dialog_confirm = dialog.clone();
-    confirm_button.connect_clicked(move |_| {
-        on_confirm();
-        dialog_confirm.close();
-    });
-
-    button_box.append(&cancel_button);
-    button_box.append(&confirm_button);
-    content_box.append(&button_box);
-
-    dialog.set_child(Some(&content_box));
     dialog.present();
 }
 
 /// Shows the TOTP setup dialog for enabling 2FA on a vault
 pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("Enable Two-Factor Authentication"));
-    dialog.set_modal(true);
-    dialog.set_default_size(600, 650);
-    dialog.add_css_class("totp-dialog");
+    let totp_window = PreferencesWindow::new();
+    totp_window.set_title(Some("Enable Two-Factor Authentication"));
+    totp_window.set_modal(true);
+    totp_window.set_default_size(600, 650);
+    totp_window.set_search_enabled(false);
 
-    // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 6);
-    content_box.set_margin_top(8);
-    content_box.set_margin_bottom(8);
-    content_box.set_margin_start(16);
-    content_box.set_margin_end(16);
+    // Create preferences page
+    let page = adw::PreferencesPage::new();
+    page.set_title("Two-Factor Authentication");
+    page.set_icon_name(Some("security-high-symbolic"));
 
-    // Title with icon
-    let title_container = GtkBox::new(Orientation::Vertical, 4);
-    title_container.set_halign(gtk4::Align::Center);
-    title_container.add_css_class("dialog-title-container");
+    // Create setup group
+    let setup_group = PreferencesGroup::new();
+    setup_group.set_title(&format!("Enable 2FA for \"{}\"", vault_name));
+    setup_group.set_description(Some("Secure your vault with two-factor authentication"));
 
-    let title = Label::new(Some(&format!("Enable 2FA for \"{}\"", vault_name)));
-    title.add_css_class("title-1");
-    title.set_halign(gtk4::Align::Center);
+    // Instructions row
+    let instructions_row = ActionRow::new();
+    instructions_row.set_title("Setup Instructions");
+    instructions_row.set_subtitle(
+        "Scan the QR code with your authenticator app, then enter the verification code",
+    );
+    setup_group.add(&instructions_row);
 
-    let subtitle = Label::new(Some("Secure your vault with two-factor authentication"));
-    subtitle.add_css_class("dim-label");
-    subtitle.set_halign(gtk4::Align::Center);
-
-    title_container.append(&title);
-    title_container.append(&subtitle);
-    content_box.append(&title_container);
-
-    // Instructions
-    let instructions = Label::new(Some(
-        "Scan the QR code below with your authenticator app (like Google Authenticator, Authy, or 1Password), then enter the 6-digit code to verify setup.",
-    ));
-    instructions.set_wrap(true);
-    instructions.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    instructions.set_justify(gtk4::Justification::Center);
-    instructions.add_css_class("body");
-    instructions.set_margin_bottom(16);
-    content_box.append(&instructions);
+    // QR Code group (will be populated after setup)
+    let qr_group = PreferencesGroup::new();
+    qr_group.set_title("QR Code");
+    qr_group.set_description(Some("Scan this code with your authenticator app"));
 
     // Show loading message initially
-    let loading_label = Label::new(Some("Generating QR code..."));
-    loading_label.add_css_class("dim-label");
-    loading_label.set_halign(gtk4::Align::Center);
-    loading_label.set_margin_top(20);
-    loading_label.set_margin_bottom(20);
-    content_box.append(&loading_label);
+    let loading_row = ActionRow::new();
+    loading_row.set_title("Generating QR code...");
+    loading_row.set_subtitle("Please wait while we prepare your 2FA setup");
+    qr_group.add(&loading_row);
 
-    dialog.set_child(Some(&content_box));
-    dialog.present();
+    // Verification group (will be populated after setup)
+    let verification_group = PreferencesGroup::new();
+    verification_group.set_title("Verification");
+    verification_group.set_description(Some("Enter the code from your authenticator app"));
+
+    page.add(&setup_group);
+    page.add(&qr_group);
+    page.add(&verification_group);
+
+    totp_window.add(&page);
+    totp_window.present();
 
     // Prepare TOTP secret and QR code after showing dialog (without enabling yet)
     match prepare_totp_setup(vault_name) {
         Ok((secret, secret_b32, otpauth_uri)) => {
             // Remove loading message
-            content_box.remove(&loading_label);
+            qr_group.remove(&loading_row);
 
-            // QR Code section
-            let qr_section = create_qr_code_section(&otpauth_uri, &secret_b32);
-            content_box.append(&qr_section);
+            // Add QR Code display
+            let qr_row = ActionRow::new();
+            qr_row.set_title("QR Code");
+            qr_row.set_subtitle(&format!("Secret: {}", secret_b32));
 
-            // Verification section with the prepared secret
-            let verification_section = create_totp_verification_section_with_secret(
-                vault_name,
-                &secret,
-                &dialog,
-                content_area,
-            );
-            content_box.append(&verification_section);
-        }
-        Err(e) => {
-            // Remove loading message
-            content_box.remove(&loading_label);
+            // Create QR code image
+            if let Ok(qr_image) = generate_qr_code_image(&otpauth_uri) {
+                let qr_image_widget = Image::from_pixbuf(Some(&qr_image));
+                qr_image_widget.set_pixel_size(200);
+                qr_row.set_child(Some(&qr_image_widget));
+            }
 
-            let error_label = Label::new(Some(&format!("Failed to prepare 2FA: {}", e)));
-            error_label.add_css_class("error");
-            error_label.set_wrap(true);
-            content_box.append(&error_label);
+            qr_group.add(&qr_row);
 
-            // Close button for error case
-            let close_button = Button::new();
-            close_button.set_label("Close");
-            close_button.add_css_class("suggested-action");
-            close_button.set_halign(gtk4::Align::Center);
-            close_button.set_margin_top(16);
+            // Add verification input
+            let verification_row = ActionRow::new();
+            verification_row.set_title("Verification Code");
+            verification_row.set_subtitle("Enter the 6-digit code from your authenticator app");
 
-            let dialog_clone = dialog.clone();
-            close_button.connect_clicked(move |_| {
-                dialog_clone.close();
+            let code_entry = Entry::new();
+            code_entry.set_placeholder_text(Some("000000"));
+            code_entry.set_max_length(6);
+            code_entry.set_input_purpose(gtk4::InputPurpose::Digits);
+            code_entry.set_valign(gtk4::Align::Center);
+            code_entry.set_size_request(120, -1);
+
+            let verify_button = Button::new();
+            verify_button.set_label("Enable 2FA");
+            verify_button.add_css_class("suggested-action");
+            verify_button.set_valign(gtk4::Align::Center);
+
+            let button_box = GtkBox::new(Orientation::Horizontal, 8);
+            button_box.append(&code_entry);
+            button_box.append(&verify_button);
+            verification_row.add_suffix(&button_box);
+
+            // Connect verification logic
+            let vault_name_clone = vault_name.to_string();
+            let secret_clone = secret.clone();
+            let window_clone = totp_window.clone();
+            let content_area_clone = content_area.clone();
+
+            verify_button.connect_clicked(move |_| {
+                let code = code_entry.text();
+                if code.len() == 6 {
+                    match verify_totp_code_with_secret(&secret_clone, &code) {
+                        Ok(true) => {
+                            if let Err(e) = confirm_totp_setup(&vault_name_clone, &secret_clone) {
+                                eprintln!("Failed to confirm TOTP setup: {}", e);
+                            } else {
+                                window_clone.close();
+                                // Refresh the content area to show updated TOTP status
+                                // This would typically trigger a UI refresh
+                            }
+                        }
+                        Ok(false) => {
+                            code_entry.add_css_class("error");
+                            // Remove error class after a delay
+                            let entry_clone = code_entry.clone();
+                            glib::timeout_add_local(std::time::Duration::from_secs(3), move || {
+                                entry_clone.remove_css_class("error");
+                                glib::ControlFlow::Break
+                            });
+                        }
+                        Err(e) => {
+                            eprintln!("TOTP verification error: {}", e);
+                        }
+                    }
+                }
             });
 
-            content_box.append(&close_button);
+            verification_group.add(&verification_row);
+        }
+        Err(e) => {
+            // Remove loading message and show error
+            qr_group.remove(&loading_row);
+
+            let error_row = ActionRow::new();
+            error_row.set_title("Setup Failed");
+            error_row.set_subtitle(&format!("Failed to prepare 2FA: {}", e));
+            qr_group.add(&error_row);
         }
     }
 }
 
 /// Shows the TOTP management dialog for an already enabled vault
 pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
-    let dialog = Dialog::new();
-    dialog.set_title(Some("Manage Two-Factor Authentication"));
-    dialog.set_modal(true);
-    dialog.set_default_size(600, 650);
-    dialog.add_css_class("totp-dialog");
+    let totp_window = PreferencesWindow::new();
+    totp_window.set_title(Some("Manage Two-Factor Authentication"));
+    totp_window.set_modal(true);
+    totp_window.set_default_size(600, 500);
+    totp_window.set_search_enabled(false);
 
-    // Create main content box
-    let content_box = GtkBox::new(Orientation::Vertical, 20);
-    content_box.set_margin_top(24);
-    content_box.set_margin_bottom(24);
-    content_box.set_margin_start(24);
-    content_box.set_margin_end(24);
+    // Create preferences page
+    let page = adw::PreferencesPage::new();
+    page.set_title("Two-Factor Authentication");
+    page.set_icon_name(Some("security-high-symbolic"));
 
-    // Title with icon
-    let title_container = GtkBox::new(Orientation::Vertical, 8);
-    title_container.set_halign(gtk4::Align::Center);
-    title_container.add_css_class("dialog-title-container");
+    // Create status group
+    let status_group = PreferencesGroup::new();
+    status_group.set_title(&format!("2FA Settings for \"{}\"", vault_name));
+    status_group.set_description(Some("Manage your two-factor authentication settings"));
 
-    let title = Label::new(Some(&format!("2FA Settings for \"{}\"", vault_name)));
-    title.add_css_class("title-1");
-    title.set_halign(gtk4::Align::Center);
+    // Status row
+    let status_row = ActionRow::new();
+    status_row.set_title("Status");
+    status_row.set_subtitle("Two-factor authentication is currently enabled");
 
-    let subtitle = Label::new(Some("Manage your two-factor authentication settings"));
-    subtitle.add_css_class("dim-label");
-    subtitle.set_halign(gtk4::Align::Center);
-
-    title_container.append(&title);
-    title_container.append(&subtitle);
-    content_box.append(&title_container);
-
-    // Status message
-    let status_label = Label::new(Some(
-        "Two-factor authentication is currently enabled for this vault.",
-    ));
-    status_label.add_css_class("success");
-    status_label.set_halign(gtk4::Align::Center);
-    content_box.append(&status_label);
+    let status_icon = Image::from_icon_name("emblem-ok-symbolic");
+    status_icon.add_css_class("success");
+    status_row.add_prefix(&status_icon);
+    status_group.add(&status_row);
 
     // Get existing TOTP info
     match get_totp_qr_info(vault_name) {
         Ok((secret, otpauth_uri)) => {
-            // QR Code section (for backup/re-setup)
-            let qr_section = create_qr_code_section(&otpauth_uri, &secret);
-            content_box.append(&qr_section);
+            // QR Code group (for backup/re-setup)
+            let qr_group = PreferencesGroup::new();
+            qr_group.set_title("Backup QR Code");
+            qr_group.set_description(Some("Use this QR code to set up 2FA on additional devices"));
 
-            // Action buttons
-            let button_box = GtkBox::new(Orientation::Horizontal, 12);
-            button_box.set_halign(gtk4::Align::Center);
-            button_box.set_margin_top(16);
+            let qr_row = ActionRow::new();
+            qr_row.set_title("QR Code");
+            qr_row.set_subtitle(&format!("Secret: {}", secret));
 
-            // Disable 2FA button
+            // Create QR code image
+            if let Ok(qr_image) = generate_qr_code_image(&otpauth_uri) {
+                let qr_image_widget = Image::from_pixbuf(Some(&qr_image));
+                qr_image_widget.set_pixel_size(200);
+                qr_row.set_child(Some(&qr_image_widget));
+            }
+
+            qr_group.add(&qr_row);
+
+            // Actions group
+            let actions_group = PreferencesGroup::new();
+            actions_group.set_title("Actions");
+            actions_group.set_description(Some("Manage your two-factor authentication"));
+
+            // Disable 2FA row
+            let disable_row = ActionRow::new();
+            disable_row.set_title("Disable Two-Factor Authentication");
+            disable_row.set_subtitle("Remove 2FA protection from this vault");
+
             let disable_button = Button::new();
-            disable_button.set_label("Disable 2FA");
+            disable_button.set_label("Disable");
             disable_button.add_css_class("destructive-action");
+            disable_button.set_valign(gtk4::Align::Center);
 
             let vault_name_clone = vault_name.to_string();
             let content_area_clone = content_area.clone();
-            let dialog_clone = dialog.clone();
+            let window_clone = totp_window.clone();
             disable_button.connect_clicked(move |_| {
                 show_confirmation_dialog(
                     "Disable Two-Factor Authentication",
                     &format!("Are you sure you want to disable 2FA for vault \"{}\"?\n\nThis will make your vault less secure.", vault_name_clone),
                     "Disable 2FA",
-                    Some(&dialog_clone),
+                    Some(&window_clone),
                     {
                         let vault_name_clone2 = vault_name_clone.clone();
                         let content_area_clone2 = content_area_clone.clone();
-                        let dialog_clone2 = dialog_clone.clone();
+                        let window_clone2 = window_clone.clone();
                         move || {
                             match disable_totp(&vault_name_clone2) {
                                 Ok(()) => {
-                                    dialog_clone2.close();
+                                    window_clone2.close();
                                     // Refresh sidebar to update 2FA status indicator
                                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2);
                                     // Refresh the vault view to update 2FA status
@@ -962,44 +1051,26 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                 );
             });
 
-            // Close button
-            let close_button = Button::new();
-            close_button.set_label("Close");
-            close_button.add_css_class("flat");
+            disable_row.add_suffix(&disable_button);
+            disable_row.set_activatable_widget(Some(&disable_button));
+            actions_group.add(&disable_row);
 
-            let dialog_close = dialog.clone();
-            close_button.connect_clicked(move |_| {
-                dialog_close.close();
-            });
-
-            button_box.append(&disable_button);
-            button_box.append(&close_button);
-            content_box.append(&button_box);
+            page.add(&status_group);
+            page.add(&qr_group);
+            page.add(&actions_group);
         }
         Err(e) => {
-            let error_label = Label::new(Some(&format!("Failed to load 2FA info: {}", e)));
-            error_label.add_css_class("error");
-            error_label.set_wrap(true);
-            content_box.append(&error_label);
+            let error_row = ActionRow::new();
+            error_row.set_title("Error Loading 2FA Information");
+            error_row.set_subtitle(&format!("Failed to load 2FA info: {}", e));
+            status_group.add(&error_row);
 
-            // Close button for error case
-            let close_button = Button::new();
-            close_button.set_label("Close");
-            close_button.add_css_class("suggested-action");
-            close_button.set_halign(gtk4::Align::Center);
-            close_button.set_margin_top(16);
-
-            let dialog_clone = dialog.clone();
-            close_button.connect_clicked(move |_| {
-                dialog_clone.close();
-            });
-
-            content_box.append(&close_button);
+            page.add(&status_group);
         }
     }
 
-    dialog.set_child(Some(&content_box));
-    dialog.present();
+    totp_window.add(&page);
+    totp_window.present();
 }
 
 /// Creates the QR code section with the code image and manual entry option

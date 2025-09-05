@@ -2,10 +2,10 @@ use crate::gui::content::{open_vault_with_gate, show_home_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
-use adw::{ButtonContent, HeaderBar, ToastOverlay};
+use adw::{ActionRow, ButtonContent, Clamp, HeaderBar, PreferencesGroup};
 use gtk4::{
-    Box, Button, Entry, Label, ListBoxRow, Orientation, Paned, PolicyType, ScrolledWindow,
-    Separator,
+    Box, Button, Entry, Label, ListBox, ListBoxRow, Orientation, Paned, PolicyType, ScrolledWindow,
+    SearchEntry, Separator,
 };
 use std::path::PathBuf;
 
@@ -54,156 +54,275 @@ pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box
 /// Creates a sidebar with navigation items that can update content
 pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     let sidebar = Box::new(Orientation::Vertical, 0);
-
-    // Add dark background styling
     sidebar.add_css_class("sidebar");
-    sidebar.set_css_classes(&["sidebar", "background"]);
-
-    // Create vault buttons section (initially unfiltered)
-    let vaults_section = create_vaults_section(content_area, "");
-
-    // Create filter bar (visible by default) - responsive to sidebar width
-    let filter_bar = create_filter_bar("", "Search vaults...", true);
-    filter_bar.set_visible(true);
-    filter_bar.set_margin_start(12);
-    filter_bar.set_margin_end(12);
-    filter_bar.set_margin_top(8);
-    filter_bar.set_margin_bottom(8);
-    filter_bar.set_halign(gtk4::Align::Fill);
-    filter_bar.set_hexpand(true);
-
-    // Connect filter bar to update vaults section
-    connect_filter_to_vaults(&filter_bar, &vaults_section, content_area);
 
     // Create header bar with navigation buttons
-    let header_bar = create_header_bar(content_area, &filter_bar);
+    let header_bar = create_header_bar(content_area);
     sidebar.append(&header_bar);
 
-    // Create a scrollable container for the content below the header
+    // Create search entry
+    let search_entry = SearchEntry::new();
+    search_entry.set_placeholder_text(Some("Search vaults..."));
+    search_entry.set_margin_start(12);
+    search_entry.set_margin_end(12);
+    search_entry.set_margin_top(8);
+    search_entry.set_margin_bottom(8);
+    sidebar.append(&search_entry);
+
+    // Create scrolled window for vault list
     let scrolled_window = ScrolledWindow::new();
     scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    // Create a box to hold the scrollable content
-    let scrollable_content = Box::new(Orientation::Vertical, 0);
+    // Use Clamp for proper content width
+    let clamp = Clamp::new();
+    clamp.set_maximum_size(400);
+    clamp.set_tightening_threshold(300);
 
-    // Add sidebar title and divider to scrollable content
-    let title_section = create_title_section();
-    scrollable_content.append(&title_section);
+    // Create vault list using PreferencesGroup for better libadwaita integration
+    let vault_group = create_vault_preferences_group(content_area, "");
+    clamp.set_child(Some(&vault_group));
+    scrolled_window.set_child(Some(&clamp));
 
-    // Add filter bar to scrollable content
-    scrollable_content.append(&filter_bar);
+    // Connect search functionality
+    connect_search_to_vault_group(&search_entry, &vault_group, content_area);
 
-    // Add vaults section to scrollable content
-    scrollable_content.append(&vaults_section);
-
-    // Set the scrollable content as the child of the scrolled window
-    scrolled_window.set_child(Some(&scrollable_content));
-
-    // Add the scrolled window to the sidebar
     sidebar.append(&scrolled_window);
-
     sidebar
 }
 
 /// Creates the header bar with navigation buttons
-fn create_header_bar(content_area: &Box, filter_bar: &Box) -> HeaderBar {
-    let header_bar = HeaderBar::builder()
-        .title_widget(&Label::new(Some("")))
-        .show_end_title_buttons(false)
-        .build();
+fn create_header_bar(content_area: &Box) -> HeaderBar {
+    let header_bar = HeaderBar::new();
+    header_bar.set_title_widget(Some(&Label::new(Some("Vaults"))));
+    header_bar.add_css_class("flat");
 
-    // Create and pack navigation buttons
-    let home_button = create_icon_button("go-home");
-    let search_button = create_icon_button("system-search-symbolic");
-
+    // Create home button
+    let home_button = create_icon_button("go-home-symbolic");
+    home_button.set_tooltip_text(Some("Home"));
     header_bar.pack_start(&home_button);
-    header_bar.pack_end(&search_button);
 
-    // Connect button callbacks
+    // Connect home button callback
     let content_area_home = content_area.clone();
     home_button.connect_clicked(move |_| {
         show_home_view(&content_area_home);
     });
 
-    // Search button toggles filter bar visibility
-    let filter_bar_clone = filter_bar.clone();
-    search_button.connect_clicked(move |_| {
-        let is_visible = filter_bar_clone.is_visible();
-        filter_bar_clone.set_visible(!is_visible);
-    });
-
     header_bar
 }
 
-/// Creates a title section with divider and add vault button
-fn create_title_section() -> Box {
-    let title_box = Box::new(Orientation::Vertical, 0);
+/// Creates a vault preferences group with filtering capability
+fn create_vault_preferences_group(content_area: &Box, filter: &str) -> adw::PreferencesGroup {
+    use adw::{ActionRow, PreferencesGroup};
 
-    // Header with title and add button
-    let header_box = Box::new(Orientation::Horizontal, 8);
-    header_box.set_margin_start(16);
-    header_box.set_margin_end(16);
-    header_box.set_margin_top(12);
-    header_box.set_margin_bottom(8);
+    let group = PreferencesGroup::new();
+    group.set_title("Your Vaults");
+    group.set_description(Some("Select a vault to open"));
 
-    // Title label
-    let title_label = Label::new(Some("Vaults"));
-    title_label.set_halign(gtk4::Align::Start);
-    title_label.set_hexpand(true);
-    title_label.add_css_class("heading");
-    title_label.add_css_class("sidebar-title");
+    // Get available vaults and apply filtering
+    let all_vaults = get_available_vaults();
+    let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
 
-    header_box.append(&title_label);
+    if filtered_vaults.is_empty() {
+        let empty_row = create_empty_state_action_row(filter);
+        group.add(&empty_row);
+    } else {
+        for vault_name in filtered_vaults {
+            let vault_row = create_vault_action_row(vault_name, content_area);
+            group.add(&vault_row);
+        }
+    }
 
-    // Divider
-    let separator = gtk4::Separator::new(Orientation::Horizontal);
-    separator.set_margin_start(16);
-    separator.set_margin_end(16);
-    separator.set_margin_bottom(8);
-    separator.add_css_class("sidebar-divider");
-
-    title_box.append(&header_box);
-    title_box.append(&separator);
-
-    title_box
+    group
 }
 
-/// Connects the filter bar to update the vaults section when text changes
-fn connect_filter_to_vaults(filter_bar: &Box, vaults_section: &Box, content_area: &Box) {
-    // Get the entry widget from the filter bar
-    if let Some(entry) = filter_bar
-        .first_child()
-        .and_then(|child| child.downcast::<Entry>().ok())
-    {
-        let vaults_section_clone = vaults_section.clone();
-        let content_area_clone = content_area.clone();
+/// Creates a vault list using ListBox for better libadwaita integration
+fn create_vault_list(content_area: &Box, filter: &str) -> ListBox {
+    let list_box = ListBox::new();
+    list_box.set_selection_mode(gtk4::SelectionMode::None);
+    list_box.add_css_class("navigation-sidebar");
 
-        entry.connect_changed(move |entry| {
-            let filter_text = entry.text();
+    // Get available vaults and apply filtering
+    let all_vaults = get_available_vaults();
+    let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
 
-            // Clear existing vault buttons
-            let mut child = vaults_section_clone.first_child();
-            while let Some(widget) = child {
-                let next_child = widget.next_sibling();
-                vaults_section_clone.remove(&widget);
-                child = next_child;
-            }
-
-            // Create new filtered vault section content
-            let new_content = create_vaults_section(&content_area_clone, &filter_text);
-
-            // Move all children from new_content to vaults_section_clone
-            let mut new_child = new_content.first_child();
-            while let Some(widget) = new_child {
-                let next_child = widget.next_sibling();
-                new_content.remove(&widget);
-                vaults_section_clone.append(&widget);
-                new_child = next_child;
-            }
-        });
+    if filtered_vaults.is_empty() {
+        let empty_row = create_empty_state_row(filter);
+        list_box.append(&empty_row);
+    } else {
+        for vault_name in filtered_vaults {
+            let vault_row = create_vault_row(vault_name, content_area);
+            list_box.append(&vault_row);
+        }
     }
+
+    list_box
+}
+
+/// Creates an empty state row for when no vaults are found
+fn create_empty_state_row(filter: &str) -> ListBoxRow {
+    let row = ListBoxRow::new();
+    row.set_selectable(false);
+    row.set_activatable(false);
+
+    let label = if filter.is_empty() {
+        Label::new(Some("No vaults found"))
+    } else {
+        Label::new(Some("No vaults match your search"))
+    };
+    label.add_css_class("dim-label");
+    label.set_margin_top(16);
+    label.set_margin_bottom(16);
+    label.set_margin_start(16);
+    label.set_margin_end(16);
+
+    row.set_child(Some(&label));
+    row
+}
+
+/// Creates a row for a specific vault
+fn create_vault_row(vault_name: &str, content_area: &Box) -> ListBoxRow {
+    let row = ListBoxRow::new();
+    row.set_activatable(true);
+
+    let label = Label::new(Some(vault_name));
+    label.set_halign(gtk4::Align::Start);
+    label.set_margin_top(12);
+    label.set_margin_bottom(12);
+    label.set_margin_start(16);
+    label.set_margin_end(16);
+
+    row.set_child(Some(&label));
+
+    // Connect click handler using a button approach since ListBoxRow doesn't have connect_activated
+    let button = Button::new();
+    button.set_child(Some(&label));
+    button.add_css_class("flat");
+    button.set_hexpand(true);
+    button.set_halign(gtk4::Align::Fill);
+
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    button.connect_clicked(move |_| {
+        open_vault_with_gate(&content_area_clone, &vault_name_clone);
+    });
+
+    row.set_child(Some(&button));
+    row
+}
+
+/// Creates an empty state action row for when no vaults are found
+fn create_empty_state_action_row(filter: &str) -> adw::ActionRow {
+    use adw::ActionRow;
+
+    let row = ActionRow::new();
+    row.set_activatable(false);
+
+    if filter.is_empty() {
+        row.set_title("No vaults found");
+        row.set_subtitle("Create your first vault to get started");
+    } else {
+        row.set_title("No vaults match your search");
+        row.set_subtitle("Try a different search term");
+    }
+
+    row
+}
+
+/// Creates an action row for a specific vault
+fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionRow {
+    use adw::ActionRow;
+
+    let row = ActionRow::new();
+    row.set_title(vault_name);
+    row.set_subtitle("Password vault");
+    row.set_activatable(true);
+
+    // Add vault icon
+    let open_button = Button::new();
+    open_button.set_label("Open");
+    open_button.add_css_class("flat");
+    open_button.set_valign(gtk4::Align::Center);
+    row.add_suffix(&open_button);
+    row.set_activatable_widget(Some(&open_button));
+
+    // Connect click handler
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    open_button.connect_clicked(move |_| {
+        open_vault_with_gate(&content_area_clone, &vault_name_clone);
+    });
+
+    row
+}
+
+/// Connects the search entry to update the vault list when text changes
+fn connect_search_to_vault_list(
+    search_entry: &SearchEntry,
+    vault_list: &ListBox,
+    content_area: &Box,
+) {
+    let vault_list_clone = vault_list.clone();
+    let content_area_clone = content_area.clone();
+
+    search_entry.connect_search_changed(move |entry| {
+        let filter_text = entry.text();
+
+        // Clear existing vault rows
+        while let Some(child) = vault_list_clone.first_child() {
+            vault_list_clone.remove(&child);
+        }
+
+        // Create new filtered vault list
+        let all_vaults = get_available_vaults();
+        let filtered_vaults =
+            crate::gui::widgets::filtering::sort_vaults(&all_vaults, &filter_text);
+
+        if filtered_vaults.is_empty() {
+            let empty_row = create_empty_state_row(&filter_text);
+            vault_list_clone.append(&empty_row);
+        } else {
+            for vault_name in filtered_vaults {
+                let vault_row = create_vault_row(vault_name, &content_area_clone);
+                vault_list_clone.append(&vault_row);
+            }
+        }
+    });
+}
+
+/// Connects the search entry to update the vault preferences group when text changes
+fn connect_search_to_vault_group(
+    search_entry: &SearchEntry,
+    vault_group: &adw::PreferencesGroup,
+    content_area: &Box,
+) {
+    let vault_group_clone = vault_group.clone();
+    let content_area_clone = content_area.clone();
+
+    search_entry.connect_search_changed(move |entry| {
+        let filter_text = entry.text().to_string();
+
+        // Clear existing vault rows
+        while let Some(child) = vault_group_clone.first_child() {
+            vault_group_clone.remove(&child);
+        }
+
+        // Create new filtered vault list
+        let all_vaults = get_available_vaults();
+        let filtered_vaults =
+            crate::gui::widgets::filtering::sort_vaults(&all_vaults, &filter_text);
+
+        if filtered_vaults.is_empty() {
+            let empty_row = create_empty_state_action_row(&filter_text);
+            vault_group_clone.add(&empty_row);
+        } else {
+            for vault_name in filtered_vaults {
+                let vault_row = create_vault_action_row(vault_name, &content_area_clone);
+                vault_group_clone.add(&vault_row);
+            }
+        }
+    });
 }
 
 /// Creates a button with an icon
@@ -214,74 +333,6 @@ pub fn create_icon_button(icon_name: &str) -> Button {
         .use_underline(true)
         .build();
     button.set_child(Some(&button_content));
-    button
-}
-
-/// Creates a section with buttons for each available vault
-fn create_vaults_section(content_area: &Box, filter: &str) -> Box {
-    println!("create_vaults_section called with filter: '{}'", filter);
-
-    let vaults_box = Box::new(Orientation::Vertical, 4);
-    vaults_box.set_margin_top(8);
-    vaults_box.set_margin_start(16);
-    vaults_box.set_margin_end(16);
-    vaults_box.set_margin_bottom(16);
-
-    // Get available vaults and apply filtering
-    let all_vaults = get_available_vaults();
-    let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
-
-    println!("After filtering: {} vaults", filtered_vaults.len());
-
-    if filtered_vaults.is_empty() {
-        let message = if filter.is_empty() {
-            "No vaults found"
-        } else {
-            "No vaults match your search"
-        };
-        println!("Showing empty message: {}", message);
-        let no_vaults_label = Label::new(Some(message));
-        no_vaults_label.add_css_class("dim-label");
-        no_vaults_label.add_css_class("sidebar-empty-message");
-        no_vaults_label.set_halign(gtk4::Align::Start);
-        no_vaults_label.set_margin_top(16);
-        vaults_box.append(&no_vaults_label);
-    } else {
-        println!("Creating buttons for vaults: {:?}", filtered_vaults);
-        for vault_name in filtered_vaults {
-            let vault_button = create_vault_button(vault_name, content_area);
-            vaults_box.append(&vault_button);
-        }
-    }
-
-    vaults_box
-}
-
-/// Creates a button for a specific vault
-fn create_vault_button(vault_name: &str, content_area: &Box) -> Button {
-    let button = Button::new();
-    button.add_css_class("flat");
-    button.add_css_class("sidebar-vault-button");
-    button.set_halign(gtk4::Align::Fill);
-    button.set_hexpand(true);
-
-    // Create a box to hold the label with proper alignment
-    let button_box = Box::new(Orientation::Horizontal, 0);
-    let label = Label::new(Some(vault_name));
-    label.set_halign(gtk4::Align::Start);
-    label.set_hexpand(true);
-    label.add_css_class("sidebar-vault-label");
-
-    button_box.append(&label);
-    button.set_child(Some(&button_box));
-
-    // Connect click handler
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    button.connect_clicked(move |_| {
-        open_vault_with_gate(&content_area_clone, &vault_name_clone);
-    });
-
     button
 }
 
@@ -318,71 +369,46 @@ pub fn refresh_sidebar_from_content_area(content_area: &Box) {
     }
 }
 
-/// Refreshes the vaults section in the sidebar
-pub fn refresh_vaults_section(sidebar: &Box, content_area: &Box) {
+/// Refreshes the vault list in the sidebar
+pub fn refresh_vault_list(sidebar: &Box, content_area: &Box) {
     // Find the scrolled window in the sidebar
     if let Some(scrolled_window) = sidebar
         .last_child()
         .and_then(|child| child.downcast::<ScrolledWindow>().ok())
     {
-        if let Some(scrollable_content) = scrolled_window
+        if let Some(vault_list) = scrolled_window
             .child()
-            .and_then(|child| child.downcast::<Box>().ok())
+            .and_then(|child| child.downcast::<ListBox>().ok())
         {
-            // Find the filter bar to get current filter text
+            // Find the search entry to get current filter text
             let mut current_filter = String::new();
-            let mut filter_child = scrollable_content.first_child();
-            while let Some(widget) = filter_child {
-                if let Some(filter_box) = widget.clone().downcast::<Box>().ok() {
-                    // Check if this box contains an Entry (filter bar)
-                    if let Some(entry) = filter_box
-                        .first_child()
-                        .and_then(|child| child.downcast::<Entry>().ok())
-                    {
-                        current_filter = entry.text().to_string();
-                        break;
-                    }
-                }
-                filter_child = widget.next_sibling();
-            }
-
-            // Find the vaults section (should be the last child)
-            if let Some(vaults_section) = scrollable_content
-                .last_child()
-                .and_then(|child| child.downcast::<Box>().ok())
+            if let Some(search_entry) = sidebar
+                .first_child()
+                .and_then(|header| header.next_sibling())
+                .and_then(|child| child.downcast::<SearchEntry>().ok())
             {
-                // Clear existing vault buttons
-                let mut child = vaults_section.first_child();
-                let mut removed_count = 0;
-                while let Some(widget) = child {
-                    let next_child = widget.next_sibling();
-                    vaults_section.remove(&widget);
-                    removed_count += 1;
-                    child = next_child;
-                }
-                println!("Removed {} existing vault widgets", removed_count);
-
-                // Recreate the vault buttons with updated vault list, preserving filter
-                let new_vaults_section = create_vaults_section(content_area, &current_filter);
-
-                // Move all children from new_vaults_section to vaults_section
-                let mut new_child = new_vaults_section.first_child();
-                let mut added_count = 0;
-                while let Some(widget) = new_child {
-                    let next_child = widget.next_sibling();
-                    new_vaults_section.remove(&widget);
-                    vaults_section.append(&widget);
-                    added_count += 1;
-                    new_child = next_child;
-                }
-                println!("Added {} new vault widgets", added_count);
-            } else {
-                println!("Could not find vaults section");
+                current_filter = search_entry.text().to_string();
             }
-        } else {
-            println!("Could not find scrollable content");
+
+            // Clear existing vault rows
+            while let Some(child) = vault_list.first_child() {
+                vault_list.remove(&child);
+            }
+
+            // Recreate the vault list with updated vault list, preserving filter
+            let all_vaults = get_available_vaults();
+            let filtered_vaults =
+                crate::gui::widgets::filtering::sort_vaults(&all_vaults, &current_filter);
+
+            if filtered_vaults.is_empty() {
+                let empty_row = create_empty_state_row(&current_filter);
+                vault_list.append(&empty_row);
+            } else {
+                for vault_name in filtered_vaults {
+                    let vault_row = create_vault_row(vault_name, content_area);
+                    vault_list.append(&vault_row);
+                }
+            }
         }
-    } else {
-        println!("Could not find scrolled window");
     }
 }
