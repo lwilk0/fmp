@@ -1,7 +1,7 @@
 use adw::{ButtonContent, Clamp, StatusPage, PreferencesGroup, ActionRow};
 use adw::prelude::*;
 
-use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog, show_totp_setup_dialog, show_totp_management_dialog, show_backup_vault_dialog, show_restore_vault_dialog, show_delete_backup_dialog, show_rename_vault_dialog, show_delete_vault_dialog, show_rename_account_dialog, show_add_field_dialog, show_edit_field_dialog, show_delete_field_dialog};
+use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog, show_standalone_password_generator_dialog, show_totp_setup_dialog, show_totp_management_dialog, show_backup_vault_dialog, show_restore_vault_dialog, show_delete_backup_dialog, show_rename_vault_dialog, show_delete_vault_dialog, show_rename_account_dialog, show_add_field_dialog, show_edit_field_dialog, show_delete_field_dialog};
 use crate::gui::widgets::loading_spinner::{LoadingOverlay, LoadingButton, create_loading_button, set_button_loading_state};
 
 use crate::password::{PasswordConfig, generate_password};
@@ -13,7 +13,7 @@ use crate::vault::{
 };
 use gtk4::pango::EllipsizeMode;
 use gtk4::{
-    Adjustment, Box, Button, CheckButton, Dialog, Entry, FlowBox, Frame, Label, Orientation,
+    Adjustment, Box, Button, CheckButton, Dialog, Entry, FlowBox, Frame, Image, Label, Orientation,
     PolicyType, ResponseType, Scale, ScrolledWindow, SelectionMode, Separator, SpinButton,
     TextBuffer, TextView, Switch, ComboBoxText, LinkButton, ProgressBar, ListBox, ListBoxRow,
     WrapMode,
@@ -46,9 +46,9 @@ pub fn show_home_view(content_area: &Box) {
     clamp.set_maximum_size(800);
     clamp.set_tightening_threshold(600);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(32);
-    main_box.set_margin_bottom(32);
+    let main_box = Box::new(Orientation::Vertical, 16);
+    main_box.set_margin_top(24);
+    main_box.set_margin_bottom(24);
     main_box.set_margin_start(24);
     main_box.set_margin_end(24);
 
@@ -749,6 +749,7 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     }
     password_entry.set_editable(edit_mode);
     password_entry.set_hexpand(true);
+    password_entry.set_size_request(250, -1); // Reduced width for better responsiveness
     password_entry.add_css_class("password-field");
 
     // Connect password changes in edit mode
@@ -930,6 +931,7 @@ fn create_additional_fields_section(
         field_entry.set_text(field_value);
         field_entry.set_editable(edit_mode);
         field_entry.set_hexpand(true);
+        field_entry.set_size_request(350, -1); // Make textbox longer
         field_entry.add_css_class("password-field");
         field_entry.set_placeholder_text(Some(&format!("Enter {}", field_name.to_lowercase())));
 
@@ -1071,6 +1073,7 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
     let account = account_rc.borrow();
     notes_entry.set_text(&account.notes);
     notes_entry.set_hexpand(true);
+    notes_entry.set_size_request(250, -1); // Reduced width for better responsiveness
     notes_entry.set_editable(edit_mode);
     notes_entry.add_css_class("notes-field");
 
@@ -1176,7 +1179,8 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     value_entry.set_text(value_text);
     value_entry.set_editable(false);
     value_entry.set_hexpand(true);
-    value_entry.add_css_class("flat");
+    value_entry.set_size_request(250, -1); // Reduced width for better responsiveness
+    value_entry.add_css_class("password-field");
     value_entry.set_tooltip_text(Some(value_text)); // Show full text on hover
 
     value_box.append(&value_entry);
@@ -1244,6 +1248,7 @@ fn create_password_field_row(
     let entry = Entry::new();
     entry.set_text(initial_value);
     entry.set_hexpand(true);
+    entry.set_size_request(250, -1); // Reduced width for better responsiveness
     entry.set_visibility(false); // Start hidden
     entry.set_invisible_char(Some('•'));
 
@@ -1441,6 +1446,8 @@ fn create_editable_field_row(
     let entry = Entry::new();
     entry.set_text(initial_value);
     entry.set_hexpand(true);
+    entry.set_size_request(250, -1); // Reduced width for better responsiveness
+    entry.add_css_class("password-field"); // Same background as password and notes
 
     // Connect entry changes to account data
     let account_rc_clone = account_rc.clone();
@@ -1467,13 +1474,29 @@ fn create_editable_field_row(
 }
 
 /// Creates the welcome section for the home view
-fn create_welcome_section() -> StatusPage {
-    let status_page = StatusPage::new();
-    status_page.set_icon_name(Some("dialog-password-symbolic"));
-    status_page.set_title("Welcome to FMP");
-    status_page.set_description(Some("A Safe, Secure Password Manager\n\nManage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe."));
+fn create_welcome_section() -> Box {
+    let welcome_box = Box::new(Orientation::Vertical, 8);
+    welcome_box.add_css_class("welcome-section");
+    welcome_box.set_halign(gtk4::Align::Center);
+    welcome_box.set_valign(gtk4::Align::Start);
+    // Create title
+    let title = Label::new(Some("Welcome to FMP"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Center);
+    title.set_margin_top(8);
+    title.set_margin_bottom(4);
+    welcome_box.append(&title);
     
-    status_page
+    // Create description
+    let description = Label::new(Some("A Safe, Secure Password Manager\n\nManage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe."));
+    description.add_css_class("body");
+    description.set_halign(gtk4::Align::Center);
+    description.set_justify(gtk4::Justification::Center);
+    description.set_margin_top(0);
+    description.set_margin_bottom(8);
+    welcome_box.append(&description);
+    
+    welcome_box
 }
 
 /// Creates the statistics section showing vault and account counts
@@ -1495,7 +1518,7 @@ fn create_statistics_section() -> PreferencesGroup {
     vault_row.set_title("Vaults");
     vault_row.set_subtitle("Total number of vaults");
     let vault_label = Label::new(Some(&vault_count.to_string()));
-    vault_label.add_css_class("title-2");
+    vault_label.add_css_class("title-3");
     vault_row.add_suffix(&vault_label);
     group.add(&vault_row);
 
@@ -1504,7 +1527,7 @@ fn create_statistics_section() -> PreferencesGroup {
     account_row.set_title("Accounts");
     account_row.set_subtitle("Total number of accounts");
     let account_label = Label::new(Some(&total_accounts.to_string()));
-    account_label.add_css_class("title-2");
+    account_label.add_css_class("title-3");
     account_row.add_suffix(&account_label);
     group.add(&account_row);
 
@@ -1514,7 +1537,7 @@ fn create_statistics_section() -> PreferencesGroup {
     most_used_row.set_title("Most Used Vault");
     most_used_row.set_subtitle("Your frequently accessed vault");
     let most_used_label = Label::new(Some(&most_used));
-    most_used_label.add_css_class("accent");
+    most_used_label.add_css_class("title-3");
     most_used_row.add_suffix(&most_used_label);
     group.add(&most_used_row);
 
@@ -1582,16 +1605,13 @@ fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
 
     let password_button = Button::new();
     password_button.set_label("Generate");
-    password_button.add_css_class("flat");
+    password_button.add_css_class("suggested-action");
     password_button.set_valign(gtk4::Align::Center);
     password_row.add_suffix(&password_button);
     password_row.set_activatable_widget(Some(&password_button));
 
     password_button.connect_clicked(move |_| {
-        // Create a temporary entry for the password generator
-        let temp_entry = Entry::new();
-        let temp_account = Rc::new(RefCell::new(Account::new("temp".to_string())));
-        show_password_generator_dialog(&temp_entry, &temp_account);
+        show_standalone_password_generator_dialog();
     });
 
     group.add(&password_row);

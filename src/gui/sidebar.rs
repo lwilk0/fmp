@@ -10,7 +10,7 @@ use gtk4::{
 use std::path::PathBuf;
 
 // Constants for better maintainability
-const SIDEBAR_WIDTH: i32 = 250;
+const SIDEBAR_WIDTH: i32 = 270;
 
 /// Gets the vaults directory path
 fn get_vaults_directory() -> PathBuf {
@@ -60,13 +60,23 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     let header_bar = create_header_bar(content_area);
     sidebar.append(&header_bar);
 
+    // Create "Your Vaults" heading
+    let vaults_heading = Label::new(Some("Your Vaults"));
+    vaults_heading.add_css_class("heading");
+    vaults_heading.set_halign(gtk4::Align::Start);
+    vaults_heading.set_margin_start(12);
+    vaults_heading.set_margin_end(12);
+    vaults_heading.set_margin_top(8);
+    vaults_heading.set_margin_bottom(4);
+    sidebar.append(&vaults_heading);
+
     // Create search entry
     let search_entry = SearchEntry::new();
     search_entry.set_placeholder_text(Some("Search vaults..."));
-    search_entry.set_margin_start(12);
-    search_entry.set_margin_end(12);
-    search_entry.set_margin_top(8);
-    search_entry.set_margin_bottom(8);
+    search_entry.set_margin_start(8);
+    search_entry.set_margin_end(8);
+    search_entry.set_margin_top(4);
+    search_entry.set_margin_bottom(4);
     sidebar.append(&search_entry);
 
     // Create scrolled window for vault list
@@ -77,8 +87,10 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
 
     // Use Clamp for proper content width
     let clamp = Clamp::new();
-    clamp.set_maximum_size(400);
-    clamp.set_tightening_threshold(300);
+    clamp.set_maximum_size(320);
+    clamp.set_tightening_threshold(240);
+    clamp.set_margin_start(8);
+    clamp.set_margin_end(8);
 
     // Create vault list using PreferencesGroup for better libadwaita integration
     let vault_group = create_vault_preferences_group(content_area, "");
@@ -95,8 +107,11 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
 /// Creates the header bar with navigation buttons
 fn create_header_bar(content_area: &Box) -> HeaderBar {
     let header_bar = HeaderBar::new();
-    header_bar.set_title_widget(Some(&Label::new(Some("Vaults"))));
+    let title_label = Label::new(None);
+    title_label.add_css_class("heading");
+    header_bar.set_title_widget(Some(&title_label));
     header_bar.add_css_class("flat");
+    header_bar.set_show_end_title_buttons(false);
 
     // Create home button
     let home_button = create_icon_button("go-home-symbolic");
@@ -117,8 +132,6 @@ fn create_vault_preferences_group(content_area: &Box, filter: &str) -> adw::Pref
     use adw::{ActionRow, PreferencesGroup};
 
     let group = PreferencesGroup::new();
-    group.set_title("Your Vaults");
-    group.set_description(Some("Select a vault to open"));
 
     // Get available vaults and apply filtering
     let all_vaults = get_available_vaults();
@@ -172,10 +185,10 @@ fn create_empty_state_row(filter: &str) -> ListBoxRow {
         Label::new(Some("No vaults match your search"))
     };
     label.add_css_class("dim-label");
-    label.set_margin_top(16);
-    label.set_margin_bottom(16);
-    label.set_margin_start(16);
-    label.set_margin_end(16);
+    label.set_margin_top(12);
+    label.set_margin_bottom(12);
+    label.set_margin_start(12);
+    label.set_margin_end(12);
 
     row.set_child(Some(&label));
     row
@@ -188,10 +201,10 @@ fn create_vault_row(vault_name: &str, content_area: &Box) -> ListBoxRow {
 
     let label = Label::new(Some(vault_name));
     label.set_halign(gtk4::Align::Start);
-    label.set_margin_top(12);
-    label.set_margin_bottom(12);
-    label.set_margin_start(16);
-    label.set_margin_end(16);
+    label.set_margin_top(8);
+    label.set_margin_bottom(8);
+    label.set_margin_start(12);
+    label.set_margin_end(12);
 
     row.set_child(Some(&label));
 
@@ -333,6 +346,9 @@ pub fn create_icon_button(icon_name: &str) -> Button {
         .use_underline(true)
         .build();
     button.set_child(Some(&button_content));
+    button.add_css_class("flat");
+    button.set_margin_start(2);
+    button.set_margin_end(2);
     button
 }
 

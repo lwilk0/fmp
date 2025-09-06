@@ -67,6 +67,42 @@ pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<Ref
     generator_window.present();
 }
 
+/// Shows the password generator dialog without the "Use Password" button (for standalone use)
+pub fn show_standalone_password_generator_dialog() {
+    let generator_window = PreferencesWindow::new();
+    generator_window.set_title(Some("Password Generator"));
+    generator_window.set_modal(true);
+    generator_window.set_default_size(560, 640);
+    generator_window.set_search_enabled(false);
+
+    // Password configuration - use single shared instance
+    let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
+
+    // Create preferences page
+    let page = adw::PreferencesPage::new();
+    page.set_title("Password Generator");
+    page.set_icon_name(Some("dialog-password-symbolic"));
+
+    // Create all sections as preference groups
+    let length_group = create_password_length_preferences_group(&password_config);
+    let character_group = create_character_types_preferences_group(&password_config);
+    let custom_group = create_custom_characters_preferences_group(&password_config);
+    let display_group = create_password_display_preferences_group(
+        &password_config,
+        None, // No target entry
+        None, // No account reference
+        Some(&generator_window),
+    );
+
+    page.add(&length_group);
+    page.add(&character_group);
+    page.add(&custom_group);
+    page.add(&display_group);
+
+    generator_window.add(&page);
+    generator_window.present();
+}
+
 /// Creates the password length configuration preferences group
 fn create_password_length_preferences_group(
     password_config: &Rc<RefCell<PasswordConfig>>,

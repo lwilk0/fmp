@@ -2,15 +2,15 @@
 .sidebar {
     background-color: #2d3142;
     border-right: 1px solid #4f5b66;
-    min-width: 200px;
-    max-width: 400px;
+    min-width: 180px;
+    max-width: 320px;
 }
 
 .sidebar-title {
     color: #ffffff;
-    font-weight: 700;
-    font-size: 1.2em;
-    padding: 4px 0;
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 2px 0;
     text-align: center;
 }
 
@@ -18,18 +18,18 @@
     background-color: #4f5b66;
     min-height: 1px;
     opacity: 0.6;
-    margin: 8px 0;
+    margin: 4px 0;
 }
 
 .sidebar-search-entry {
     background-color: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 8px;
+    border-radius: 6px;
     color: #ffffff;
-    padding: 10px 14px;
-    font-size: 0.95em;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    min-width: 180px;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    min-width: 160px;
     transition: all 0.2s ease;
 }
 
@@ -52,11 +52,11 @@
 .sidebar-vault-button {
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin: 3px 0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 2px 0;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-vault-button:hover {
@@ -83,7 +83,7 @@
     color: #ffffff;
     font-weight: 500;
     text-align: left;
-    font-size: 0.95em;
+    font-size: 0.9em;
 }
 
 /* Empty Message Styling */
@@ -96,17 +96,79 @@
 /* General improvements */
 .dim-label {
     opacity: 0.7;
+    font-size: 0.9em;
 }
 
 .heading {
     font-weight: bold;
+    font-size: 1.1em;
+}
+
+/* Compact spacing for overall interface */
+box {
+    margin: 0;
+}
+
+preferencesgroup {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+actionrow {
+    min-height: 48px;
+    padding: 4px 8px;
+}
+
+headerbar {
+    min-height: 40px;
+    padding: 2px 6px;
+}
+
+searchentry {
+    min-height: 32px;
+}
+
+/* Custom welcome section styling for compact layout */
+.welcome-section {
+    margin: 0px;
+    padding: 0px;
+}
+
+.welcome-section image {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+/* Reduce gap between welcome section and overview */
+.home-section {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+/* Sidebar vault items consistent margins */
+.sidebar preferencesgroup {
+    margin-start: 0;
+    margin-end: 0;
+}
+
+.sidebar actionrow {
+    margin-start: 0;
+    margin-end: 0;
 }
 
 .account-section,
 .home-section {
     background-color: @headerbar_bg_color;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Overview and Quick Actions section rows */
+preferencesgroup actionrow {
+    background-color: @headerbar_bg_color;
+    border-radius: 6px;
+    margin: 2px 0;
     border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -130,10 +192,10 @@
 /* Password field styling */
 .password-field {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
-    font-size: 1.1em;
-    min-height: 44px;
-    padding: 14px 16px;
-    border-radius: 8px;
+    font-size: 1.0em;
+    min-height: 36px;
+    padding: 10px 12px;
+    border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     background-color: @headerbar_bg_color;
     transition: all 0.2s ease;
@@ -146,10 +208,10 @@
 
 /* Notes field styling */
 .notes-field {
-    font-size: 1.05em;
-    min-height: 44px;
-    padding: 14px 16px;
-    border-radius: 8px;
+    font-size: 0.95em;
+    min-height: 36px;
+    padding: 10px 12px;
+    border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     background-color: @headerbar_bg_color;
     transition: all 0.2s ease;
@@ -162,7 +224,7 @@
 
 /* Password generator dialog styling */
 .password-generator-dialog {
-    border-radius: 12px;
+    border-radius: 8px;
     animation: dialog-fade-in 0.2s ease-out;
 }
 
@@ -180,9 +242,9 @@
 
 /* Password strength indicator styling */
 .password-strength {
-    border-radius: 6px;
-    min-height: 8px;
-    font-size: 12px;
+    border-radius: 4px;
+    min-height: 6px;
+    font-size: 11px;
     font-weight: 600;
     transition: all 0.3s ease;
 }
@@ -206,9 +268,9 @@
 /* 2FA/TOTP Styling */
 .totp-section {
     background-color: @headerbar_bg_color;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -219,21 +281,21 @@
 }
 
 .totp-dialog {
-    border-radius: 12px;
+    border-radius: 8px;
 }
 
 .totp-verification-dialog {
-    border-radius: 12px;
+    border-radius: 8px;
 }
 
 .totp-entry {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     text-align: center;
-    letter-spacing: 2px;
-    padding: 12px;
-    border-radius: 8px;
+    letter-spacing: 1px;
+    padding: 10px;
+    border-radius: 6px;
     background-color: @headerbar_bg_color;
     border: 2px solid rgba(0, 0, 0, 0.1);
 }
@@ -245,12 +307,12 @@
 
 .totp-code-entry {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     text-align: center;
-    letter-spacing: 2px;
-    padding: 12px;
-    border-radius: 8px;
+    letter-spacing: 1px;
+    padding: 10px;
+    border-radius: 6px;
     background-color: @headerbar_bg_color;
     border: 2px solid rgba(0, 0, 0, 0.1);
 }
@@ -382,10 +444,10 @@ dialog headerbar {
 button.suggested-action {
     background: linear-gradient(135deg, @accent_bg_color, shade(@accent_bg_color, 0.9));
     border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: 6px;
+    padding: 8px 14px;
     font-weight: 600;
-    box-shadow: 0 2px 6px rgba(53, 132, 228, 0.3);
+    box-shadow: 0 2px 4px rgba(53, 132, 228, 0.3);
     transition: all 0.2s ease;
 }
 
@@ -398,10 +460,10 @@ button.suggested-action:hover {
 button.destructive-action {
     background: linear-gradient(135deg, @destructive_bg_color, shade(@destructive_bg_color, 0.9));
     border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: 6px;
+    padding: 8px 14px;
     font-weight: 600;
-    box-shadow: 0 2px 6px rgba(192, 28, 40, 0.3);
+    box-shadow: 0 2px 4px rgba(192, 28, 40, 0.3);
     transition: all 0.2s ease;
 }
 
@@ -412,8 +474,8 @@ button.destructive-action:hover {
 }
 
 button.flat {
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: 6px;
+    padding: 8px 12px;
     transition: all 0.2s ease;
 }
 
@@ -432,8 +494,8 @@ button.success {
 /* Account card styling */
 .account-card {
     transition: all 0.2s ease;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .account-card:hover {
@@ -447,25 +509,25 @@ button.success {
 }
 
 .account-card .title-4 {
-    line-height: 1.3;
-    margin-bottom: 6px;
-    padding: 0 4px;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    padding: 0 2px;
 }
 
 .account-card .caption {
-    font-size: 0.9em;
-    line-height: 1.2;
-    padding: 0 4px;
+    font-size: 0.85em;
+    line-height: 1.1;
+    padding: 0 2px;
 }
 
 /* Field row styling for better text layout */
 .account-section entry.flat {
     background-color: transparent;
     border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    padding: 14px 16px;
-    min-height: 44px;
-    font-size: 1.1em;
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-height: 36px;
+    font-size: 1.0em;
     transition: all 0.2s ease;
 }
 
@@ -476,9 +538,9 @@ button.success {
 
 .account-section label {
     font-weight: 500;
-    min-width: 160px;
-    font-size: 1.05em;
-    padding: 4px 0;
+    min-width: 140px;
+    font-size: 0.95em;
+    padding: 2px 0;
 }
 
 /* Responsive text handling */
