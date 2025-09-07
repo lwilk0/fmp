@@ -1,29 +1,38 @@
-use adw::{ButtonContent, Clamp, StatusPage, PreferencesGroup, ActionRow};
-use adw::prelude::*;
-
-use crate::gui::dialogs::{show_confirmation_dialog, show_password_generator_dialog, show_standalone_password_generator_dialog, show_totp_setup_dialog, show_totp_management_dialog, show_backup_vault_dialog, show_restore_vault_dialog, show_delete_backup_dialog, show_rename_vault_dialog, show_delete_vault_dialog, show_rename_account_dialog, show_add_field_dialog, show_edit_field_dialog, show_delete_field_dialog};
-use crate::gui::widgets::loading_spinner::{LoadingOverlay, LoadingButton, create_loading_button, set_button_loading_state};
-
-use crate::password::{PasswordConfig, generate_password};
-use crate::totp::{is_totp_required, verify_totp_code, is_totp_enabled};
-use crate::storage::filesystem::{create_backup, install_backup, delete_vault, rename_vault, rename_account, backup_exists, delete_backup, list_backups};
-use crate::vault::{
-    Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
-    read_directory, update_account, warm_up_gpg,
+use crate::{
+    gui::{
+        dialogs::{
+            show_add_field_dialog, show_backup_vault_dialog, show_confirmation_dialog,
+            show_delete_backup_dialog, show_delete_field_dialog, show_delete_vault_dialog,
+            show_edit_field_dialog, show_password_generator_dialog, show_rename_account_dialog,
+            show_rename_vault_dialog, show_restore_vault_dialog,
+            show_standalone_password_generator_dialog, show_totp_authentication_dialog,
+            show_totp_management_dialog, show_totp_setup_dialog,
+        },
+        widgets::loading_spinner::{
+            LoadingOverlay, create_loading_button, set_button_loading_state,
+        },
+    },
+    storage::filesystem::backup_exists,
+    totp::{is_totp_enabled, is_totp_required},
+    vault::{
+        Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
+        read_directory, update_account, warm_up_gpg,
+    },
 };
-use gtk4::pango::EllipsizeMode;
+use adw::{ActionRow, ButtonContent, Clamp, PreferencesGroup, prelude::*};
+
 use gtk4::{
-    Adjustment, Box, Button, CheckButton, Dialog, Entry, FlowBox, Frame, Image, Label, Orientation,
-    PolicyType, ResponseType, Scale, ScrolledWindow, SelectionMode, Separator, SpinButton,
-    TextBuffer, TextView, Switch, ComboBoxText, LinkButton, ProgressBar, ListBox, ListBoxRow,
-    WrapMode,
+    Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
+    pango::EllipsizeMode,
 };
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fs,
+    path::PathBuf,
+    rc::Rc,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 // Global counter for tracking vault loading operations
 static VAULT_LOADING_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -31,17 +40,15 @@ static VAULT_LOADING_COUNTER: AtomicU64 = AtomicU64::new(0);
 /// Shows the home view in the content area
 pub fn show_home_view(content_area: &Box) {
     clear_content(content_area);
-    
+
     // Cancel any pending vault loading operations
     VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst);
 
-    // Create scrolled window for the home content
     let scrolled_window = ScrolledWindow::new();
     scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    // Use Clamp for proper content width
     let clamp = Clamp::new();
     clamp.set_maximum_size(800);
     clamp.set_tightening_threshold(600);
@@ -52,15 +59,12 @@ pub fn show_home_view(content_area: &Box) {
     main_box.set_margin_start(24);
     main_box.set_margin_end(24);
 
-    // Welcome section using StatusPage
     let welcome_section = create_welcome_section();
     main_box.append(&welcome_section);
 
-    // Statistics section using PreferencesGroup
     let stats_section = create_statistics_section();
     main_box.append(&stats_section);
 
-    // Quick actions section using PreferencesGroup
     let actions_section = create_quick_actions_section(content_area);
     main_box.append(&actions_section);
 
@@ -69,107 +73,22 @@ pub fn show_home_view(content_area: &Box) {
     content_area.append(&scrolled_window);
 }
 
-
-/// Clears all content from the content area
-fn clear_content(content_area: &Box) {
-    while let Some(child) = content_area.first_child() {
-        content_area.remove(&child);
-    }
-}
-
-/// Shows a specific vault view with improved account display
-/// Handles vault opening with gate logic (TOTP verification and GPG warm-up)
-pub fn open_vault_with_gate(content_area: &Box, vault_name: &str) {
-    let vault_name = vault_name.to_string();
-    let content_area = content_area.clone();
-
-        // No TOTP required, proceed with gate warm-up
-        proceed_with_gate_warmup(&content_area, &vault_name);
-}
-
-/// Proceeds with gate warm-up and then shows the vault view
-fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
-    // Check if TOTP is required for this vault
-    if is_totp_required(vault_name) {
-        // Show TOTP verification dialog
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
-        
-    } else {
-        // No TOTP required, proceed directly with GPG warm-up
-        proceed_with_gpg_warmup(content_area, vault_name);
-    }
-}
-
-/// Proceeds with GPG warm-up after TOTP verification (if required)
-fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
-    // Attempt to warm up GPG by decrypting the gate file
-    match warm_up_gpg(vault_name) {
-        Ok(()) => {
-            // Gate warm-up successful, show the vault
-            show_vault_view(content_area, vault_name);
-        }
-        Err(e) => {
-            // Gate warm-up failed, show error
-            show_error_message(
-                content_area,
-                "Failed to Access Vault",
-                &format!("Could not decrypt vault gate file: {}", e),
-            );
-        }
-    }
-}
-
-/// Shows an error message in the content area
-fn show_error_message(content_area: &Box, title: &str, message: &str) {
-    clear_content(content_area);
-
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(48);
-    main_box.set_margin_bottom(48);
-    main_box.set_margin_start(48);
-    main_box.set_margin_end(48);
-    main_box.set_halign(gtk4::Align::Center);
-    main_box.set_valign(gtk4::Align::Center);
-
-    let error_title = Label::new(Some(title));
-    error_title.add_css_class("title-1");
-    error_title.set_halign(gtk4::Align::Center);
-
-    let error_message = Label::new(Some(message));
-    error_message.set_wrap(true);
-    error_message.set_max_width_chars(80); // Increased from 60
-    error_message.set_halign(gtk4::Align::Center);
-    error_message.add_css_class("dim-label");
-    error_message.set_justify(gtk4::Justification::Center);
-
-    main_box.append(&error_title);
-    main_box.append(&error_message);
-
-    content_area.append(&main_box);
-}
-
 pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     clear_content(content_area);
 
     // Increment the loading counter to cancel any previous loading operations
     let current_loading_id = VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
 
-    // Increment usage count for this vault
     increment_vault_usage(vault_name);
 
-    // Create loading overlay
     let loading_overlay = Rc::new(LoadingOverlay::new());
     content_area.append(loading_overlay.widget());
 
-    // Create main container with scrolling
     let scrolled_window = ScrolledWindow::new();
     scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    // Use Clamp for proper content width
     let clamp = Clamp::new();
     clamp.set_maximum_size(800);
     clamp.set_tightening_threshold(600);
@@ -180,23 +99,22 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     main_box.set_margin_start(24);
     main_box.set_margin_end(24);
 
-    // Vault title with description using HeaderBar style
     let header_group = PreferencesGroup::new();
     header_group.set_title(vault_name);
-    header_group.set_description(Some("Secure vault for managing your accounts and passwords"));
+    header_group.set_description(Some(
+        "Secure vault for managing your accounts and passwords",
+    ));
+
     main_box.append(&header_group);
 
-    // 2FA Management section
     let totp_section = create_totp_management_section(content_area, vault_name);
     main_box.append(&totp_section);
 
-    // Vault Management section
     let vault_management_section = create_vault_management_section(content_area, vault_name);
     main_box.append(&vault_management_section);
 
-    // Show loading while accounts are being loaded
     loading_overlay.show("Loading accounts...");
-    
+
     // Load accounts asynchronously
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
@@ -204,8 +122,7 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     let scrolled_window_clone = scrolled_window.clone();
     let clamp_clone = clamp.clone();
     let loading_overlay_clone = loading_overlay.clone();
-    
-    // Use idle_add for better performance instead of timeout
+
     glib::idle_add_local(move || {
         // Check if this loading operation is still the current one
         let current_counter = VAULT_LOADING_COUNTER.load(Ordering::SeqCst);
@@ -215,32 +132,431 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
             return glib::ControlFlow::Break;
         }
 
-        // Accounts section
         let accounts_section = create_accounts_grid(&content_area_clone, &vault_name_clone);
         main_box_clone.append(&accounts_section);
 
         clamp_clone.set_child(Some(&main_box_clone));
         scrolled_window_clone.set_child(Some(&clamp_clone));
         content_area_clone.append(&scrolled_window_clone);
-        
+
         // Hide loading overlay
         loading_overlay_clone.hide();
-        
+
         glib::ControlFlow::Break
     });
 }
 
-/// Creates a modern list layout for accounts using PreferencesGroup
+/// Shows the account view with edit mode option
+pub fn show_account_view_with_mode(
+    content_area: &Box,
+    vault_name: &str,
+    account_name: &str,
+    edit_mode: bool,
+) {
+    clear_content(content_area);
+
+    let account_data = match get_full_account_details(vault_name, account_name) {
+        Ok(account) => Some(account),
+        Err(e) => {
+            eprintln!("Failed to load account data: {e}");
+            None
+        }
+    };
+
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled_window.set_vexpand(true);
+    scrolled_window.set_hexpand(true);
+
+    let main_box = Box::new(Orientation::Vertical, 0);
+    main_box.set_margin_top(24);
+    main_box.set_margin_bottom(24);
+    main_box.set_margin_start(24);
+    main_box.set_margin_end(24);
+
+    // Wrap account data in Rc<RefCell<>> for sharing between sections
+    let account_rc = Rc::new(RefCell::new(account_data.unwrap_or_else(|| {
+        Account {
+            name: account_name.to_string(),
+            ..Default::default()
+        }
+    })));
+
+    let header_section = create_account_header(
+        &account_rc,
+        content_area,
+        vault_name,
+        account_name,
+        edit_mode,
+    );
+
+    main_box.append(&header_section);
+
+    let details_section = create_account_details_section(&account_rc, edit_mode);
+    main_box.append(&details_section);
+
+    let password_section = create_password_section(&account_rc, edit_mode);
+    main_box.append(&password_section);
+
+    let additional_fields_section =
+        create_additional_fields_section(&account_rc, edit_mode, content_area, vault_name);
+    main_box.append(&additional_fields_section);
+
+    let notes_section = create_notes_section(&account_rc, edit_mode);
+    main_box.append(&notes_section);
+
+    if edit_mode {
+        let actions_section = create_account_actions_section(&account_rc, vault_name, content_area);
+        main_box.append(&actions_section);
+    }
+
+    scrolled_window.set_child(Some(&main_box));
+    content_area.append(&scrolled_window);
+}
+
+/// Shows the new account creation view
+pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
+    clear_content(content_area);
+
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled_window.set_vexpand(true);
+    scrolled_window.set_hexpand(true);
+
+    let main_box = Box::new(Orientation::Vertical, 24);
+    main_box.set_margin_top(24);
+    main_box.set_margin_bottom(24);
+    main_box.set_margin_start(24);
+    main_box.set_margin_end(24);
+
+    let header_box = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Create New Account"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Start);
+
+    let subtitle = Label::new(Some("Enter the details for your new account"));
+    subtitle.add_css_class("dim-label");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    header_box.append(&title);
+    header_box.append(&subtitle);
+    main_box.append(&header_box);
+
+    let new_account = Rc::new(RefCell::new(Account::default()));
+
+    let form_box = Box::new(Orientation::Vertical, 16);
+
+    // Account name
+    let name_row = create_editable_field_row("Account Name", "", &new_account, "name");
+    form_box.append(&name_row);
+
+    // Account type
+    let type_row = create_editable_field_row(
+        "Account Type",
+        "Password Account",
+        &new_account,
+        "account_type",
+    );    // Account name
+
+    form_box.append(&type_row);
+
+    // Website
+    let website_row = create_editable_field_row("Website", "", &new_account, "website");
+    form_box.append(&website_row);
+
+    // Username
+    let username_row = create_editable_field_row("Username", "", &new_account, "username");
+    form_box.append(&username_row);
+
+    // Password (with show/hide functionality)
+    let password_row = create_password_field_row("Password", "", &new_account);
+    form_box.append(&password_row);
+
+    // Notes
+    let notes_row = create_editable_field_row("Notes", "", &new_account, "notes");
+    form_box.append(&notes_row);
+
+    main_box.append(&form_box);
+
+    let actions_box = Box::new(Orientation::Horizontal, 12);
+    actions_box.set_halign(gtk4::Align::Center);
+    actions_box.set_margin_top(24);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.set_size_request(120, -1);
+
+    let content_area_clone2 = content_area.clone();
+    let vault_name_clone2 = vault_name.to_string();
+    cancel_button.connect_clicked(move |_| {
+        show_vault_view(&content_area_clone2, &vault_name_clone2);
+    });
+
+    let create_button = Button::new();
+    create_button.set_label("Create Account");
+    create_button.add_css_class("suggested-action");
+    create_button.set_size_request(120, -1);
+
+    let account_rc_clone = new_account.clone();
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    create_button.connect_clicked(move |_| {
+        let account = account_rc_clone.borrow();
+
+        if account.name.is_empty() {
+            return;
+        }
+
+        match create_account(&vault_name_clone, &account) {
+            Ok(()) => {
+                show_vault_view(&content_area_clone, &vault_name_clone);
+            }
+            Err(e) => {
+                eprintln!("Failed to create account: {e}");
+            }
+        }
+    });
+
+    actions_box.append(&cancel_button);
+    actions_box.append(&create_button);
+    main_box.append(&actions_box);
+
+    scrolled_window.set_child(Some(&main_box));
+    content_area.append(&scrolled_window);
+}
+
+/// Creates the welcome section for the home view
+fn create_welcome_section() -> Box {
+    let welcome_box = Box::new(Orientation::Vertical, 8);
+    welcome_box.add_css_class("welcome-section");
+    welcome_box.set_halign(gtk4::Align::Center);
+    welcome_box.set_valign(gtk4::Align::Start);
+
+    let title = Label::new(Some("Welcome to FMP"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Center);
+    title.set_margin_top(8);
+    title.set_margin_bottom(4);
+    welcome_box.append(&title);
+
+    let description = Label::new(Some(
+        "A Safe, Secure Password Manager\n\nManage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe.",
+    ));
+    description.add_css_class("body");
+    description.set_halign(gtk4::Align::Center);
+    description.set_justify(gtk4::Justification::Center);
+    description.set_margin_top(0);
+    description.set_margin_bottom(8);
+    welcome_box.append(&description);
+
+    welcome_box
+}
+
+/// Creates the statistics section showing vault and account counts
+fn create_statistics_section() -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Overview");
+    group.set_description(Some("Your vault statistics at a glance"));
+
+    let vaults = crate::gui::sidebar::get_available_vaults();
+    let vault_count = vaults.len();
+    let total_accounts: usize = vaults
+        .iter()
+        .map(|vault_name| get_available_accounts(vault_name).len())
+        .sum();
+
+    let vault_row = ActionRow::new();
+    vault_row.set_title("Vaults");
+    vault_row.set_subtitle("Total number of vaults");
+
+    let vault_label = Label::new(Some(&vault_count.to_string()));
+    vault_label.add_css_class("title-3");
+    vault_row.add_suffix(&vault_label);
+    group.add(&vault_row);
+
+    let account_row = ActionRow::new();
+    account_row.set_title("Accounts");
+    account_row.set_subtitle("Total number of accounts");
+
+    let account_label = Label::new(Some(&total_accounts.to_string()));
+    account_label.add_css_class("title-3");
+    account_row.add_suffix(&account_label);
+    group.add(&account_row);
+
+    let most_used = get_most_used_vault();
+
+    let most_used_row = ActionRow::new();
+    most_used_row.set_title("Most Used Vault");
+    most_used_row.set_subtitle("Your frequently accessed vault");
+
+    let most_used_label = Label::new(Some(&most_used));
+    most_used_label.add_css_class("title-3");
+    most_used_row.add_suffix(&most_used_label);
+    group.add(&most_used_row);
+
+    group
+}
+
+
+/// Creates the quick actions section
+fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Quick Actions");
+    group.set_description(Some("Get started with common tasks"));
+
+    // Create new vault row
+    let create_vault_row = ActionRow::new();
+    create_vault_row.set_title("Create New Vault");
+    create_vault_row.set_subtitle("Set up a new secure vault for your passwords");
+    create_vault_row.set_activatable(true);
+
+    let create_vault_button = Button::new();
+    create_vault_button.set_label("Create");
+    create_vault_button.add_css_class("suggested-action");
+    create_vault_button.set_valign(gtk4::Align::Center);
+    create_vault_row.add_suffix(&create_vault_button);
+    create_vault_row.set_activatable_widget(Some(&create_vault_button));
+
+    let content_area_clone = content_area.clone();
+    create_vault_button.connect_clicked(move |_| {
+        show_create_vault_view(&content_area_clone);
+    });
+
+    group.add(&create_vault_row);
+
+    let password_row = ActionRow::new();
+    password_row.set_title("Generate Password");
+    password_row.set_subtitle("Create a secure password with customizable options");
+    password_row.set_activatable(true);
+
+    let password_button = Button::new();
+    password_button.set_label("Generate");
+    password_button.add_css_class("suggested-action");
+    password_button.set_valign(gtk4::Align::Center);
+    password_row.add_suffix(&password_button);
+    password_row.set_activatable_widget(Some(&password_button));
+
+    password_button.connect_clicked(move |_| {
+        show_standalone_password_generator_dialog();
+    });
+
+    group.add(&password_row);
+
+    group
+}
+
+/// Shows the create vault view
+fn show_create_vault_view(content_area: &Box) {
+    clear_content(content_area);
+
+    let main_box = Box::new(Orientation::Vertical, 24);
+    main_box.set_margin_top(48);
+    main_box.set_margin_bottom(48);
+    main_box.set_margin_start(48);
+    main_box.set_margin_end(48);
+    main_box.set_halign(gtk4::Align::Center);
+    main_box.set_valign(gtk4::Align::Center);
+
+    let title = Label::new(Some("Create New Vault"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Center);
+
+    let subtitle = Label::new(Some("Enter a name for your new vault and select a GPG key"));
+    subtitle.add_css_class("dim-label");
+    subtitle.set_halign(gtk4::Align::Center);
+
+    main_box.append(&title);
+    main_box.append(&subtitle);
+
+    let form_box = Box::new(Orientation::Vertical, 16);
+    form_box.set_size_request(400, -1);
+
+    let name_label = Label::new(Some("Vault Name"));
+    name_label.set_halign(gtk4::Align::Start);
+    let name_entry = Entry::new();
+    name_entry.set_placeholder_text(Some("Enter vault name"));
+
+    let recipient_label = Label::new(Some("GPG Key ID"));
+    recipient_label.set_halign(gtk4::Align::Start);
+    let recipient_entry = Entry::new();
+    recipient_entry.set_placeholder_text(Some("Enter GPG key ID or email"));
+
+    form_box.append(&name_label);
+    form_box.append(&name_entry);
+    form_box.append(&recipient_label);
+    form_box.append(&recipient_entry);
+
+    main_box.append(&form_box);
+
+    let actions_box = Box::new(Orientation::Horizontal, 12);
+    actions_box.set_halign(gtk4::Align::Center);
+    actions_box.set_margin_top(24);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.set_size_request(120, -1);
+
+    let content_area_clone2 = content_area.clone();
+    cancel_button.connect_clicked(move |_| {
+        show_home_view(&content_area_clone2);
+    });
+
+    let (create_button, _) = create_loading_button("Create Vault", "Creating vault...");
+    create_button.add_css_class("suggested-action");
+    create_button.set_size_request(120, -1);
+
+    let content_area_clone = content_area.clone();
+    create_button.connect_clicked(move |button| {
+        let vault_name = name_entry.text().to_string();
+        let recipient = recipient_entry.text().to_string();
+
+        if vault_name.is_empty() || recipient.is_empty() {
+            return;
+        }
+
+        set_button_loading_state(button, true);
+
+        // Use a timeout to simulate async operation and allow UI to update
+        glib::timeout_add_local(std::time::Duration::from_millis(100), {
+            let content_area_clone = content_area_clone.clone();
+            let vault_name = vault_name.clone();
+            let recipient = recipient.clone();
+            let button = button.clone();
+
+            move || {
+                match create_vault(&vault_name, &recipient) {
+                    Ok(()) => {
+                        // Refresh sidebar to show new vault
+                        crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
+                        proceed_with_gate_warmup(&content_area_clone, &vault_name);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create vault: {e}");
+                        set_button_loading_state(&button, false);
+                    }
+                }
+                glib::ControlFlow::Break
+            }
+        });
+    });
+
+    actions_box.append(&cancel_button);
+    actions_box.append(&create_button);
+    main_box.append(&actions_box);
+
+    content_area.append(&main_box);
+}
+
+/// Creates a modern list layout for accounts using `PreferencesGroup`
 fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGroup {
     let group = PreferencesGroup::new();
     group.set_title("Accounts");
     group.set_description(Some("Manage your account credentials"));
 
-    // Get available accounts
     let all_accounts = get_available_accounts(vault_name);
 
     if all_accounts.is_empty() {
-        // Empty state row
         let empty_row = ActionRow::new();
         empty_row.set_title("No accounts yet");
         empty_row.set_subtitle("Create your first account to get started");
@@ -261,7 +577,6 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
 
         group.add(&empty_row);
     } else {
-        // Add account button row
         let add_row = ActionRow::new();
         add_row.set_title("Add New Account");
         add_row.set_subtitle("Create a new account entry");
@@ -292,28 +607,163 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
     group
 }
 
-/// Creates an empty state widget when no accounts are found
-fn create_empty_state() -> Box {
-    let empty_box = Box::new(Orientation::Vertical, 16);
-    empty_box.set_halign(gtk4::Align::Center);
-    empty_box.set_valign(gtk4::Align::Center);
-    empty_box.set_margin_top(48);
-    empty_box.set_margin_bottom(48);
+/// Creates an account row for the preferences group
+fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) -> ActionRow {
+    let row = ActionRow::new();
+    row.set_title(account_name);
+    row.set_subtitle("Password Account");
+    row.set_activatable(true);
 
-    let icon_label = Label::new(Some("🔐"));
-    icon_label.add_css_class("title-1");
+    let view_button = Button::new();
+    view_button.set_label("View");
+    view_button.add_css_class("flat");
+    view_button.set_valign(gtk4::Align::Center);
+    row.add_suffix(&view_button);
+    row.set_activatable_widget(Some(&view_button));
 
-    let message = Label::new(Some("No accounts found"));
-    message.add_css_class("title-4");
+    let account_name_clone = account_name.to_string();
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    view_button.connect_clicked(move |_| {
+        show_account_view_with_mode(&content_area_clone, &vault_name_clone, &account_name_clone, false);
+    });
 
-    let description = Label::new(Some("Create your first account to get started"));
-    description.add_css_class("dim-label");
+    row
+}
 
-    empty_box.append(&icon_label);
-    empty_box.append(&message);
-    empty_box.append(&description);
+/// Creates the TOTP (2FA) management section for the vault view
+fn create_totp_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Two-Factor Authentication");
+    group.set_description(Some("Secure your vault with TOTP authentication"));
 
-    empty_box
+    let is_enabled = is_totp_enabled(vault_name);
+
+    if is_enabled {
+        // 2FA is enabled - show status row
+        let status_row = ActionRow::new();
+        status_row.set_title("TOTP Status");
+        status_row.set_subtitle("Two-factor authentication is enabled and active");
+        status_row.set_activatable(true);
+
+        let status_label = Label::new(Some("✅ Enabled"));
+        status_label.add_css_class("success");
+        status_row.add_suffix(&status_label);
+
+        let manage_button = Button::new();
+        manage_button.set_label("Manage");
+        manage_button.add_css_class("flat");
+        manage_button.set_valign(gtk4::Align::Center);
+        status_row.add_suffix(&manage_button);
+        status_row.set_activatable_widget(Some(&manage_button));
+
+        // Connect manage button
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        manage_button.connect_clicked(move |_| {
+            show_totp_management_dialog(&vault_name_clone, &content_area_clone);
+        });
+
+        group.add(&status_row);
+    } else {
+        // 2FA is not enabled - show setup row
+        let setup_row = ActionRow::new();
+        setup_row.set_title("Enable Two-Factor Authentication");
+        setup_row.set_subtitle("Add an extra layer of security to your vault");
+        setup_row.set_activatable(true);
+
+        let enable_button = Button::new();
+        enable_button.set_label("Enable 2FA");
+        enable_button.add_css_class("suggested-action");
+        enable_button.set_valign(gtk4::Align::Center);
+        setup_row.add_suffix(&enable_button);
+        setup_row.set_activatable_widget(Some(&enable_button));
+
+        // Connect enable button
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        enable_button.connect_clicked(move |_| {
+            show_totp_setup_dialog(&vault_name_clone, &content_area_clone);
+        });
+
+        group.add(&setup_row);
+    }
+
+    group
+}
+
+
+
+
+
+
+
+/// Clears all content from the content area
+fn clear_content(content_area: &Box) {
+    while let Some(child) = content_area.first_child() {
+        content_area.remove(&child);
+    }
+}
+
+/// Proceeds with gate warm-up and then shows the vault view
+pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
+    // Check if TOTP is required for this vault
+    if is_totp_required(vault_name) {
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        
+        show_totp_authentication_dialog(&vault_name_clone.clone(), move || {
+            proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
+        });
+    } else {
+        proceed_with_gpg_warmup(content_area, vault_name);
+    }
+}
+
+/// Proceeds with GPG warm-up after TOTP verification (if required)
+fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
+    // Attempt to warm up GPG by decrypting the gate file
+    match warm_up_gpg(vault_name) {
+        Ok(()) => {
+            show_vault_view(content_area, vault_name);
+        }
+        Err(e) => {
+            show_error_message(
+                content_area,
+                "Failed to Access Vault",
+                &format!("Could not decrypt vault gate file: {e}"),
+            );
+        }
+    }
+}
+
+/// Shows an error message in the content area
+fn show_error_message(content_area: &Box, title: &str, message: &str) {
+    clear_content(content_area);
+
+    let main_box = Box::new(Orientation::Vertical, 24);
+    main_box.set_margin_top(48);
+    main_box.set_margin_bottom(48);
+    main_box.set_margin_start(48);
+    main_box.set_margin_end(48);
+    main_box.set_halign(gtk4::Align::Center);
+    main_box.set_valign(gtk4::Align::Center);
+
+    let error_title = Label::new(Some(title));
+    error_title.add_css_class("title-1");
+    error_title.set_halign(gtk4::Align::Center);
+
+    let error_message = Label::new(Some(message));
+    error_message.set_wrap(true);
+    error_message.set_max_width_chars(80);
+    error_message.set_halign(gtk4::Align::Center);
+    error_message.add_css_class("dim-label");
+    error_message.set_justify(gtk4::Justification::Center);
+
+    main_box.append(&error_title);
+    main_box.append(&error_message);
+
+    content_area.append(&main_box);
 }
 
 /// Reads available vaults from the vaults directory
@@ -334,169 +784,6 @@ fn get_account_directory(vault_name: &str) -> PathBuf {
     locations.account
 }
 
-/// Creates an account row for the preferences group
-fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) -> ActionRow {
-    let row = ActionRow::new();
-    row.set_title(account_name);
-    row.set_subtitle("Password Account");
-    row.set_activatable(true);
-
-    // View button
-    let view_button = Button::new();
-    view_button.set_label("View");
-    view_button.add_css_class("flat");
-    view_button.set_valign(gtk4::Align::Center);
-    row.add_suffix(&view_button);
-    row.set_activatable_widget(Some(&view_button));
-
-    // Connect click handler
-    let account_name_clone = account_name.to_string();
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    view_button.connect_clicked(move |_| {
-        show_account_view(&content_area_clone, &vault_name_clone, &account_name_clone);
-    });
-
-    row
-}
-
-/// Creates a card-style button for a specific account
-fn create_account_card(account_name: &str, content_area: &Box, vault_name: &str) -> Button {
-    let button = Button::new();
-    button.add_css_class("card");
-    button.add_css_class("account-card");
-    button.set_size_request(200, 130); // Increased size to fit more text
-    button.set_hexpand(true);
-    button.set_vexpand(false);
-
-    // Create card content with better spacing
-    let card_box = Box::new(Orientation::Vertical, 10);
-    card_box.set_margin_top(18);
-    card_box.set_margin_bottom(18);
-    card_box.set_margin_start(16);
-    card_box.set_margin_end(16);
-
-    // Account icon (you can customize this based on account type)
-    let icon_label = Label::new(Some("👤"));
-    icon_label.add_css_class("title-2");
-    icon_label.set_halign(gtk4::Align::Center);
-
-    // Account name - better text fitting with more space
-    let name_label = Label::new(Some(account_name));
-    name_label.add_css_class("title-4");
-    name_label.set_halign(gtk4::Align::Center);
-    name_label.set_ellipsize(EllipsizeMode::End);
-    name_label.set_max_width_chars(25); // Increased from 15
-    name_label.set_lines(2);
-    name_label.set_wrap(true);
-    name_label.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
-    name_label.set_justify(gtk4::Justification::Center);
-    name_label.set_tooltip_text(Some(account_name)); // Show full text on hover
-
-    // Account type/description (placeholder) - better text fitting
-    let type_label = Label::new(Some("Password Account"));
-    type_label.add_css_class("dim-label");
-    type_label.add_css_class("caption");
-    type_label.set_halign(gtk4::Align::Center);
-    type_label.set_ellipsize(EllipsizeMode::End);
-    type_label.set_max_width_chars(28); // Increased from 18
-    type_label.set_tooltip_text(Some("Password Account"));
-
-    card_box.append(&icon_label);
-    card_box.append(&name_label);
-    card_box.append(&type_label);
-    button.set_child(Some(&card_box));
-
-    // Connect click handler
-    let account_name_clone = account_name.to_string();
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    button.connect_clicked(move |_| {
-        println!("Opening account: {account_name_clone}");
-        show_account_view(&content_area_clone, &vault_name_clone, &account_name_clone);
-    });
-
-    button
-}
-
-/// Shows the account view with detailed information and controls
-pub fn show_account_view(content_area: &Box, vault_name: &str, account_name: &str) {
-    show_account_view_with_mode(content_area, vault_name, account_name, false);
-}
-
-/// Shows the account view with edit mode option
-pub fn show_account_view_with_mode(
-    content_area: &Box,
-    vault_name: &str,
-    account_name: &str,
-    edit_mode: bool,
-) {
-    clear_content(content_area);
-
-    // Try to load account data
-    let account_data = match get_full_account_details(vault_name, account_name) {
-        Ok(account) => Some(account),
-        Err(e) => {
-            eprintln!("Failed to load account data: {}", e);
-            None
-        }
-    };
-
-    // Create main container with scrolling
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
-
-    let main_box = Box::new(Orientation::Vertical, 0);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
-
-    // Wrap account data in Rc<RefCell<>> for sharing between sections
-    let account_rc = Rc::new(RefCell::new(account_data.unwrap_or_else(|| {
-        let mut default_account = Account::default();
-        default_account.name = account_name.to_string();
-        default_account
-    })));
-
-    // Header section with account name and actions
-    let header_section = create_account_header(
-        &account_rc,
-        content_area,
-        vault_name,
-        account_name,
-        edit_mode,
-    );
-    main_box.append(&header_section);
-
-    // Account details section
-    let details_section = create_account_details_section(&account_rc, edit_mode);
-    main_box.append(&details_section);
-
-    // Password section
-    let password_section = create_password_section(&account_rc, edit_mode);
-    main_box.append(&password_section);
-
-    // Additional fields section
-    let additional_fields_section = create_additional_fields_section(&account_rc, edit_mode, content_area, vault_name);
-    main_box.append(&additional_fields_section);
-
-    // Notes section
-    let notes_section = create_notes_section(&account_rc, edit_mode);
-    main_box.append(&notes_section);
-
-    // Action buttons section (only show in edit mode)
-    if edit_mode {
-        let actions_section = create_account_actions_section(&account_rc, vault_name, content_area);
-        main_box.append(&actions_section);
-    }
-
-    scrolled_window.set_child(Some(&main_box));
-    content_area.append(&scrolled_window);
-}
-
 /// Creates the account header with title and action buttons
 fn create_account_header(
     account_rc: &Rc<RefCell<Account>>,
@@ -508,7 +795,6 @@ fn create_account_header(
     let header_box = Box::new(Orientation::Horizontal, 16);
     header_box.set_halign(gtk4::Align::Fill);
 
-    // Left side - account info
     let info_box = Box::new(Orientation::Vertical, 4);
     info_box.set_hexpand(true);
 
@@ -532,7 +818,6 @@ fn create_account_header(
     info_box.append(&title);
     info_box.append(&subtitle);
 
-    // Right side - action buttons
     let actions_box = Box::new(Orientation::Horizontal, 8);
 
     if !edit_mode {
@@ -570,9 +855,7 @@ fn create_account_header(
         let account_name_delete = account_name.to_string();
         delete_button.connect_clicked(move |_| {
             let message = format!(
-                "Are you sure you want to delete the account '{}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.",
-                account_name_delete
-            );
+                "Are you sure you want to delete the account '{account_name_delete}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.");
             
             let content_area_confirm = content_area_delete.clone();
             let vault_name_confirm = vault_name_delete.clone();
@@ -584,31 +867,27 @@ fn create_account_header(
                 "Delete",
                 None::<&gtk4::Window>,
                 move || {
-                    // Perform the deletion
                     match delete_account(&vault_name_confirm, &account_name_confirm) {
                         Ok(()) => {
-                            // Navigate back to home view after successful deletion
                             show_home_view(&content_area_confirm);
-                            
-                            // Refresh the sidebar to update the account list
-                            // Note: This would ideally trigger a sidebar refresh, but we don't have 
-                            // direct access to the sidebar here. The user will see the updated 
-                            // list when they navigate to a vault again.
                         }
                         Err(e) => {
-                            eprintln!("Failed to delete account '{}': {}", account_name_confirm, e);
+                            eprintln!("Failed to delete account '{account_name_confirm}': {e}");
                         }
                     }
                 },
             );
         });
 
-        // Connect rename functionality
         let content_area_rename = content_area.clone();
         let vault_name_rename = vault_name.to_string();
         let account_name_rename = account_name.to_string();
         rename_button.connect_clicked(move |_| {
-            show_rename_account_dialog(&vault_name_rename, &account_name_rename, &content_area_rename);
+            show_rename_account_dialog(
+                &vault_name_rename,
+                &account_name_rename,
+                &content_area_rename,
+            );
         });
 
         actions_box.append(&edit_button);
@@ -628,14 +907,12 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     section.add_css_class("account-section");
     section.set_margin_top(20);
 
-    // Section header
     let header_box = Box::new(Orientation::Vertical, 8);
     header_box.set_margin_top(16);
     header_box.set_margin_bottom(0);
     header_box.set_margin_start(24);
     header_box.set_margin_end(24);
 
-    // Section title with subtitle
     let title = Label::new(Some("Account Details"));
     title.add_css_class("title-3");
     title.set_halign(gtk4::Align::Start);
@@ -649,7 +926,6 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     header_box.append(&subtitle);
     section.append(&header_box);
 
-    // Details grid - increased spacing for bigger fields
     let details_box = Box::new(Orientation::Vertical, 18);
     details_box.set_margin_bottom(20);
     details_box.set_margin_start(24);
@@ -676,7 +952,6 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
         details_box.append(&username_row);
     }
 
-    // Always show read-only date fields
     let created_row = create_field_row("Created", &account.created_at, false);
     details_box.append(&created_row);
 
@@ -694,7 +969,6 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     section.add_css_class("account-section");
     section.set_margin_top(20);
 
-    // Section title with generate button
     let header_box = Box::new(Orientation::Horizontal, 12);
     header_box.set_margin_top(20);
     header_box.set_margin_bottom(0);
@@ -738,7 +1012,6 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     let password_entry = Entry::new();
     let account = account_rc.borrow();
 
-    // In edit mode, show the actual password; in view mode, show masked
     if edit_mode {
         account.password.with_exposed(|password| {
             password_entry.set_text(password);
@@ -747,6 +1020,7 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
         let masked_password = account.password.masked(8);
         password_entry.set_text(&masked_password);
     }
+
     password_entry.set_editable(edit_mode);
     password_entry.set_hexpand(true);
     password_entry.set_size_request(250, -1); // Reduced width for better responsiveness
@@ -813,18 +1087,14 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     copy_button.add_css_class("flat");
     copy_button.set_tooltip_text(Some("Copy Password"));
 
-    // Add copy functionality
     let account_rc_copy = account_rc.clone();
     copy_button.connect_clicked(move |button| {
         let account = account_rc_copy.borrow();
         let display = button.display();
         let clipboard = display.clipboard();
 
-        // Use secure clipboard exposure with automatic cleanup
         let password_copy = account.password.expose_for_clipboard();
         clipboard.set_text(&password_copy);
-
-        // The SecureClipboardString will be automatically zeroized when dropped
 
         // Schedule clipboard clearing after 30 seconds for security
         let clipboard_clone = clipboard.clone();
@@ -852,16 +1122,15 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 #[allow(clippy::too_many_lines)]
 /// Creates the additional fields section
 fn create_additional_fields_section(
-    account_rc: &Rc<RefCell<Account>>, 
-    edit_mode: bool, 
-    content_area: &Box, 
-    vault_name: &str
+    account_rc: &Rc<RefCell<Account>>,
+    edit_mode: bool,
+    content_area: &Box,
+    vault_name: &str,
 ) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
     section.add_css_class("account-section");
     section.set_margin_top(16);
 
-    // Section title with add button in horizontal layout
     let header_box = Box::new(Orientation::Horizontal, 12);
     header_box.set_margin_top(20);
     header_box.set_margin_bottom(0);
@@ -888,7 +1157,6 @@ fn create_additional_fields_section(
     add_button.add_css_class("suggested-action");
     add_button.set_valign(gtk4::Align::Center);
 
-    // Connect the add field button
     if edit_mode {
         let account_rc_clone = account_rc.clone();
         let content_area_clone = content_area.clone();
@@ -905,7 +1173,6 @@ fn create_additional_fields_section(
 
     section.append(&header_box);
 
-    // Additional fields with styling similar to password panel
     let fields_box = Box::new(Orientation::Vertical, 8);
     fields_box.set_margin_bottom(20);
     fields_box.set_margin_start(24);
@@ -916,16 +1183,14 @@ fn create_additional_fields_section(
     for (field_name, field_value) in &account.additional_fields {
         // Create a vertical box for each field (field name + field controls)
         let field_container = Box::new(Orientation::Vertical, 4);
-        
-        // Field name label
+
         let field_label = Label::new(Some(field_name));
         field_label.add_css_class("field-label");
         field_label.set_halign(gtk4::Align::Start);
         field_label.set_margin_start(4);
-        
-        // Create a horizontal box for the field controls (similar to password_box)
-        let field_box = Box::new(Orientation::Horizontal, 8);
-        field_box.set_halign(gtk4::Align::Center);
+
+        let password_field_box = Box::new(Orientation::Horizontal, 8);
+        password_field_box.set_halign(gtk4::Align::Center);
 
         let field_entry = Entry::new();
         field_entry.set_text(field_value);
@@ -942,7 +1207,9 @@ fn create_additional_fields_section(
             field_entry.connect_changed(move |entry| {
                 let text = entry.text().to_string();
                 let mut account = account_rc_field.borrow_mut();
-                account.additional_fields.insert(field_name_clone.clone(), text);
+                account
+                    .additional_fields
+                    .insert(field_name_clone.clone(), text);
             });
         }
 
@@ -953,7 +1220,7 @@ fn create_additional_fields_section(
             .build();
         copy_button.set_child(Some(&copy_button_content));
         copy_button.add_css_class("flat");
-        copy_button.set_tooltip_text(Some(&format!("Copy {}", field_name)));
+        copy_button.set_tooltip_text(Some(&format!("Copy {field_name}")));
 
         // Add copy functionality
         let field_value_copy = field_value.clone();
@@ -970,8 +1237,8 @@ fn create_additional_fields_section(
             });
         });
 
-        field_box.append(&field_entry);
-        field_box.append(&copy_button);
+        password_field_box.append(&field_entry);
+        password_field_box.append(&copy_button);
 
         // Add edit/delete buttons in edit mode
         if edit_mode {
@@ -992,30 +1259,38 @@ fn create_additional_fields_section(
             delete_button.add_css_class("destructive-action");
             delete_button.set_tooltip_text(Some("Delete field"));
 
-            // Connect edit functionality
             let account_rc_edit = account_rc.clone();
             let content_area_edit = content_area.clone();
             let vault_name_edit = vault_name.to_string();
             let field_name_edit = field_name.clone();
             edit_button.connect_clicked(move |_| {
-                show_edit_field_dialog(&account_rc_edit, &content_area_edit, &field_name_edit, &vault_name_edit);
+                show_edit_field_dialog(
+                    &account_rc_edit,
+                    &content_area_edit,
+                    &field_name_edit,
+                    &vault_name_edit,
+                );
             });
 
-            // Connect delete functionality
             let account_rc_delete = account_rc.clone();
             let content_area_delete = content_area.clone();
             let vault_name_delete = vault_name.to_string();
             let field_name_delete = field_name.clone();
             delete_button.connect_clicked(move |_| {
-                show_delete_field_dialog(&account_rc_delete, &content_area_delete, &field_name_delete, &vault_name_delete);
+                show_delete_field_dialog(
+                    &account_rc_delete,
+                    &content_area_delete,
+                    &field_name_delete,
+                    &vault_name_delete,
+                );
             });
 
-            field_box.append(&edit_button);
-            field_box.append(&delete_button);
+            password_field_box.append(&edit_button);
+            password_field_box.append(&delete_button);
         }
 
         field_container.append(&field_label);
-        field_container.append(&field_box);
+        field_container.append(&password_field_box);
         fields_box.append(&field_container);
     }
 
@@ -1023,12 +1298,12 @@ fn create_additional_fields_section(
     if account.additional_fields.is_empty() {
         let placeholder_box = Box::new(Orientation::Horizontal, 8);
         placeholder_box.set_halign(gtk4::Align::Center);
-        
+
         let placeholder = Label::new(Some("No additional fields"));
         placeholder.add_css_class("dim-label");
         placeholder.set_halign(gtk4::Align::Start);
         placeholder.set_hexpand(true);
-        
+
         placeholder_box.append(&placeholder);
         fields_box.append(&placeholder_box);
     }
@@ -1100,11 +1375,9 @@ fn create_account_actions_section(
 ) -> Box {
     let section = Box::new(Orientation::Vertical, 16);
 
-    // Separator
     let separator = Separator::new(Orientation::Horizontal);
     section.append(&separator);
 
-    // Action buttons
     let actions_box = Box::new(Orientation::Horizontal, 12);
     actions_box.set_halign(gtk4::Align::Center);
 
@@ -1122,14 +1395,14 @@ fn create_account_actions_section(
         account.update_modified_time();
         let account_name = account.name.clone();
 
-        match update_account(&vault_name_clone, &*account) {
+        match update_account(&vault_name_clone, &account) {
             Ok(()) => {
                 drop(account); // Release the borrow
                 // Exit edit mode and show the updated account
-                show_account_view(&content_area_clone3, &vault_name_clone, &account_name);
+                show_account_view_with_mode(&content_area_clone3, &vault_name_clone, &account_name, false);
             }
             Err(e) => {
-                eprintln!("Failed to save account: {}", e);
+                eprintln!("Failed to save account: {e}");
             }
         }
     });
@@ -1138,13 +1411,12 @@ fn create_account_actions_section(
     cancel_button.set_label("Cancel");
     cancel_button.set_size_request(120, -1);
 
-    // Connect cancel functionality - exit edit mode
     let vault_name_clone2 = vault_name.to_string();
     let content_area_clone2 = content_area.clone();
     let account_rc_clone3 = account_rc.clone();
     cancel_button.connect_clicked(move |_| {
         let account = account_rc_clone3.borrow();
-        show_account_view(&content_area_clone2, &vault_name_clone2, &account.name);
+        show_account_view_with_mode(&content_area_clone2, &vault_name_clone2, &account.name, false);
     });
 
     actions_box.append(&cancel_button);
@@ -1161,17 +1433,15 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     row_box.set_margin_top(4);
     row_box.set_margin_bottom(4);
 
-    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
     label.set_valign(gtk4::Align::Center);
-    label.set_size_request(160, -1); // Increased from 140
+    label.set_size_request(160, -1);
     label.set_ellipsize(EllipsizeMode::End);
-    label.set_max_width_chars(25); // Increased from 18
-    label.set_tooltip_text(Some(label_text)); // Show full text on hover
+    label.set_max_width_chars(25);
+    label.set_tooltip_text(Some(label_text));
 
-    // Value container
     let value_box = Box::new(Orientation::Horizontal, 8);
     value_box.set_hexpand(true);
 
@@ -1179,13 +1449,12 @@ fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
     value_entry.set_text(value_text);
     value_entry.set_editable(false);
     value_entry.set_hexpand(true);
-    value_entry.set_size_request(250, -1); // Reduced width for better responsiveness
+    value_entry.set_size_request(250, -1);
     value_entry.add_css_class("password-field");
-    value_entry.set_tooltip_text(Some(value_text)); // Show full text on hover
+    value_entry.set_tooltip_text(Some(value_text));
 
     value_box.append(&value_entry);
 
-    // Copy button for copyable fields
     if copyable {
         let copy_button = Button::new();
         let copy_button_content = ButtonContent::builder()
@@ -1230,35 +1499,30 @@ fn create_password_field_row(
     row_box.set_margin_top(4);
     row_box.set_margin_bottom(4);
 
-    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
     label.set_valign(gtk4::Align::Center);
-    label.set_size_request(160, -1); // Increased from 140
+    label.set_size_request(160, -1);
     label.set_ellipsize(EllipsizeMode::End);
-    label.set_max_width_chars(25); // Increased from 18
-    label.set_tooltip_text(Some(label_text)); // Show full text on hover
+    label.set_max_width_chars(25);
+    label.set_tooltip_text(Some(label_text));
 
-    // Password container
     let password_container = Box::new(Orientation::Horizontal, 8);
     password_container.set_hexpand(true);
 
-    // Entry field
     let entry = Entry::new();
     entry.set_text(initial_value);
     entry.set_hexpand(true);
-    entry.set_size_request(250, -1); // Reduced width for better responsiveness
-    entry.set_visibility(false); // Start hidden
+    entry.set_size_request(250, -1);
+    entry.set_visibility(false);
     entry.set_invisible_char(Some('•'));
 
-    // Generate button
     let generate_button = Button::new();
     generate_button.set_label("Generate");
     generate_button.add_css_class("flat");
     generate_button.set_tooltip_text(Some("Generate Password"));
 
-    // Show/hide button
     let reveal_button = Button::new();
     let reveal_button_content = ButtonContent::builder()
         .icon_name("view-reveal-symbolic")
@@ -1275,14 +1539,12 @@ fn create_password_field_row(
         account.password.update(text);
     });
 
-    // Connect generate button
     let entry_gen = entry.clone();
     let account_rc_gen = account_rc.clone();
     generate_button.connect_clicked(move |_| {
         show_password_generator_dialog(&entry_gen, &account_rc_gen);
     });
 
-    // Connect reveal button
     let entry_clone = entry.clone();
     let is_revealed = Rc::new(RefCell::new(false));
     let is_revealed_clone = is_revealed.clone();
@@ -1302,123 +1564,11 @@ fn create_password_field_row(
     row_box
 }
 
-/// Shows the new account creation view
-pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
-    clear_content(content_area);
 
-    // Create main container with scrolling
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
 
-    // Header
-    let header_box = Box::new(Orientation::Vertical, 8);
-    let title = Label::new(Some("Create New Account"));
-    title.add_css_class("title-1");
-    title.set_halign(gtk4::Align::Start);
 
-    let subtitle = Label::new(Some("Enter the details for your new account"));
-    subtitle.add_css_class("dim-label");
-    subtitle.set_halign(gtk4::Align::Start);
 
-    header_box.append(&title);
-    header_box.append(&subtitle);
-    main_box.append(&header_box);
-
-    // Create a new account with default values
-    let new_account = Rc::new(RefCell::new(Account::default()));
-
-    // Form fields
-    let form_box = Box::new(Orientation::Vertical, 16);
-
-    // Account name
-    let name_row = create_editable_field_row("Account Name", "", &new_account, "name");
-    form_box.append(&name_row);
-
-    // Account type
-    let type_row = create_editable_field_row(
-        "Account Type",
-        "Password Account",
-        &new_account,
-        "account_type",
-    );
-    form_box.append(&type_row);
-
-    // Website
-    let website_row = create_editable_field_row("Website", "", &new_account, "website");
-    form_box.append(&website_row);
-
-    // Username
-    let username_row = create_editable_field_row("Username", "", &new_account, "username");
-    form_box.append(&username_row);
-
-    // Password (with show/hide functionality)
-    let password_row = create_password_field_row("Password", "", &new_account);
-    form_box.append(&password_row);
-
-    // Notes
-    let notes_row = create_editable_field_row("Notes", "", &new_account, "notes");
-    form_box.append(&notes_row);
-
-    main_box.append(&form_box);
-
-    // Action buttons
-    let actions_box = Box::new(Orientation::Horizontal, 12);
-    actions_box.set_halign(gtk4::Align::Center);
-    actions_box.set_margin_top(24);
-
-    let cancel_button = Button::new();
-    cancel_button.set_label("Cancel");
-    cancel_button.set_size_request(120, -1);
-
-    // Connect cancel functionality
-    let content_area_clone2 = content_area.clone();
-    let vault_name_clone2 = vault_name.to_string();
-    cancel_button.connect_clicked(move |_| {
-        show_vault_view(&content_area_clone2, &vault_name_clone2);
-    });
-
-    let create_button = Button::new();
-    create_button.set_label("Create Account");
-    create_button.add_css_class("suggested-action");
-    create_button.set_size_request(120, -1);
-
-    // Add create functionality
-    let account_rc_clone = new_account.clone();
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    create_button.connect_clicked(move |_| {
-        let account = account_rc_clone.borrow();
-
-        if account.name.is_empty() {
-            return;
-        }
-
-        let account_name = account.name.clone();
-        match create_account(&vault_name_clone, &*account) {
-            Ok(()) => {
-                show_vault_view(&content_area_clone, &vault_name_clone);
-            }
-            Err(e) => {
-                eprintln!("Failed to create account: {}", e);
-            }
-        }
-    });
-
-    actions_box.append(&cancel_button);
-    actions_box.append(&create_button);
-    main_box.append(&actions_box);
-
-    scrolled_window.set_child(Some(&main_box));
-    content_area.append(&scrolled_window);
-}
 
 /// Creates an editable field row for account creation/editing
 fn create_editable_field_row(
@@ -1432,24 +1582,21 @@ fn create_editable_field_row(
     row_box.set_margin_top(4);
     row_box.set_margin_bottom(4);
 
-    // Label - better text fitting with more space
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
     label.set_halign(gtk4::Align::Start);
     label.set_valign(gtk4::Align::Center);
-    label.set_size_request(160, -1); // Increased from 140
+    label.set_size_request(160, -1);
     label.set_ellipsize(EllipsizeMode::End);
-    label.set_max_width_chars(25); // Increased from 18
-    label.set_tooltip_text(Some(label_text)); // Show full text on hover
+    label.set_max_width_chars(25);
+    label.set_tooltip_text(Some(label_text));
 
-    // Entry field
     let entry = Entry::new();
     entry.set_text(initial_value);
     entry.set_hexpand(true);
-    entry.set_size_request(250, -1); // Reduced width for better responsiveness
-    entry.add_css_class("password-field"); // Same background as password and notes
+    entry.set_size_request(250, -1);
+    entry.add_css_class("password-field");
 
-    // Connect entry changes to account data
     let account_rc_clone = account_rc.clone();
     let field_name_owned = field_name.to_string();
     entry.connect_changed(move |entry| {
@@ -1473,268 +1620,11 @@ fn create_editable_field_row(
     row_box
 }
 
-/// Creates the welcome section for the home view
-fn create_welcome_section() -> Box {
-    let welcome_box = Box::new(Orientation::Vertical, 8);
-    welcome_box.add_css_class("welcome-section");
-    welcome_box.set_halign(gtk4::Align::Center);
-    welcome_box.set_valign(gtk4::Align::Start);
-    // Create title
-    let title = Label::new(Some("Welcome to FMP"));
-    title.add_css_class("title-1");
-    title.set_halign(gtk4::Align::Center);
-    title.set_margin_top(8);
-    title.set_margin_bottom(4);
-    welcome_box.append(&title);
-    
-    // Create description
-    let description = Label::new(Some("A Safe, Secure Password Manager\n\nManage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe."));
-    description.add_css_class("body");
-    description.set_halign(gtk4::Align::Center);
-    description.set_justify(gtk4::Justification::Center);
-    description.set_margin_top(0);
-    description.set_margin_bottom(8);
-    welcome_box.append(&description);
-    
-    welcome_box
-}
-
-/// Creates the statistics section showing vault and account counts
-fn create_statistics_section() -> PreferencesGroup {
-    let group = PreferencesGroup::new();
-    group.set_title("Overview");
-    group.set_description(Some("Your vault statistics at a glance"));
-
-    // Get vault statistics
-    let vaults = crate::gui::sidebar::get_available_vaults();
-    let vault_count = vaults.len();
-    let total_accounts: usize = vaults
-        .iter()
-        .map(|vault_name| get_available_accounts(vault_name).len())
-        .sum();
-
-    // Vault count row
-    let vault_row = ActionRow::new();
-    vault_row.set_title("Vaults");
-    vault_row.set_subtitle("Total number of vaults");
-    let vault_label = Label::new(Some(&vault_count.to_string()));
-    vault_label.add_css_class("title-3");
-    vault_row.add_suffix(&vault_label);
-    group.add(&vault_row);
-
-    // Account count row
-    let account_row = ActionRow::new();
-    account_row.set_title("Accounts");
-    account_row.set_subtitle("Total number of accounts");
-    let account_label = Label::new(Some(&total_accounts.to_string()));
-    account_label.add_css_class("title-3");
-    account_row.add_suffix(&account_label);
-    group.add(&account_row);
-
-    // Most used vault row
-    let most_used = get_most_used_vault();
-    let most_used_row = ActionRow::new();
-    most_used_row.set_title("Most Used Vault");
-    most_used_row.set_subtitle("Your frequently accessed vault");
-    let most_used_label = Label::new(Some(&most_used));
-    most_used_label.add_css_class("title-3");
-    most_used_row.add_suffix(&most_used_label);
-    group.add(&most_used_row);
-
-    group
-}
-
-/// Creates a statistics card
-fn create_stat_card(title: &str, value: &str, icon: &str) -> Box {
-    let card_box = Box::new(Orientation::Vertical, 8);
-    card_box.set_size_request(120, 80);
-    card_box.set_halign(gtk4::Align::Center);
-    card_box.set_valign(gtk4::Align::Center);
-
-    let icon_label = Label::new(Some(icon));
-    icon_label.add_css_class("title-2");
-    icon_label.set_halign(gtk4::Align::Center);
-
-    let value_label = Label::new(Some(value));
-    value_label.add_css_class("title-2");
-    value_label.set_halign(gtk4::Align::Center);
-
-    let title_label = Label::new(Some(title));
-    title_label.add_css_class("caption");
-    title_label.add_css_class("dim-label");
-    title_label.set_halign(gtk4::Align::Center);
-
-    card_box.append(&icon_label);
-    card_box.append(&value_label);
-    card_box.append(&title_label);
-
-    card_box
-}
-
-/// Creates the quick actions section
-fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
-    let group = PreferencesGroup::new();
-    group.set_title("Quick Actions");
-    group.set_description(Some("Get started with common tasks"));
-
-    // Create new vault row
-    let create_vault_row = ActionRow::new();
-    create_vault_row.set_title("Create New Vault");
-    create_vault_row.set_subtitle("Set up a new secure vault for your passwords");
-    create_vault_row.set_activatable(true);
-
-    let create_vault_button = Button::new();
-    create_vault_button.set_label("Create");
-    create_vault_button.add_css_class("suggested-action");
-    create_vault_button.set_valign(gtk4::Align::Center);
-    create_vault_row.add_suffix(&create_vault_button);
-    create_vault_row.set_activatable_widget(Some(&create_vault_button));
-
-    let content_area_clone = content_area.clone();
-    create_vault_button.connect_clicked(move |_| {
-        show_create_vault_view(&content_area_clone);
-    });
-
-    group.add(&create_vault_row);
-
-    // Generate password row
-    let password_row = ActionRow::new();
-    password_row.set_title("Generate Password");
-    password_row.set_subtitle("Create a secure password with customizable options");
-    password_row.set_activatable(true);
-
-    let password_button = Button::new();
-    password_button.set_label("Generate");
-    password_button.add_css_class("suggested-action");
-    password_button.set_valign(gtk4::Align::Center);
-    password_row.add_suffix(&password_button);
-    password_row.set_activatable_widget(Some(&password_button));
-
-    password_button.connect_clicked(move |_| {
-        show_standalone_password_generator_dialog();
-    });
-
-    group.add(&password_row);
-
-    group
-}
-
-/// Shows the create vault view
-fn show_create_vault_view(content_area: &Box) {
-    clear_content(content_area);
-
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(48);
-    main_box.set_margin_bottom(48);
-    main_box.set_margin_start(48);
-    main_box.set_margin_end(48);
-    main_box.set_halign(gtk4::Align::Center);
-    main_box.set_valign(gtk4::Align::Center);
-
-    // Header
-    let title = Label::new(Some("Create New Vault"));
-    title.add_css_class("title-1");
-    title.set_halign(gtk4::Align::Center);
-
-    let subtitle = Label::new(Some("Enter a name for your new vault and select a GPG key"));
-    subtitle.add_css_class("dim-label");
-    subtitle.set_halign(gtk4::Align::Center);
-
-    main_box.append(&title);
-    main_box.append(&subtitle);
-
-    // Form
-    let form_box = Box::new(Orientation::Vertical, 16);
-    form_box.set_size_request(400, -1);
-
-    // Vault name
-    let name_label = Label::new(Some("Vault Name"));
-    name_label.set_halign(gtk4::Align::Start);
-    let name_entry = Entry::new();
-    name_entry.set_placeholder_text(Some("Enter vault name"));
-
-    // GPG recipient
-    let recipient_label = Label::new(Some("GPG Key ID"));
-    recipient_label.set_halign(gtk4::Align::Start);
-    let recipient_entry = Entry::new();
-    recipient_entry.set_placeholder_text(Some("Enter GPG key ID or email"));
-
-    form_box.append(&name_label);
-    form_box.append(&name_entry);
-    form_box.append(&recipient_label);
-    form_box.append(&recipient_entry);
-
-    main_box.append(&form_box);
-
-    // Action buttons
-    let actions_box = Box::new(Orientation::Horizontal, 12);
-    actions_box.set_halign(gtk4::Align::Center);
-    actions_box.set_margin_top(24);
-
-    let cancel_button = Button::new();
-    cancel_button.set_label("Cancel");
-    cancel_button.set_size_request(120, -1);
-
-    // Connect cancel functionality
-    let content_area_clone2 = content_area.clone();
-    cancel_button.connect_clicked(move |_| {
-        show_home_view(&content_area_clone2);
-    });
-
-    let (create_button, _) = create_loading_button("Create Vault", "Creating vault...");
-    create_button.add_css_class("suggested-action");
-    create_button.set_size_request(120, -1);
-
-    // Add create functionality
-    let content_area_clone = content_area.clone();
-    create_button.connect_clicked(move |button| {
-        let vault_name = name_entry.text().to_string();
-        let recipient = recipient_entry.text().to_string();
-
-        if vault_name.is_empty() || recipient.is_empty() {
-            return;
-        }
-
-        set_button_loading_state(button, true);
-
-        // Use a timeout to simulate async operation and allow UI to update
-        glib::timeout_add_local(std::time::Duration::from_millis(100), {
-            let content_area_clone = content_area_clone.clone();
-            let vault_name = vault_name.clone();
-            let recipient = recipient.clone();
-            let button = button.clone();
-            
-            move || {
-                match create_vault(&vault_name, &recipient) {
-                    Ok(()) => {
-                        // Refresh sidebar to show new vault
-                        crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                        // Show the new vault with gate logic
-                        open_vault_with_gate(&content_area_clone, &vault_name);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to create vault: {}", e);
-                        set_button_loading_state(&button, false);
-                    }
-                }
-                glib::ControlFlow::Break
-            }
-        });
-    });
-
-    actions_box.append(&cancel_button);
-    actions_box.append(&create_button);
-    main_box.append(&actions_box);
-
-    content_area.append(&main_box);
-}
-
 /// Increments the usage count for a vault
 pub fn increment_vault_usage(vault_name: &str) {
     let stats_file = get_vault_stats_file();
     let mut usage_counts = HashMap::new();
 
-    // Read existing stats
     if let Ok(content) = fs::read_to_string(&stats_file) {
         for line in content.lines() {
             if let Some((name, count_str)) = line.split_once(':') {
@@ -1745,22 +1635,20 @@ pub fn increment_vault_usage(vault_name: &str) {
         }
     }
 
-    // Increment count for this vault
     let current_count = usage_counts.get(vault_name).unwrap_or(&0);
     usage_counts.insert(vault_name.to_string(), current_count + 1);
 
-    // Write back to file
     let mut content = String::new();
     for (name, count) in usage_counts {
-        content.push_str(&format!("{}:{}\n", name, count));
+        use std::fmt::Write;
+        writeln!(content, "{name}:{count}").unwrap();
     }
 
     if let Err(e) = fs::write(&stats_file, content) {
-        eprintln!("Failed to write vault stats: {}", e);
+        eprintln!("Failed to write vault stats: {e}");
     }
 }
 
-/// Gets the path to the vault statistics file
 fn get_vault_stats_file() -> PathBuf {
     let locations = crate::vault::Locations::new("", "");
     locations.fmp.join("vault_stats.txt")
@@ -1793,67 +1681,6 @@ fn get_most_used_vault() -> String {
 }
 
 
-/// Creates the TOTP (2FA) management section for the vault view
-fn create_totp_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
-    let group = PreferencesGroup::new();
-    group.set_title("Two-Factor Authentication");
-    group.set_description(Some("Secure your vault with TOTP authentication"));
-
-    // Check if TOTP is enabled for this vault
-    let is_enabled = is_totp_enabled(vault_name);
-    
-    if is_enabled {
-        // 2FA is enabled - show status row
-        let status_row = ActionRow::new();
-        status_row.set_title("TOTP Status");
-        status_row.set_subtitle("Two-factor authentication is enabled and active");
-        status_row.set_activatable(true);
-
-        let status_label = Label::new(Some("✅ Enabled"));
-        status_label.add_css_class("success");
-        status_row.add_suffix(&status_label);
-
-        let manage_button = Button::new();
-        manage_button.set_label("Manage");
-        manage_button.add_css_class("flat");
-        manage_button.set_valign(gtk4::Align::Center);
-        status_row.add_suffix(&manage_button);
-        status_row.set_activatable_widget(Some(&manage_button));
-        
-        // Connect manage button
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        manage_button.connect_clicked(move |_| {
-            show_totp_management_dialog(&vault_name_clone, &content_area_clone);
-        });
-
-        group.add(&status_row);
-    } else {
-        // 2FA is not enabled - show setup row
-        let setup_row = ActionRow::new();
-        setup_row.set_title("Enable Two-Factor Authentication");
-        setup_row.set_subtitle("Add an extra layer of security to your vault");
-        setup_row.set_activatable(true);
-
-        let enable_button = Button::new();
-        enable_button.set_label("Enable 2FA");
-        enable_button.add_css_class("suggested-action");
-        enable_button.set_valign(gtk4::Align::Center);
-        setup_row.add_suffix(&enable_button);
-        setup_row.set_activatable_widget(Some(&enable_button));
-        
-        // Connect enable button
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        enable_button.connect_clicked(move |_| {
-            show_totp_setup_dialog(&vault_name_clone, &content_area_clone);
-        });
-
-        group.add(&setup_row);
-    }
-
-    group
-}
 
 /// Creates the vault management section with backup and vault operations
 fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
@@ -1861,7 +1688,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     group.set_title("Vault Management");
     group.set_description(Some("Backup, restore, rename, and delete vault operations"));
 
-    // Create Backup row
     let backup_row = ActionRow::new();
     backup_row.set_title("Create Backup");
     backup_row.set_subtitle("Create a backup of this vault");
@@ -1874,7 +1700,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     backup_row.add_suffix(&backup_button);
     backup_row.set_activatable_widget(Some(&backup_button));
 
-    // Connect backup button
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
     backup_button.connect_clicked(move |_| {
@@ -1883,7 +1708,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
 
     group.add(&backup_row);
 
-    // Restore Backup row
     let restore_row = ActionRow::new();
     restore_row.set_title("Restore Backup");
     restore_row.set_subtitle("Restore vault from backup");
@@ -1893,12 +1717,12 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     restore_button.set_label("Restore");
     restore_button.add_css_class("flat");
     restore_button.set_valign(gtk4::Align::Center);
-    
+
     // Check if backup exists to enable/disable button
     let has_backup = backup_exists(vault_name);
     restore_button.set_sensitive(has_backup);
     restore_row.set_sensitive(has_backup);
-    
+
     restore_row.add_suffix(&restore_button);
     restore_row.set_activatable_widget(Some(&restore_button));
 
@@ -1910,7 +1734,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
 
     group.add(&restore_row);
 
-    // Delete Backup row
     let delete_backup_row = ActionRow::new();
     delete_backup_row.set_title("Delete Backup");
     delete_backup_row.set_subtitle("Delete vault backup");
@@ -1922,7 +1745,7 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     delete_backup_button.set_valign(gtk4::Align::Center);
     delete_backup_button.set_sensitive(has_backup);
     delete_backup_row.set_sensitive(has_backup);
-    
+
     delete_backup_row.add_suffix(&delete_backup_button);
     delete_backup_row.set_activatable_widget(Some(&delete_backup_button));
 
@@ -1934,7 +1757,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
 
     group.add(&delete_backup_row);
 
-    // Rename Vault row
     let rename_row = ActionRow::new();
     rename_row.set_title("Rename Vault");
     rename_row.set_subtitle("Change the name of this vault");
@@ -1955,7 +1777,6 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
 
     group.add(&rename_row);
 
-    // Delete Vault row
     let delete_row = ActionRow::new();
     delete_row.set_title("Delete Vault");
     delete_row.set_subtitle("Permanently delete this vault and all its data");
@@ -1978,4 +1799,3 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
 
     group
 }
-

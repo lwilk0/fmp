@@ -1109,342 +1109,6 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     totp_window.present();
 }
 
-/// Creates the QR code section with the code image and manual entry option
-fn create_qr_code_section(otpauth_uri: &str, secret: &str) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 6);
-
-    // QR Code container with frame
-    let qr_container = GtkBox::new(Orientation::Vertical, 6);
-    qr_container.set_halign(gtk4::Align::Center);
-    qr_container.add_css_class("qr-container");
-
-    let qr_title = Label::new(Some("Scan QR Code"));
-    qr_title.add_css_class("title-3");
-    qr_title.set_halign(gtk4::Align::Center);
-    qr_title.set_margin_bottom(6);
-    qr_container.append(&qr_title);
-
-    // Generate and display QR code
-    match generate_qr_code_image(otpauth_uri) {
-        Ok(pixbuf) => {
-            // Create a frame for the QR code
-            let qr_frame = gtk4::Frame::new(None);
-            qr_frame.add_css_class("qr-frame");
-            qr_frame.set_halign(gtk4::Align::Center);
-            qr_frame.set_valign(gtk4::Align::Center);
-
-            let qr_image = Image::from_pixbuf(Some(&pixbuf));
-            qr_image.add_css_class("qr-code");
-            qr_image.set_margin_top(4);
-            qr_image.set_margin_bottom(4);
-            qr_image.set_margin_start(4);
-            qr_image.set_margin_end(4);
-            // Ensure the image displays at its natural size
-            qr_image.set_size_request(300, 300);
-            qr_image.set_halign(gtk4::Align::Center);
-            qr_image.set_valign(gtk4::Align::Center);
-
-            qr_frame.set_child(Some(&qr_image));
-            qr_container.append(&qr_frame);
-        }
-        Err(e) => {
-            let error_label = Label::new(Some(&format!("Failed to generate QR code: {}", e)));
-            error_label.add_css_class("error");
-            error_label.set_halign(gtk4::Align::Center);
-            qr_container.append(&error_label);
-        }
-    }
-
-    section.append(&qr_container);
-
-    // Manual entry section
-    let manual_section = GtkBox::new(Orientation::Vertical, 6);
-    manual_section.set_margin_top(8);
-    manual_section.add_css_class("manual-entry-section");
-
-    let manual_title = Label::new(Some("Or enter manually"));
-    manual_title.add_css_class("title-4");
-    manual_title.set_halign(gtk4::Align::Center);
-    manual_title.set_margin_bottom(6);
-    manual_section.append(&manual_title);
-
-    let secret_container = GtkBox::new(Orientation::Vertical, 6);
-    secret_container.set_halign(gtk4::Align::Center);
-    secret_container.set_margin_start(24);
-    secret_container.set_margin_end(24);
-
-    let secret_label = Label::new(Some("Secret Key"));
-    secret_label.add_css_class("caption-heading");
-    secret_label.set_halign(gtk4::Align::Start);
-    secret_label.set_margin_bottom(4);
-
-    let secret_entry = Entry::new();
-    secret_entry.set_text(secret);
-    secret_entry.set_editable(false);
-    secret_entry.add_css_class("secret-key-entry");
-    secret_entry.set_width_chars(32);
-
-    secret_container.append(&secret_label);
-    secret_container.append(&secret_entry);
-    manual_section.append(&secret_container);
-
-    section.append(&manual_section);
-    section
-}
-
-/// Creates the TOTP verification section for confirming setup
-fn create_totp_verification_section(
-    vault_name: &str,
-    dialog: &Dialog,
-    content_area: &GtkBox,
-) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
-    section.set_margin_top(8);
-    section.add_css_class("verification-section");
-
-    let verify_title = Label::new(Some("Verify Setup"));
-    verify_title.add_css_class("title-3");
-    verify_title.set_halign(gtk4::Align::Center);
-    verify_title.set_margin_bottom(6);
-    section.append(&verify_title);
-
-    let verify_instructions =
-        Label::new(Some("Enter the 6-digit code from your authenticator app"));
-    verify_instructions.add_css_class("body");
-    verify_instructions.set_halign(gtk4::Align::Center);
-    verify_instructions.set_margin_bottom(12);
-    section.append(&verify_instructions);
-
-    // Code entry container
-    let code_container = GtkBox::new(Orientation::Vertical, 8);
-    code_container.set_halign(gtk4::Align::Center);
-
-    let code_entry = Entry::new();
-    code_entry.set_placeholder_text(Some("000000"));
-    code_entry.set_max_length(8); // Allow some flexibility
-    code_entry.set_width_chars(10);
-    code_entry.set_halign(gtk4::Align::Center);
-    code_entry.add_css_class("totp-code-entry");
-
-    code_container.append(&code_entry);
-    section.append(&code_container);
-
-    // Status label for feedback
-    let status_label = Label::new(None);
-    status_label.set_halign(gtk4::Align::Center);
-    section.append(&status_label);
-
-    // Button box
-    let button_box = GtkBox::new(Orientation::Horizontal, 12);
-    button_box.set_halign(gtk4::Align::Center);
-    button_box.set_margin_top(16);
-
-    // Verify button
-    let verify_button = Button::new();
-    verify_button.set_label("Verify & Enable");
-    verify_button.add_css_class("suggested-action");
-
-    // Cancel button
-    let cancel_button = Button::new();
-    cancel_button.set_label("Cancel");
-    cancel_button.add_css_class("flat");
-
-    // Connect verify button
-    let vault_name_clone = vault_name.to_string();
-    let dialog_clone = dialog.clone();
-    let content_area_clone = content_area.clone();
-    let code_entry_clone = code_entry.clone();
-    let status_label_clone = status_label.clone();
-    verify_button.connect_clicked(move |_| {
-        let code = code_entry_clone.text();
-
-        match verify_totp_code(&vault_name_clone, &code) {
-            Ok(true) => {
-                status_label_clone.set_text("✅ 2FA enabled successfully!");
-                status_label_clone.add_css_class("success");
-
-                // Close dialog after a brief delay and refresh vault view
-                let dialog_clone2 = dialog_clone.clone();
-                let content_area_clone2 = content_area_clone.clone();
-                let vault_name_clone2 = vault_name_clone.clone();
-
-                glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
-                    dialog_clone2.close();
-                    // Refresh the vault view to show 2FA is now enabled
-                    crate::gui::content::show_vault_view(&content_area_clone2, &vault_name_clone2);
-                    glib::ControlFlow::Break
-                });
-            }
-            Ok(false) => {
-                status_label_clone.set_text("❌ Invalid code. Please try again.");
-                status_label_clone.remove_css_class("success");
-                status_label_clone.add_css_class("error");
-                code_entry_clone.select_region(0, -1); // Select all text for easy replacement
-            }
-            Err(e) => {
-                status_label_clone.set_text(&format!("❌ Error: {}", e));
-                status_label_clone.remove_css_class("success");
-                status_label_clone.add_css_class("error");
-            }
-        }
-    });
-
-    // Connect cancel button
-    let dialog_cancel = dialog.clone();
-    let vault_name_cancel = vault_name.to_string();
-    cancel_button.connect_clicked(move |_| {
-        // If user cancels, we should disable the TOTP that was just enabled
-        let _ = disable_totp(&vault_name_cancel);
-        dialog_cancel.close();
-    });
-
-    // Allow Enter key to trigger verification
-    let verify_button_clone = verify_button.clone();
-    code_entry.connect_activate(move |_| {
-        verify_button_clone.emit_clicked();
-    });
-
-    button_box.append(&verify_button);
-    button_box.append(&cancel_button);
-    section.append(&button_box);
-
-    section
-}
-
-/// Creates the TOTP verification section for confirming setup with a prepared secret
-fn create_totp_verification_section_with_secret(
-    vault_name: &str,
-    secret: &[u8],
-    dialog: &Dialog,
-    content_area: &GtkBox,
-) -> GtkBox {
-    let section = GtkBox::new(Orientation::Vertical, 8);
-    section.set_margin_top(8);
-    section.add_css_class("verification-section");
-
-    let verify_title = Label::new(Some("Verify Setup"));
-    verify_title.add_css_class("title-3");
-    verify_title.set_halign(gtk4::Align::Center);
-    verify_title.set_margin_bottom(6);
-    section.append(&verify_title);
-
-    let verify_instructions =
-        Label::new(Some("Enter the 6-digit code from your authenticator app"));
-    verify_instructions.add_css_class("body");
-    verify_instructions.set_halign(gtk4::Align::Center);
-    verify_instructions.set_margin_bottom(12);
-    section.append(&verify_instructions);
-
-    // Code entry container
-    let code_container = GtkBox::new(Orientation::Vertical, 8);
-    code_container.set_halign(gtk4::Align::Center);
-
-    let code_entry = Entry::new();
-    code_entry.set_placeholder_text(Some("000000"));
-    code_entry.set_max_length(8); // Allow some flexibility
-    code_entry.set_width_chars(10);
-    code_entry.set_halign(gtk4::Align::Center);
-    code_entry.add_css_class("totp-code-entry");
-
-    code_container.append(&code_entry);
-    section.append(&code_container);
-
-    // Status label for feedback
-    let status_label = Label::new(None);
-    status_label.set_halign(gtk4::Align::Center);
-    section.append(&status_label);
-
-    // Button box
-    let button_box = GtkBox::new(Orientation::Horizontal, 12);
-    button_box.set_halign(gtk4::Align::Center);
-    button_box.set_margin_top(16);
-
-    // Verify button
-    let verify_button = Button::new();
-    verify_button.set_label("Verify & Enable");
-    verify_button.add_css_class("suggested-action");
-
-    // Cancel button
-    let cancel_button = Button::new();
-    cancel_button.set_label("Cancel");
-    cancel_button.add_css_class("flat");
-
-    // Connect verify button
-    let vault_name_clone = vault_name.to_string();
-    let dialog_clone = dialog.clone();
-    let content_area_clone = content_area.clone();
-    let code_entry_clone = code_entry.clone();
-    let status_label_clone = status_label.clone();
-    let secret_clone = secret.to_vec();
-    verify_button.connect_clicked(move |_| {
-        let code = code_entry_clone.text();
-
-        match verify_totp_code_with_secret(&secret_clone, &code) {
-            Ok(true) => {
-                // Code is valid, now actually enable TOTP
-                match confirm_totp_setup(&vault_name_clone, &secret_clone) {
-                    Ok(()) => {
-                        status_label_clone.set_text("✅ 2FA enabled successfully!");
-                        status_label_clone.add_css_class("success");
-
-                        // Close dialog after a brief delay and refresh vault view
-                        let dialog_clone2 = dialog_clone.clone();
-                        let content_area_clone2 = content_area_clone.clone();
-                        let vault_name_clone2 = vault_name_clone.clone();
-
-                        glib::timeout_add_local(
-                            std::time::Duration::from_millis(1500),
-                            move || {
-                                dialog_clone2.close();
-                                // Refresh the vault view to show 2FA is now enabled
-                                crate::gui::content::show_vault_view(
-                                    &content_area_clone2,
-                                    &vault_name_clone2,
-                                );
-                                glib::ControlFlow::Break
-                            },
-                        );
-                    }
-                    Err(e) => {
-                        status_label_clone.set_text(&format!("❌ Failed to enable 2FA: {}", e));
-                        status_label_clone.remove_css_class("success");
-                        status_label_clone.add_css_class("error");
-                    }
-                }
-            }
-            Ok(false) => {
-                status_label_clone.set_text("❌ Invalid code. Please try again.");
-                status_label_clone.remove_css_class("success");
-                status_label_clone.add_css_class("error");
-                code_entry_clone.select_region(0, -1); // Select all text for easy replacement
-            }
-            Err(e) => {
-                status_label_clone.set_text(&format!("❌ Error: {}", e));
-                status_label_clone.remove_css_class("success");
-                status_label_clone.add_css_class("error");
-            }
-        }
-    });
-
-    // Connect cancel button - no cleanup needed since TOTP wasn't enabled yet
-    let dialog_cancel = dialog.clone();
-    cancel_button.connect_clicked(move |_| {
-        dialog_cancel.close();
-    });
-
-    // Allow Enter key to trigger verification
-    let verify_button_clone = verify_button.clone();
-    code_entry.connect_activate(move |_| {
-        verify_button_clone.emit_clicked();
-    });
-
-    button_box.append(&verify_button);
-    button_box.append(&cancel_button);
-    section.append(&button_box);
-
-    section
-}
-
 /// Generates a QR code image from an otpauth URI
 fn generate_qr_code_image(otpauth_uri: &str) -> Result<Pixbuf, Box<dyn std::error::Error>> {
     // Generate QR code with larger module size for better performance and visibility
@@ -1905,10 +1569,11 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                 Ok(()) => {
                     dialog_clone.close();
                     // Navigate to the renamed account
-                    crate::gui::content::show_account_view(
+                    crate::gui::content::show_account_view_with_mode(
                         &content_area_clone,
                         &vault_name_clone,
                         &new_name,
+                        false,
                     );
                 }
                 Err(e) => {
@@ -2374,6 +2039,126 @@ pub fn show_delete_field_dialog(
 
     button_box.append(&cancel_button);
     button_box.append(&delete_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows the TOTP authentication dialog for vault access
+pub fn show_totp_authentication_dialog<F>(vault_name: &str, on_success: F)
+where
+    F: Fn() + 'static + Clone,
+{
+    let dialog = Dialog::new();
+    dialog.set_title(Some("Two-Factor Authentication"));
+    dialog.set_modal(true);
+    dialog.set_default_size(400, 250);
+
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    // Title
+    let title = Label::new(Some(&format!("Access Vault '{}'", vault_name)));
+    title.add_css_class("title-2");
+    title.set_halign(gtk4::Align::Center);
+    content_box.append(&title);
+
+    // Instructions
+    let instructions = Label::new(Some("Enter the 6-digit code from your authenticator app"));
+    instructions.add_css_class("body");
+    instructions.set_halign(gtk4::Align::Center);
+    instructions.set_margin_bottom(12);
+    content_box.append(&instructions);
+
+    // Code entry container
+    let code_container = GtkBox::new(Orientation::Vertical, 8);
+    code_container.set_halign(gtk4::Align::Center);
+
+    let code_entry = Entry::new();
+    code_entry.set_placeholder_text(Some("000000"));
+    code_entry.set_max_length(8); // Allow some flexibility
+    code_entry.set_width_chars(10);
+    code_entry.set_halign(gtk4::Align::Center);
+    code_entry.add_css_class("totp-code-entry");
+
+    code_container.append(&code_entry);
+    content_box.append(&code_container);
+
+    // Status label for feedback
+    let status_label = Label::new(None);
+    status_label.set_halign(gtk4::Align::Center);
+    content_box.append(&status_label);
+
+    // Button box
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::Center);
+    button_box.set_margin_top(16);
+
+    // Cancel button
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.add_css_class("flat");
+
+    // Verify button
+    let verify_button = Button::new();
+    verify_button.set_label("Enter");
+    verify_button.add_css_class("suggested-action");
+
+    // Connect cancel button
+    let dialog_clone = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+
+    // Connect verify button
+    let vault_name_clone = vault_name.to_string();
+    let dialog_clone = dialog.clone();
+    let code_entry_clone = code_entry.clone();
+    let status_label_clone = status_label.clone();
+    let on_success_clone = on_success.clone();
+    verify_button.connect_clicked(move |_| {
+        let code = code_entry_clone.text();
+
+        match verify_totp_code(&vault_name_clone, &code) {
+            Ok(true) => {
+                status_label_clone.set_text("✅ Authentication successful!");
+                status_label_clone.add_css_class("success");
+
+                // Close dialog after a brief delay and call success callback
+                let dialog_clone2 = dialog_clone.clone();
+                let on_success_clone2 = on_success_clone.clone();
+                glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
+                    dialog_clone2.close();
+                    on_success_clone2();
+                    glib::ControlFlow::Break
+                });
+            }
+            Ok(false) => {
+                status_label_clone.set_text("❌ Invalid code. Please try again.");
+                status_label_clone.remove_css_class("success");
+                status_label_clone.add_css_class("error");
+                code_entry_clone.select_region(0, -1); // Select all text for easy replacement
+            }
+            Err(e) => {
+                status_label_clone.set_text(&format!("❌ Error: {}", e));
+                status_label_clone.remove_css_class("success");
+                status_label_clone.add_css_class("error");
+            }
+        }
+    });
+
+    // Allow Enter key to trigger verification
+    let verify_button_clone = verify_button.clone();
+    code_entry.connect_activate(move |_| {
+        verify_button_clone.emit_clicked();
+    });
+
+    button_box.append(&cancel_button);
+    button_box.append(&verify_button);
     content_box.append(&button_box);
 
     dialog.set_child(Some(&content_box));

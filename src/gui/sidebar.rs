@@ -1,4 +1,4 @@
-use crate::gui::content::{open_vault_with_gate, show_home_view};
+use crate::gui::content::{proceed_with_gate_warmup, show_home_view};
 use crate::gui::widgets::filtering::create_filter_bar;
 use crate::vault::{Locations, read_directory};
 use adw::prelude::*;
@@ -218,7 +218,7 @@ fn create_vault_row(vault_name: &str, content_area: &Box) -> ListBoxRow {
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();
     button.connect_clicked(move |_| {
-        open_vault_with_gate(&content_area_clone, &vault_name_clone);
+        proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
     });
 
     row.set_child(Some(&button));
@@ -264,7 +264,7 @@ fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionR
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();
     open_button.connect_clicked(move |_| {
-        open_vault_with_gate(&content_area_clone, &vault_name_clone);
+        proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
     });
 
     row
