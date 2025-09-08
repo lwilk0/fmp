@@ -25,6 +25,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Account {
     pub name: String,
+    #[allow(clippy::struct_field_names)]
     pub account_type: String,
     pub website: String,
     pub username: String,
@@ -53,13 +54,6 @@ impl Default for Account {
 }
 
 impl Account {
-    /// Creates a new account with the specified name
-    pub fn new(name: String) -> Self {
-        let mut account = Self::default();
-        account.name = name;
-        account
-    }
-
     /// Updates the modified timestamp to the current time
     pub fn update_modified_time(&mut self) {
         self.modified_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();

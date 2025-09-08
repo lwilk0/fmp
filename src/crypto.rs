@@ -18,6 +18,8 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
+use rand::RngCore;
+
 /// Locks the memory of the provided data to prevent it from being swapped to disk.
 ///
 /// # Arguments
@@ -84,8 +86,7 @@ pub fn secure_overwrite(data: &mut [u8]) {
     }
 
     // First pass: fill with random data
-    use rand::RngCore;
-    rand::thread_rng().fill_bytes(data);
+    rand::rng().fill_bytes(data);
 
     // Second pass: fill with zeros
     data.fill(0);

@@ -1,36 +1,35 @@
-use adw::prelude::*;
+use crate::{
+    password::{
+        PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,
+        get_strength_description,
+    },
+    storage::filesystem::{
+        create_backup, delete_backup, delete_vault, install_backup, rename_account, rename_vault,
+    },
+    totp::{
+        confirm_totp_setup, disable_totp, get_totp_qr_info, prepare_totp_setup, verify_totp_code,
+        verify_totp_code_with_secret,
+    },
+    vault::Account,
+};
 
-use crate::password::{
-    PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,
-    get_strength_description,
-};
-use crate::storage::filesystem::{
-    backup_exists, create_backup, delete_backup, delete_vault, install_backup, list_backups,
-    rename_account, rename_vault,
-};
-use crate::totp::{
-    confirm_totp_setup, disable_totp, enable_totp, get_totp_qr_info, is_totp_enabled,
-    prepare_totp_setup, verify_totp_code, verify_totp_code_with_secret,
-};
-use crate::vault::Account;
 use adw::{
     ActionRow, ButtonContent, Clamp, HeaderBar, PreferencesGroup, PreferencesWindow,
-    Window as AdwWindow,
+    Window as AdwWindow, prelude::*,
 };
-use gtk4::Box as GtkBox;
-use gtk4::gdk_pixbuf::{Colorspace, Pixbuf};
-use gtk4::glib::{self, Bytes};
 use gtk4::{
-    Adjustment, Button, ButtonsType, CheckButton, Dialog, Entry, Frame, Image, Label,
-    MessageDialog, MessageType, Orientation, PolicyType, ProgressBar, ResponseType, ScrolledWindow,
-    SpinButton, Switch, TextView, gdk,
+    Adjustment, Box as GtkBox, Button, ButtonsType, Dialog, Entry, Image, Label, MessageDialog,
+    MessageType, Orientation, PolicyType, ProgressBar, ResponseType, ScrolledWindow, SpinButton,
+    Switch, TextView, gdk,
+    gdk_pixbuf::{Colorspace, Pixbuf},
+    glib::{self, Bytes},
 };
-use image::{DynamicImage, ImageBuffer, Luma};
+use image::{DynamicImage, Luma};
 use qrcode::QrCode;
 use std::cell::RefCell;
 use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 /// Shows the password generator dialog and updates the provided entry field and account
 pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
     let generator_window = PreferencesWindow::new();

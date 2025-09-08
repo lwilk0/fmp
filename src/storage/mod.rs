@@ -24,6 +24,5 @@ pub mod filesystem;
 pub mod locations;
 pub mod store;
 
-pub use filesystem::{read_directory, rename_directory};
 pub use locations::Locations;
 pub use store::Store;

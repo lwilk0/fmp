@@ -17,8 +17,11 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::crypto::{lock_memory, secure_overwrite};
-use crate::security::SecureClipboardString;
+use crate::{
+    crypto::{lock_memory, secure_overwrite},
+    security::SecureClipboardString,
+};
+use rand::RngCore;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
@@ -28,7 +31,7 @@ use zeroize::Zeroize;
 pub struct SecurePassword {
     inner_secret: SecretString,
     // Add a dummy field to make memory layout less predictable
-    _obfuscation_data: [u8; 32],
+    obfuscation_data: [u8; 32],
 }
 
 impl SecurePassword {
@@ -37,14 +40,12 @@ impl SecurePassword {
         // Lock the password in memory to prevent swapping
         lock_memory(password_input.as_bytes());
 
-        // Generate random obfuscation data
-        use rand::RngCore;
         let mut obfuscation_buffer = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut obfuscation_buffer);
+        rand::rng().fill_bytes(&mut obfuscation_buffer);
 
         let secure_password_instance = Self {
             inner_secret: SecretString::new(password_input.clone().into_boxed_str()),
-            _obfuscation_data: obfuscation_buffer,
+            obfuscation_data: obfuscation_buffer,
         };
 
         // Zeroize the original password string
@@ -55,30 +56,19 @@ impl SecurePassword {
 
     /// Creates an empty secure password
     pub fn empty() -> Self {
-        // Generate random obfuscation data even for empty passwords
         use rand::RngCore;
         let mut obfuscation_buffer = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut obfuscation_buffer);
+        rand::rng().fill_bytes(&mut obfuscation_buffer);
 
         Self {
             inner_secret: SecretString::new(String::new().into_boxed_str()),
-            _obfuscation_data: obfuscation_buffer,
+            obfuscation_data: obfuscation_buffer,
         }
-    }
-
-    /// Exposes the password securely for temporary use
-    pub fn expose_secret(&self) -> &str {
-        self.inner_secret.expose_secret()
     }
 
     /// Returns the length of the password for UI purposes
     pub fn len(&self) -> usize {
         self.inner_secret.expose_secret().len()
-    }
-
-    /// Checks if the password is empty
-    pub fn is_empty(&self) -> bool {
-        self.inner_secret.expose_secret().is_empty()
     }
 
     /// Updates the password with a new value
@@ -87,12 +77,10 @@ impl SecurePassword {
         lock_memory(new_password_input.as_bytes());
 
         // Regenerate obfuscation data on update
-        use rand::RngCore;
-        rand::thread_rng().fill_bytes(&mut self._obfuscation_data);
+        rand::rng().fill_bytes(&mut self.obfuscation_data);
 
         self.inner_secret = SecretString::new(new_password_input.clone().into_boxed_str());
 
-        // Zeroize the input password string
         new_password_input.zeroize();
     }
 
@@ -106,7 +94,7 @@ impl SecurePassword {
     /// The returned string should be used immediately and then dropped
     pub fn expose_for_clipboard(&self) -> SecureClipboardString {
         let password_copy = self.inner_secret.expose_secret().to_string();
-        // Lock this temporary copy in memory too
+
         lock_memory(password_copy.as_bytes());
         SecureClipboardString::new(password_copy)
     }
@@ -118,7 +106,7 @@ impl SecurePassword {
         F: FnOnce(&str) -> R,
     {
         let exposed_password = self.inner_secret.expose_secret();
-        // Lock the exposed password in memory during the operation
+
         lock_memory(exposed_password.as_bytes());
 
         // Add some timing obfuscation to prevent timing attacks
@@ -134,25 +122,6 @@ impl SecurePassword {
 
         operation_result
     }
-
-    /// Constant-time comparison to prevent timing attacks
-    pub fn constant_time_eq(&self, comparison_target: &str) -> bool {
-        let stored_password = self.inner_secret.expose_secret();
-        let stored_password_bytes = stored_password.as_bytes();
-        let target_password_bytes = comparison_target.as_bytes();
-
-        // Ensure we always compare the same amount of data
-        let maximum_length = stored_password_bytes.len().max(target_password_bytes.len());
-        let mut comparison_result = stored_password_bytes.len() == target_password_bytes.len();
-
-        for byte_index in 0..maximum_length {
-            let stored_byte = stored_password_bytes.get(byte_index).copied().unwrap_or(0);
-            let target_byte = target_password_bytes.get(byte_index).copied().unwrap_or(0);
-            comparison_result &= stored_byte == target_byte;
-        }
-
-        comparison_result
-    }
 }
 
 impl Default for SecurePassword {
@@ -163,11 +132,7 @@ impl Default for SecurePassword {
 
 impl Drop for SecurePassword {
     fn drop(&mut self) {
-        // Securely overwrite the obfuscation data
-        secure_overwrite(&mut self._obfuscation_data);
-
-        // The SecretString will be zeroized by its own Drop implementation
-        // but we add extra security measures here
+        secure_overwrite(&mut self.obfuscation_data);
 
         // Add a small delay to make timing attacks harder
         std::thread::sleep(std::time::Duration::from_millis(1));
@@ -194,7 +159,6 @@ impl<'de> Deserialize<'de> for SecurePassword {
         let mut password_data = String::deserialize(deserializer)?;
         let secure_password_instance = SecurePassword::new(password_data.clone());
 
-        // Zeroize the temporary password string
         password_data.zeroize();
 
         Ok(secure_password_instance)

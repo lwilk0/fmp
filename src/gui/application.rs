@@ -5,8 +5,8 @@ use crate::gui::{
     dialogs::{is_first_run, show_welcome_dialog},
     sidebar::create_paned_layout_with_callbacks,
 };
-use adw::{Application, ApplicationWindow, HeaderBar, ToastOverlay};
-use gtk4::{Box, CssProvider, Label, Orientation, StyleContext, gdk};
+use adw::{Application, ApplicationWindow, HeaderBar};
+use gtk4::{Box, CssProvider, Label, Orientation, gdk, style_context_add_provider_for_display};
 
 pub fn run_gui() {
     let application = Application::builder().application_id("com.fmp").build();
@@ -18,13 +18,13 @@ pub fn run_gui() {
 }
 
 fn run_ui(app: &Application) {
-    // Load CSS styles
     load_css();
 
     let main_content = Box::new(Orientation::Vertical, 0);
 
     let title_label = Label::new(None);
     title_label.set_markup("<b>Forgot My Password</b>");
+
     let header = HeaderBar::builder().title_widget(&title_label).build();
     main_content.append(&header);
 
@@ -32,29 +32,22 @@ fn run_ui(app: &Application) {
     let content_area = Box::new(Orientation::Vertical, 12);
     content_area.add_css_class("main-content");
 
-    // Initialize with home view
     show_home_view(&content_area);
 
     main_content.append(&content_area);
 
     // Create sidebar with content area reference for updating
-    let paned = create_paned_layout_with_callbacks(&main_content, &content_area);
-
-    // Create toast overlay and wrap the paned layout
-    let toast_overlay = ToastOverlay::new();
-    toast_overlay.set_child(Some(&paned));
+    create_paned_layout_with_callbacks(&main_content, &content_area);
 
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Forgot My Password")
         .default_width(800)
         .default_height(600)
-        .content(&toast_overlay)
         .build();
 
     window.present();
 
-    // Show welcome dialog on first run
     if is_first_run() {
         show_welcome_dialog();
     }
@@ -66,7 +59,7 @@ fn load_css() {
 
     provider.load_from_data(css_data);
 
-    StyleContext::add_provider_for_display(
+    style_context_add_provider_for_display(
         &gdk::Display::default().expect("Could not connect to a display."),
         &provider,
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,

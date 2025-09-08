@@ -97,11 +97,9 @@ pub fn create_vault(vault_name: &str, recipient: &str) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     locations.initialize_vault()?;
 
-    // Write recipient to file
     let mut recipient_file = File::create(&locations.recipient)?;
     recipient_file.write_all(recipient.as_bytes())?;
 
-    // Create a gate file for GPG warm-up
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
     let recipient_key = ctx.get_key(recipient).map_err(|e| {
         anyhow::anyhow!(
@@ -169,7 +167,6 @@ pub fn delete_account(vault_name: &str, account_name: &str) -> Result<(), Error>
     store.storage_locations.does_vault_exist()?;
     store.storage_locations.does_account_exist()?;
 
-    // Remove the entire account directory
     remove_dir_all(&store.storage_locations.account)?;
 
     Ok(())

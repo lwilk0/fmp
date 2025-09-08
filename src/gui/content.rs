@@ -12,11 +12,11 @@ use crate::{
             LoadingOverlay, create_loading_button, set_button_loading_state,
         },
     },
-    storage::filesystem::backup_exists,
+    storage::filesystem::{backup_exists, read_directory},
     totp::{is_totp_enabled, is_totp_required},
     vault::{
         Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
-        read_directory, update_account, warm_up_gpg,
+        update_account, warm_up_gpg,
     },
 };
 use adw::{ActionRow, ButtonContent, Clamp, PreferencesGroup, prelude::*};
@@ -398,7 +398,6 @@ fn create_statistics_section() -> PreferencesGroup {
     group
 }
 
-
 /// Creates the quick actions section
 fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
     let group = PreferencesGroup::new();
@@ -692,96 +691,122 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Prefe
     group
 }
 
+/// Creates the vault management section with backup and vault operations
+fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Vault Management");
+    group.set_description(Some("Backup, restore, rename, and delete vault operations"));
 
+    let backup_row = ActionRow::new();
+    backup_row.set_title("Create Backup");
+    backup_row.set_subtitle("Create a backup of this vault");
+    backup_row.set_activatable(true);
 
+    let backup_button = Button::new();
+    backup_button.set_label("Backup");
+    backup_button.add_css_class("flat");
+    backup_button.set_valign(gtk4::Align::Center);
+    backup_row.add_suffix(&backup_button);
+    backup_row.set_activatable_widget(Some(&backup_button));
 
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    backup_button.connect_clicked(move |_| {
+        show_backup_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
 
+    group.add(&backup_row);
 
+    let restore_row = ActionRow::new();
+    restore_row.set_title("Restore Backup");
+    restore_row.set_subtitle("Restore vault from backup");
+    restore_row.set_activatable(true);
 
-/// Clears all content from the content area
-fn clear_content(content_area: &Box) {
-    while let Some(child) = content_area.first_child() {
-        content_area.remove(&child);
-    }
-}
+    let restore_button = Button::new();
+    restore_button.set_label("Restore");
+    restore_button.add_css_class("flat");
+    restore_button.set_valign(gtk4::Align::Center);
 
-/// Proceeds with gate warm-up and then shows the vault view
-pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
-    // Check if TOTP is required for this vault
-    if is_totp_required(vault_name) {
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        
-        show_totp_authentication_dialog(&vault_name_clone.clone(), move || {
-            proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
-        });
-    } else {
-        proceed_with_gpg_warmup(content_area, vault_name);
-    }
-}
+    // Check if backup exists to enable/disable button
+    let has_backup = backup_exists(vault_name);
+    restore_button.set_sensitive(has_backup);
+    restore_row.set_sensitive(has_backup);
 
-/// Proceeds with GPG warm-up after TOTP verification (if required)
-fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
-    // Attempt to warm up GPG by decrypting the gate file
-    match warm_up_gpg(vault_name) {
-        Ok(()) => {
-            show_vault_view(content_area, vault_name);
-        }
-        Err(e) => {
-            show_error_message(
-                content_area,
-                "Failed to Access Vault",
-                &format!("Could not decrypt vault gate file: {e}"),
-            );
-        }
-    }
-}
+    restore_row.add_suffix(&restore_button);
+    restore_row.set_activatable_widget(Some(&restore_button));
 
-/// Shows an error message in the content area
-fn show_error_message(content_area: &Box, title: &str, message: &str) {
-    clear_content(content_area);
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    restore_button.connect_clicked(move |_| {
+        show_restore_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(48);
-    main_box.set_margin_bottom(48);
-    main_box.set_margin_start(48);
-    main_box.set_margin_end(48);
-    main_box.set_halign(gtk4::Align::Center);
-    main_box.set_valign(gtk4::Align::Center);
+    group.add(&restore_row);
 
-    let error_title = Label::new(Some(title));
-    error_title.add_css_class("title-1");
-    error_title.set_halign(gtk4::Align::Center);
+    let delete_backup_row = ActionRow::new();
+    delete_backup_row.set_title("Delete Backup");
+    delete_backup_row.set_subtitle("Delete vault backup");
+    delete_backup_row.set_activatable(true);
 
-    let error_message = Label::new(Some(message));
-    error_message.set_wrap(true);
-    error_message.set_max_width_chars(80);
-    error_message.set_halign(gtk4::Align::Center);
-    error_message.add_css_class("dim-label");
-    error_message.set_justify(gtk4::Justification::Center);
+    let delete_backup_button = Button::new();
+    delete_backup_button.set_label("Delete");
+    delete_backup_button.add_css_class("destructive-action");
+    delete_backup_button.set_valign(gtk4::Align::Center);
+    delete_backup_button.set_sensitive(has_backup);
+    delete_backup_row.set_sensitive(has_backup);
 
-    main_box.append(&error_title);
-    main_box.append(&error_message);
+    delete_backup_row.add_suffix(&delete_backup_button);
+    delete_backup_row.set_activatable_widget(Some(&delete_backup_button));
 
-    content_area.append(&main_box);
-}
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    delete_backup_button.connect_clicked(move |_| {
+        show_delete_backup_dialog(&vault_name_clone, &content_area_clone);
+    });
 
-/// Reads available vaults from the vaults directory
-pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
-    let account_dir = get_account_directory(vault_name);
-    read_directory(&account_dir).unwrap_or_else(|_| {
-        eprintln!(
-            "Failed to read account directory: {}",
-            account_dir.display()
-        );
-        Vec::new()
-    })
-}
+    group.add(&delete_backup_row);
 
-/// Gets the account directory path
-fn get_account_directory(vault_name: &str) -> PathBuf {
-    let locations = Locations::new(vault_name, "");
-    locations.account
+    let rename_row = ActionRow::new();
+    rename_row.set_title("Rename Vault");
+    rename_row.set_subtitle("Change the name of this vault");
+    rename_row.set_activatable(true);
+
+    let rename_button = Button::new();
+    rename_button.set_label("Rename");
+    rename_button.add_css_class("flat");
+    rename_button.set_valign(gtk4::Align::Center);
+    rename_row.add_suffix(&rename_button);
+    rename_row.set_activatable_widget(Some(&rename_button));
+
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    rename_button.connect_clicked(move |_| {
+        show_rename_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+
+    group.add(&rename_row);
+
+    let delete_row = ActionRow::new();
+    delete_row.set_title("Delete Vault");
+    delete_row.set_subtitle("Permanently delete this vault and all its data");
+    delete_row.set_activatable(true);
+
+    let delete_button = Button::new();
+    delete_button.set_label("Delete");
+    delete_button.add_css_class("destructive-action");
+    delete_button.set_valign(gtk4::Align::Center);
+    delete_row.add_suffix(&delete_button);
+    delete_row.set_activatable_widget(Some(&delete_button));
+
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+    delete_button.connect_clicked(move |_| {
+        show_delete_vault_dialog(&vault_name_clone, &content_area_clone);
+    });
+
+    group.add(&delete_row);
+
+    group
 }
 
 /// Creates the account header with title and action buttons
@@ -1113,7 +1138,6 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     }
 
     password_box.append(&copy_button);
-
     section.append(&password_box);
 
     section
@@ -1564,12 +1588,6 @@ fn create_password_field_row(
     row_box
 }
 
-
-
-
-
-
-
 /// Creates an editable field row for account creation/editing
 fn create_editable_field_row(
     label_text: &str,
@@ -1618,6 +1636,92 @@ fn create_editable_field_row(
     row_box.append(&entry);
 
     row_box
+}
+
+/// Clears all content from the content area
+fn clear_content(content_area: &Box) {
+    while let Some(child) = content_area.first_child() {
+        content_area.remove(&child);
+    }
+}
+
+/// Proceeds with gate warm-up and then shows the vault view
+pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
+    // Check if TOTP is required for this vault
+    if is_totp_required(vault_name) {
+        let content_area_clone = content_area.clone();
+        let vault_name_clone = vault_name.to_string();
+        
+        show_totp_authentication_dialog(&vault_name_clone.clone(), move || {
+            proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
+        });
+    } else {
+        proceed_with_gpg_warmup(content_area, vault_name);
+    }
+}
+
+/// Proceeds with GPG warm-up after TOTP verification (if required)
+fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
+    // Attempt to warm up GPG by decrypting the gate file
+    match warm_up_gpg(vault_name) {
+        Ok(()) => {
+            show_vault_view(content_area, vault_name);
+        }
+        Err(e) => {
+            show_error_message(
+                content_area,
+                "Failed to Access Vault",
+                &format!("Could not decrypt vault gate file: {e}"),
+            );
+        }
+    }
+}
+
+/// Shows an error message in the content area
+fn show_error_message(content_area: &Box, title: &str, message: &str) {
+    clear_content(content_area);
+
+    let main_box = Box::new(Orientation::Vertical, 24);
+    main_box.set_margin_top(48);
+    main_box.set_margin_bottom(48);
+    main_box.set_margin_start(48);
+    main_box.set_margin_end(48);
+    main_box.set_halign(gtk4::Align::Center);
+    main_box.set_valign(gtk4::Align::Center);
+
+    let error_title = Label::new(Some(title));
+    error_title.add_css_class("title-1");
+    error_title.set_halign(gtk4::Align::Center);
+
+    let error_message = Label::new(Some(message));
+    error_message.set_wrap(true);
+    error_message.set_max_width_chars(80);
+    error_message.set_halign(gtk4::Align::Center);
+    error_message.add_css_class("dim-label");
+    error_message.set_justify(gtk4::Justification::Center);
+
+    main_box.append(&error_title);
+    main_box.append(&error_message);
+
+    content_area.append(&main_box);
+}
+
+/// Reads available vaults from the vaults directory
+pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
+    let account_dir = get_account_directory(vault_name);
+    read_directory(&account_dir).unwrap_or_else(|_| {
+        eprintln!(
+            "Failed to read account directory: {}",
+            account_dir.display()
+        );
+        Vec::new()
+    })
+}
+
+/// Gets the account directory path
+fn get_account_directory(vault_name: &str) -> PathBuf {
+    let locations = Locations::new(vault_name, "");
+    locations.account
 }
 
 /// Increments the usage count for a vault
@@ -1681,121 +1785,3 @@ fn get_most_used_vault() -> String {
 }
 
 
-
-/// Creates the vault management section with backup and vault operations
-fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
-    let group = PreferencesGroup::new();
-    group.set_title("Vault Management");
-    group.set_description(Some("Backup, restore, rename, and delete vault operations"));
-
-    let backup_row = ActionRow::new();
-    backup_row.set_title("Create Backup");
-    backup_row.set_subtitle("Create a backup of this vault");
-    backup_row.set_activatable(true);
-
-    let backup_button = Button::new();
-    backup_button.set_label("Backup");
-    backup_button.add_css_class("flat");
-    backup_button.set_valign(gtk4::Align::Center);
-    backup_row.add_suffix(&backup_button);
-    backup_row.set_activatable_widget(Some(&backup_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    backup_button.connect_clicked(move |_| {
-        show_backup_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&backup_row);
-
-    let restore_row = ActionRow::new();
-    restore_row.set_title("Restore Backup");
-    restore_row.set_subtitle("Restore vault from backup");
-    restore_row.set_activatable(true);
-
-    let restore_button = Button::new();
-    restore_button.set_label("Restore");
-    restore_button.add_css_class("flat");
-    restore_button.set_valign(gtk4::Align::Center);
-
-    // Check if backup exists to enable/disable button
-    let has_backup = backup_exists(vault_name);
-    restore_button.set_sensitive(has_backup);
-    restore_row.set_sensitive(has_backup);
-
-    restore_row.add_suffix(&restore_button);
-    restore_row.set_activatable_widget(Some(&restore_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    restore_button.connect_clicked(move |_| {
-        show_restore_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&restore_row);
-
-    let delete_backup_row = ActionRow::new();
-    delete_backup_row.set_title("Delete Backup");
-    delete_backup_row.set_subtitle("Delete vault backup");
-    delete_backup_row.set_activatable(true);
-
-    let delete_backup_button = Button::new();
-    delete_backup_button.set_label("Delete");
-    delete_backup_button.add_css_class("destructive-action");
-    delete_backup_button.set_valign(gtk4::Align::Center);
-    delete_backup_button.set_sensitive(has_backup);
-    delete_backup_row.set_sensitive(has_backup);
-
-    delete_backup_row.add_suffix(&delete_backup_button);
-    delete_backup_row.set_activatable_widget(Some(&delete_backup_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    delete_backup_button.connect_clicked(move |_| {
-        show_delete_backup_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&delete_backup_row);
-
-    let rename_row = ActionRow::new();
-    rename_row.set_title("Rename Vault");
-    rename_row.set_subtitle("Change the name of this vault");
-    rename_row.set_activatable(true);
-
-    let rename_button = Button::new();
-    rename_button.set_label("Rename");
-    rename_button.add_css_class("flat");
-    rename_button.set_valign(gtk4::Align::Center);
-    rename_row.add_suffix(&rename_button);
-    rename_row.set_activatable_widget(Some(&rename_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    rename_button.connect_clicked(move |_| {
-        show_rename_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&rename_row);
-
-    let delete_row = ActionRow::new();
-    delete_row.set_title("Delete Vault");
-    delete_row.set_subtitle("Permanently delete this vault and all its data");
-    delete_row.set_activatable(true);
-
-    let delete_button = Button::new();
-    delete_button.set_label("Delete");
-    delete_button.add_css_class("destructive-action");
-    delete_button.set_valign(gtk4::Align::Center);
-    delete_row.add_suffix(&delete_button);
-    delete_row.set_activatable_widget(Some(&delete_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    delete_button.connect_clicked(move |_| {
-        show_delete_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&delete_row);
-
-    group
-}

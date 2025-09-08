@@ -60,27 +60,6 @@ impl LoadingOverlay {
     }
 }
 
-/// Show a loading spinner for an async operation
-pub fn show_loading_for_operation<F, R>(
-    loading_overlay: &LoadingOverlay,
-    message: &str,
-    operation: F,
-) -> R
-where
-    F: FnOnce() -> R,
-{
-    loading_overlay.show(message);
-
-    // Force UI update
-    while gtk4::glib::MainContext::default().pending() {
-        gtk4::glib::MainContext::default().iteration(false);
-    }
-
-    let result = operation();
-    loading_overlay.hide();
-    result
-}
-
 /// A loading button that can show a spinner
 pub struct LoadingButton {
     button: gtk4::Button,
@@ -139,11 +118,6 @@ impl LoadingButton {
             self.label.set_text(&self.original_text);
             self.button.set_sensitive(true);
         }
-    }
-
-    /// Check if currently loading
-    pub fn is_loading(&self) -> bool {
-        *self.is_loading.borrow()
     }
 }
 

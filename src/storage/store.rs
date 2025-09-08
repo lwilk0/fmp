@@ -133,13 +133,13 @@ impl Store {
         // Lock the decrypted buffer to reduce swap risk
         lock_memory(&decrypted_output);
 
-        // Try to parse as JSON first (new format)
+        // Try to parse as JSON first
         let account_data = if let Ok(json_string) = String::from_utf8(decrypted_output.clone()) {
             if let Ok(parsed_account) = serde_json::from_str::<Account>(&json_string) {
                 parsed_account
             } else {
                 // Fallback to old format parsing
-                self.parse_legacy_format(&decrypted_output)?
+                Self::parse_legacy_format(&decrypted_output)?
             }
         } else {
             return Err(anyhow::anyhow!(
@@ -147,15 +147,13 @@ impl Store {
             ));
         };
 
-        // Zeroize decrypted buffer
         decrypted_output.zeroize();
 
         Ok(account_data)
     }
 
     /// Parses legacy format (username:password) into an Account struct
-    fn parse_legacy_format(&self, legacy_data: &[u8]) -> Result<Account, Error> {
-        // Parse "username:password" using the first ':' only
+    fn parse_legacy_format(legacy_data: &[u8]) -> Result<Account, Error> {
         let separator_position = legacy_data
             .iter()
             .position(|&byte| byte == b':')
@@ -167,12 +165,13 @@ impl Store {
         let parsed_username = String::from_utf8(username_bytes.to_vec())?;
         let mut parsed_password = String::from_utf8(password_bytes.to_vec())?;
 
-        let mut migrated_account = Account::default();
-        migrated_account.username = parsed_username;
-        migrated_account.password = SecurePassword::new(parsed_password.clone());
-        migrated_account.name = "Migrated Account".to_string();
+        let migrated_account = Account {
+            username: parsed_username,
+            password: SecurePassword::new(parsed_password.clone()),
+            name: "Migrated Account".to_string(),
+            ..Default::default()
+        };
 
-        // Zeroize the temporary password string
         parsed_password.zeroize();
 
         Ok(migrated_account)

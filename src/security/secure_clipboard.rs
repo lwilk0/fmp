@@ -31,10 +31,6 @@ impl SecureClipboardString {
             inner_content: clipboard_content,
         }
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.inner_content
-    }
 }
 
 impl Drop for SecureClipboardString {

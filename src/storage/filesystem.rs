@@ -24,30 +24,6 @@ use fs_extra::dir::{CopyOptions, copy};
 use std::fs::{create_dir_all, read_dir, remove_dir_all, rename};
 use std::path::PathBuf;
 
-/// Renames a directory from `old_path` to `new_path`.
-///
-/// # Arguments
-/// * `old_path` - The current path of the directory to be renamed.
-/// * `new_path` - The new path for the directory.
-///
-/// # Returns
-/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
-///
-/// # Errors
-/// * If the directory at `old_path` does not exist, or if the renaming operation fails, an error is returned.
-pub fn rename_directory(old_path: &PathBuf, new_path: &PathBuf) -> Result<(), Error> {
-    if old_path.exists() {
-        rename(old_path, new_path)?;
-    } else {
-        return Err(anyhow::anyhow!(
-            "The directory `{}` does not exist.",
-            old_path.display()
-        ));
-    }
-
-    Ok(())
-}
-
 /// Reads all directories in the specified directory and returns their names as a vector of strings.
 ///
 /// # Arguments
@@ -152,13 +128,11 @@ pub fn delete_vault(vault_name: &str) -> Result<(), Error> {
 
     remove_dir_all(&locations.vault)?;
 
-    // Also remove backup if it exists
     let backup_path = locations.backup.join(vault_name);
     if backup_path.exists() {
         remove_dir_all(&backup_path)?;
     }
 
-    // Remove vault from stats file
     remove_vault_from_stats(vault_name)?;
 
     Ok(())
@@ -199,10 +173,8 @@ pub fn rename_vault(old_name: &str, new_name: &str) -> Result<(), Error> {
         rename(&old_backup, &new_backup)?;
     }
 
-    // Update vault stats file to reflect the new name
     update_vault_stats_on_rename(old_name, new_name)?;
 
-    // Update TOTP ledgers to reflect the new name
     update_totp_ledgers_on_rename(old_name, new_name)?;
 
     Ok(())
@@ -224,7 +196,6 @@ pub fn rename_account(vault_name: &str, old_name: &str, new_name: &str) -> Resul
     let old_locations = Locations::new(vault_name, old_name);
     let new_locations = Locations::new(vault_name, new_name);
 
-    // Check if vault exists
     old_locations.does_vault_exist()?;
 
     if !old_locations.account.exists() {
@@ -246,57 +217,6 @@ pub fn rename_account(vault_name: &str, old_name: &str, new_name: &str) -> Resul
     rename(&old_locations.account, &new_locations.account)?;
 
     Ok(())
-}
-
-/// Deletes an account and all its contents from a vault.
-///
-/// # Arguments
-/// * `vault_name` - The name of the vault containing the account.
-/// * `account_name` - The name of the account to delete.
-///
-/// # Returns
-/// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure.
-///
-/// # Errors
-/// * If the vault or account does not exist or cannot be deleted, an error is returned.
-pub fn delete_account(vault_name: &str, account_name: &str) -> Result<(), Error> {
-    let locations = Locations::new(vault_name, account_name);
-
-    // Check if vault exists
-    locations.does_vault_exist()?;
-
-    if !locations.account.exists() {
-        return Err(anyhow::anyhow!(
-            "Account `{}` does not exist in vault `{}`.",
-            account_name,
-            vault_name
-        ));
-    }
-
-    remove_dir_all(&locations.account)?;
-
-    Ok(())
-}
-
-/// Lists all available backups for a vault.
-///
-/// # Arguments
-/// * `vault_name` - The name of the vault to check for backups.
-///
-/// # Returns
-/// * `Result<Vec<String>, Error>` - Returns a vector of backup names on success, or an error on failure.
-///
-/// # Errors
-/// * If reading the backup directory fails, an error is returned.
-pub fn list_backups(vault_name: &str) -> Result<Vec<String>, Error> {
-    let locations = Locations::new(vault_name, "");
-    let backup_vault_path = locations.backup.join(vault_name);
-
-    if !backup_vault_path.exists() {
-        return Ok(Vec::new());
-    }
-
-    read_directory(&backup_vault_path)
 }
 
 /// Checks if a backup exists for the specified vault.
@@ -357,7 +277,7 @@ fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
     let content = fs::read_to_string(&stats_file)?;
     let updated_content: String = content
         .lines()
-        .filter(|line| !line.starts_with(&format!("{}:", vault_name)))
+        .filter(|line| !line.starts_with(&format!("{vault_name}:")))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -388,8 +308,8 @@ fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Er
     let updated_content: String = content
         .lines()
         .map(|line| {
-            if line.starts_with(&format!("{}:", old_name)) {
-                line.replace(&format!("{}:", old_name), &format!("{}:", new_name))
+            if line.starts_with(&format!("{old_name}:")) {
+                line.replace(&format!("{old_name}:"), &format!("{new_name}:"))
             } else {
                 line.to_string()
             }

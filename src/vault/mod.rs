@@ -26,6 +26,5 @@ pub mod operations;
 // Re-export all the types and functions that were previously in the vault.rs module
 // to maintain backward compatibility
 pub use crate::models::Account;
-pub use crate::security::{SecureClipboardString, SecurePassword};
-pub use crate::storage::{Locations, Store, read_directory, rename_directory};
+pub use crate::storage::Locations;
 pub use operations::*;

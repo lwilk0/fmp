@@ -1,9 +1,9 @@
-use rand::prelude::SliceRandom;
-use rand::{Rng, thread_rng};
+use rand::{Rng, rng};
 use std::collections::HashSet;
 
 /// Configuration for password generation
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct PasswordConfig {
     pub length: usize,
     pub include_lowercase: bool,
@@ -92,11 +92,11 @@ pub fn generate_password(password_config: &PasswordConfig) -> Result<String, Str
     }
 
     // Generate password more efficiently
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let mut password = String::with_capacity(password_config.length);
 
     for _ in 0..password_config.length {
-        let idx = rng.gen_range(0..available_characters.len());
+        let idx = rng.random_range(0..available_characters.len());
         password.push(available_characters[idx]);
     }
 
@@ -132,7 +132,7 @@ pub fn calculate_password_strength(password: &str) -> u8 {
         .filter(|&&x| x)
         .count();
 
-    score += (variety_count as u8) * 10;
+    score += u8::try_from(variety_count).expect("Failed to convert variety count") * 10;
 
     // Entropy bonus (0-20 points)
     let unique_chars = password
