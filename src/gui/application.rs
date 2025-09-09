@@ -36,8 +36,7 @@ fn run_ui(app: &Application) {
 
     main_content.append(&content_area);
 
-    // Create sidebar with content area reference for updating
-    create_paned_layout_with_callbacks(&main_content, &content_area);
+    let paned_layout = create_paned_layout_with_callbacks(&main_content, &content_area);
 
     let window = ApplicationWindow::builder()
         .application(app)
@@ -46,6 +45,7 @@ fn run_ui(app: &Application) {
         .default_height(600)
         .build();
 
+    window.set_content(Some(&paned_layout));
     window.present();
 
     if is_first_run() {

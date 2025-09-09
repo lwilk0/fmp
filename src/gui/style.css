@@ -1,4 +1,3 @@
-/* Sidebar Styling */
 .sidebar {
     background-color: #2d3142;
     border-right: 1px solid #4f5b66;
@@ -48,7 +47,6 @@
     transition: all 0.2s ease;
 }
 
-/* Vault Button Styling */
 .sidebar-vault-button {
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -86,14 +84,12 @@
     font-size: 0.9em;
 }
 
-/* Empty Message Styling */
 .sidebar-empty-message {
     color: rgba(255, 255, 255, 0.6);
     font-style: italic;
     text-align: left;
 }
 
-/* General improvements */
 .dim-label {
     opacity: 0.7;
     font-size: 0.9em;
@@ -104,7 +100,6 @@
     font-size: 1.1em;
 }
 
-/* Compact spacing for overall interface */
 box {
     margin: 0;
 }
@@ -128,7 +123,6 @@ searchentry {
     min-height: 32px;
 }
 
-/* Custom welcome section styling for compact layout */
 .welcome-section {
     margin: 0px;
     padding: 0px;
@@ -139,13 +133,11 @@ searchentry {
     margin-bottom: 0px;
 }
 
-/* Reduce gap between welcome section and overview */
 .home-section {
     margin-top: 8px;
     margin-bottom: 8px;
 }
 
-/* Sidebar vault items consistent margins */
 .sidebar preferencesgroup {
     margin-start: 0;
     margin-end: 0;
@@ -164,7 +156,6 @@ searchentry {
     border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* Overview and Quick Actions section rows */
 preferencesgroup actionrow {
     background-color: @headerbar_bg_color;
     border-radius: 6px;
@@ -173,13 +164,11 @@ preferencesgroup actionrow {
 }
 
 
-/* Error styling */
 .error {
     color: @error_color;
     font-weight: 500;
 }
 
-/* Password display styling */
 .password-display {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
     font-size: 14px;
@@ -189,7 +178,6 @@ preferencesgroup actionrow {
     padding: 8px;
 }
 
-/* Password field styling */
 .password-field {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
     font-size: 1.0em;
@@ -206,7 +194,6 @@ preferencesgroup actionrow {
     box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.2);
 }
 
-/* Notes field styling */
 .notes-field {
     font-size: 0.95em;
     min-height: 36px;
@@ -222,7 +209,6 @@ preferencesgroup actionrow {
     box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.2);
 }
 
-/* Password generator dialog styling */
 .password-generator-dialog {
     border-radius: 8px;
     animation: dialog-fade-in 0.2s ease-out;
@@ -240,7 +226,6 @@ preferencesgroup actionrow {
     }
 }
 
-/* Password strength indicator styling */
 .password-strength {
     border-radius: 4px;
     min-height: 6px;
@@ -265,7 +250,6 @@ preferencesgroup actionrow {
     background: linear-gradient(90deg, #27ae60, #2ecc71);
 }
 
-/* 2FA/TOTP Styling */
 .totp-section {
     background-color: @headerbar_bg_color;
     border-radius: 8px;
@@ -415,12 +399,10 @@ preferencesgroup actionrow {
     color: @success_color;
 }
 
-/* Confirmation dialog styling */
 .confirmation-dialog {
     border-radius: 12px;
 }
 
-/* Card styling for GPG info */
 .card {
     background-color: @headerbar_bg_color;
     border-radius: 8px;
@@ -428,7 +410,6 @@ preferencesgroup actionrow {
     padding: 12px;
 }
 
-/* Enhanced dialog styling */
 dialog {
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -440,7 +421,6 @@ dialog headerbar {
     border-top-right-radius: 12px;
 }
 
-/* Button improvements */
 button.suggested-action {
     background: linear-gradient(135deg, @accent_bg_color, shade(@accent_bg_color, 0.9));
     border: none;
@@ -491,7 +471,6 @@ button.success {
     transition: all 0.2s ease;
 }
 
-/* Account card styling */
 .account-card {
     transition: all 0.2s ease;
     border-radius: 8px;
@@ -520,7 +499,6 @@ button.success {
     padding: 0 2px;
 }
 
-/* Field row styling for better text layout */
 .account-section entry.flat {
     background-color: transparent;
     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -543,7 +521,6 @@ button.success {
     padding: 2px 0;
 }
 
-/* Responsive text handling */
 .title-1 {
     word-wrap: break-word;
     overflow-wrap: break-word;
@@ -574,7 +551,6 @@ button.success {
     hyphens: auto;
 }
 
-/* Step-by-step styling for 2FA setup */
 .totp-step {
     background-color: rgba(0, 0, 0, 0.02);
     border-radius: 8px;
@@ -587,7 +563,6 @@ button.success {
     background-color: rgba(46, 160, 67, 0.05);
 }
 
-/* QR code text styling */
 .qr-uri {
     background-color: @headerbar_bg_color;
     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -597,7 +572,6 @@ button.success {
     word-break: break-all;
 }
 
-/* Enhanced status messages */
 .status-message {
     padding: 8px 12px;
     border-radius: 6px;
@@ -616,7 +590,6 @@ button.success {
     border: 1px solid rgba(192, 28, 40, 0.3);
 }
 
-/* Vault Management Section Styling */
 .vault-management-section {
     margin-bottom: 16px;
 }
@@ -635,7 +608,6 @@ button.success {
     opacity: 0.5;
 }
 
-/* Toast Notification Styling */
 toast {
     border-radius: 8px;
     padding: 12px 16px;
@@ -668,7 +640,6 @@ toast.info-toast {
     border-color: rgba(53, 132, 228, 0.8);
 }
 
-/* Settings Page Styling */
 .settings-section {
     margin-bottom: 32px;
 }
@@ -707,7 +678,6 @@ toast.info-toast {
     }
 }
 
-/* Loading Overlay Styling */
 .loading-overlay {
     background-color: transparent;
     border-radius: 16px;
@@ -722,7 +692,6 @@ toast.info-toast {
     margin: 0 auto;
 }
 
-/* Custom circular outline spinner animation */
 @keyframes spin {
     0% {
         transform: rotate(0deg);
@@ -733,7 +702,6 @@ toast.info-toast {
     }
 }
 
-/* GTK4 Spinner styling with circular outline */
 spinner {
     background: transparent;
     border: 3px solid rgba(0, 0, 0, 0.1);
@@ -741,7 +709,6 @@ spinner {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     opacity: 1;
-    /* Hide the default GTK spinner content */
     color: transparent;
     -gtk-icon-source: none;
 }
@@ -751,7 +718,6 @@ spinner:disabled {
     animation-play-state: paused;
 }
 
-/* Dark mode spinner styling */
 @media (prefers-color-scheme: dark) {
     spinner {
         border: 3px solid rgba(255, 255, 255, 0.1);
@@ -759,7 +725,6 @@ spinner:disabled {
     }
 }
 
-/* Loading Button Styling */
 button .loading-spinner {
     margin-right: 8px;
 }
@@ -768,7 +733,6 @@ button:disabled {
     opacity: 0.6;
 }
 
-/* Settings Row Styling */
 .settings-row {
     transition: background-color 0.2s ease;
     border-radius: 8px;
@@ -785,7 +749,6 @@ button:disabled {
     }
 }
 
-/* Enhanced Switch Styling */
 switch {
     border-radius: 16px;
     min-width: 48px;
@@ -799,14 +762,12 @@ switch slider {
     margin: 2px;
 }
 
-/* Enhanced ComboBox Styling */
 combobox button {
     border-radius: 8px;
     padding: 8px 12px;
     min-height: 36px;
 }
 
-/* Enhanced SpinButton Styling */
 spinbutton {
     border-radius: 8px;
     min-height: 36px;
@@ -821,7 +782,6 @@ spinbutton button {
     min-width: 32px;
 }
 
-/* Link Button Styling */
 linkbutton {
     padding: 8px 12px;
     border-radius: 6px;
@@ -832,7 +792,6 @@ linkbutton:hover {
     background-color: rgba(53, 132, 228, 0.1);
 }
 
-/* Progress Bar Styling */
 progressbar {
     border-radius: 8px;
     min-height: 8px;
@@ -854,7 +813,6 @@ progressbar trough {
     }
 }
 
-/* GPG Entry Validation Styles */
 entry.success {
     border-color: #26a269;
     box-shadow: 0 0 0 1px #26a269;

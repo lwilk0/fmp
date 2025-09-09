@@ -26,10 +26,13 @@ use gtk4::{
 };
 use image::{DynamicImage, Luma};
 use qrcode::QrCode;
-use std::cell::RefCell;
-use std::fs::{File, create_dir_all};
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    fs::{File, create_dir_all},
+    path::PathBuf,
+    rc::Rc,
+};
+
 /// Shows the password generator dialog and updates the provided entry field and account
 pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
     let generator_window = PreferencesWindow::new();
@@ -41,12 +44,10 @@ pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<Ref
     // Password configuration - use single shared instance
     let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
 
-    // Create preferences page
     let page = adw::PreferencesPage::new();
     page.set_title("Password Generator");
     page.set_icon_name(Some("dialog-password-symbolic"));
 
-    // Create all sections as preference groups
     let length_group = create_password_length_preferences_group(&password_config);
     let character_group = create_character_types_preferences_group(&password_config);
     let custom_group = create_custom_characters_preferences_group(&password_config);
@@ -77,19 +78,17 @@ pub fn show_standalone_password_generator_dialog() {
     // Password configuration - use single shared instance
     let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
 
-    // Create preferences page
     let page = adw::PreferencesPage::new();
     page.set_title("Password Generator");
     page.set_icon_name(Some("dialog-password-symbolic"));
 
-    // Create all sections as preference groups
     let length_group = create_password_length_preferences_group(&password_config);
     let character_group = create_character_types_preferences_group(&password_config);
     let custom_group = create_custom_characters_preferences_group(&password_config);
     let display_group = create_password_display_preferences_group(
         &password_config,
-        None, // No target entry
-        None, // No account reference
+        None,
+        None,
         Some(&generator_window),
     );
 
@@ -110,12 +109,10 @@ fn create_password_length_preferences_group(
     group.set_title("Password Length");
     group.set_description(Some("Configure the length of generated passwords"));
 
-    // Create action row for password length
     let length_row = ActionRow::new();
     length_row.set_title("Length");
     length_row.set_subtitle("Number of characters in the password");
 
-    // Spin button for length
     let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
     let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);
     length_spinner.set_value(16.0);
@@ -143,7 +140,6 @@ fn create_character_types_preferences_group(
     group.set_title("Character Types");
     group.set_description(Some("Select which character types to include in passwords"));
 
-    // Create action rows for each character type
     let character_type_options = vec![
         (
             "Lowercase Letters",
@@ -259,7 +255,6 @@ fn create_custom_characters_preferences_group(
         "Add or exclude specific characters from password generation",
     ));
 
-    // Additional characters row
     let additional_row = ActionRow::new();
     additional_row.set_title("Additional Characters");
     additional_row.set_subtitle("Extra characters to include in passwords");
@@ -269,6 +264,7 @@ fn create_custom_characters_preferences_group(
     additional_entry.set_tooltip_text(Some(
         "Add extra characters to include in password generation",
     ));
+
     additional_entry.set_valign(gtk4::Align::Center);
     additional_entry.set_size_request(200, -1);
 
@@ -282,7 +278,6 @@ fn create_custom_characters_preferences_group(
     additional_row.add_suffix(&additional_entry);
     group.add(&additional_row);
 
-    // Excluded characters row
     let excluded_row = ActionRow::new();
     excluded_row.set_title("Excluded Characters");
     excluded_row.set_subtitle("Characters to avoid in passwords (e.g., confusing characters)");
@@ -306,6 +301,7 @@ fn create_custom_characters_preferences_group(
     group
 }
 
+#[allow(clippy::too_many_lines)]
 /// Creates the password display preferences group with auto-generation capability
 fn create_password_display_preferences_group(
     password_config: &Rc<RefCell<PasswordConfig>>,
@@ -317,12 +313,10 @@ fn create_password_display_preferences_group(
     group.set_title("Generated Password");
     group.set_description(Some("View and manage your generated password"));
 
-    // Password display row
     let password_row = ActionRow::new();
     password_row.set_title("Password");
     password_row.set_subtitle("Generated password will appear here");
 
-    // Text view for password display in a clamp
     let password_display = TextView::new();
     password_display.set_editable(false);
     password_display.set_cursor_visible(false);
@@ -332,10 +326,9 @@ fn create_password_display_preferences_group(
     password_display.set_margin_top(8);
     password_display.set_margin_bottom(8);
 
-    // Set initial text and generate initial password
     let display_buffer = password_display.buffer();
     let initial_config = password_config.borrow();
-    match generate_password(&*initial_config) {
+    match generate_password(&initial_config) {
         Ok(initial_password) => {
             display_buffer.set_text(&initial_password);
         }
@@ -350,11 +343,9 @@ fn create_password_display_preferences_group(
     scrolled_window.set_child(Some(&password_display));
     scrolled_window.set_size_request(-1, 80);
 
-    // Create a container for the password display
     let password_container = GtkBox::new(Orientation::Vertical, 8);
     password_container.append(&scrolled_window);
 
-    // Password strength row
     let strength_row = ActionRow::new();
     strength_row.set_title("Password Strength");
 
@@ -378,8 +369,9 @@ fn create_password_display_preferences_group(
         && initial_password != "Click 'Generate Password' to create a password"
     {
         let strength = calculate_password_strength(&initial_password);
+        #[allow(clippy::cast_lossless)]
         strength_progress.set_fraction(strength as f64 / 100.0);
-        strength_progress.set_text(Some(&format!("{}%", strength)));
+        strength_progress.set_text(Some(&format!("{strength}%")));
         strength_description.set_text(get_strength_description(strength));
         strength_progress.remove_css_class("strength-weak");
         strength_progress.remove_css_class("strength-fair");
@@ -393,16 +385,13 @@ fn create_password_display_preferences_group(
     strength_box.append(&strength_description);
     strength_row.add_suffix(&strength_box);
 
-    // Actions row for buttons
     let actions_row = ActionRow::new();
     actions_row.set_title("Actions");
     actions_row.set_subtitle("Generate, copy, or use the password");
 
-    // Button container
     let button_container = GtkBox::new(Orientation::Horizontal, 8);
     button_container.set_halign(gtk4::Align::End);
 
-    // Generate button with icon
     let generate_button = Button::new();
     let generate_content = ButtonContent::new();
     generate_content.set_label("Generate");
@@ -417,18 +406,17 @@ fn create_password_display_preferences_group(
     let strength_desc_ref = strength_description.clone();
     generate_button.connect_clicked(move |_| {
         let config = config_ref.borrow();
-        match generate_password(&*config) {
+        match generate_password(&config) {
             Ok(generated_password) => {
                 let buffer = display_ref.buffer();
                 buffer.set_text(&generated_password);
 
-                // Update strength indicator
                 let strength = calculate_password_strength(&generated_password);
+                #[allow(clippy::cast_lossless)]
                 strength_progress_ref.set_fraction(strength as f64 / 100.0);
-                strength_progress_ref.set_text(Some(&format!("{}%", strength)));
+                strength_progress_ref.set_text(Some(&format!("{strength}%")));
                 strength_desc_ref.set_text(get_strength_description(strength));
 
-                // Update CSS classes for color
                 strength_progress_ref.remove_css_class("strength-weak");
                 strength_progress_ref.remove_css_class("strength-fair");
                 strength_progress_ref.remove_css_class("strength-good");
@@ -436,11 +424,10 @@ fn create_password_display_preferences_group(
                 strength_progress_ref.add_css_class(get_strength_color_class(strength));
             }
             Err(error_message) => {
-                eprintln!("Failed to generate password: {}", error_message);
+                eprintln!("Failed to generate password: {error_message}");
                 let buffer = display_ref.buffer();
                 buffer.set_text("Error generating password");
 
-                // Reset strength indicator
                 strength_progress_ref.set_fraction(0.0);
                 strength_progress_ref.set_text(Some("0%"));
                 strength_desc_ref.set_text("");
@@ -448,7 +435,6 @@ fn create_password_display_preferences_group(
         }
     });
 
-    // Copy button with icon
     let copy_button = Button::new();
     let copy_content = ButtonContent::new();
     copy_content.set_label("Copy");
@@ -491,43 +477,10 @@ fn create_password_display_preferences_group(
     button_container.append(&generate_button);
     button_container.append(&copy_button);
 
-    // Add keyboard shortcuts if we have a parent window
-    if let Some(window) = parent_window {
-        let key_controller = gtk4::EventControllerKey::new();
-        let window_ref = window.clone();
-        let generate_ref = generate_button.clone();
-        let copy_ref = copy_button.clone();
-        key_controller.connect_key_pressed(move |_, key, _, modifier| {
-            match key {
-                // Ctrl+G or F5 to generate
-                gdk::Key::g | gdk::Key::F5
-                    if modifier.contains(gdk::ModifierType::CONTROL_MASK)
-                        || key == gdk::Key::F5 =>
-                {
-                    generate_ref.emit_clicked();
-                    glib::Propagation::Stop
-                }
-                // Ctrl+C to copy
-                gdk::Key::c if modifier.contains(gdk::ModifierType::CONTROL_MASK) => {
-                    copy_ref.emit_clicked();
-                    glib::Propagation::Stop
-                }
-                // Escape to close
-                gdk::Key::Escape => {
-                    window_ref.close();
-                    glib::Propagation::Stop
-                }
-                _ => glib::Propagation::Proceed,
-            }
-        });
-        window.add_controller(key_controller);
-    }
-
     // Add Use button only if we have the necessary parameters
     if let (Some(entry), Some(account_rc), Some(window)) =
         (target_entry, account_ref, parent_window)
     {
-        // Use button with icon
         let use_button = Button::new();
         let use_content = ButtonContent::new();
         use_content.set_label("Use Password");
@@ -560,7 +513,6 @@ fn create_password_display_preferences_group(
 
     actions_row.add_suffix(&button_container);
 
-    // Add all rows to the group
     password_row.set_child(Some(&password_container));
     group.add(&password_row);
     group.add(&strength_row);
@@ -604,16 +556,13 @@ pub fn show_welcome_dialog() {
     welcome_window.set_default_size(600, 500);
     welcome_window.add_css_class("welcome-dialog");
 
-    // Create header bar
     let header_bar = HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("Welcome"))));
     header_bar.add_css_class("flat");
 
-    // Create main content with proper libadwaita layout
     let main_container = GtkBox::new(Orientation::Vertical, 0);
     main_container.append(&header_bar);
 
-    // Create clamp for content width
     let clamp = Clamp::new();
     clamp.set_maximum_size(500);
     clamp.set_tightening_threshold(400);
@@ -624,7 +573,6 @@ pub fn show_welcome_dialog() {
     content_box.set_margin_start(24);
     content_box.set_margin_end(24);
 
-    // Welcome title with icon
     let title_container = GtkBox::new(Orientation::Horizontal, 12);
     title_container.set_halign(gtk4::Align::Center);
 
@@ -638,8 +586,7 @@ pub fn show_welcome_dialog() {
     title_container.append(&dialog_title);
     content_box.append(&title_container);
 
-    // Welcome message
-    let welcome_message_text = "Thank you for choosing Forgot My Password (FMP) - your secure password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
+    let welcome_message_text = "Thank you for choosing Forgot My Password (FMP), a secure local password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
 
     let welcome_message_label = Label::new(Some(welcome_message_text));
     welcome_message_label.set_wrap(true);
@@ -649,7 +596,6 @@ pub fn show_welcome_dialog() {
     welcome_message_label.set_valign(gtk4::Align::Start);
     welcome_message_label.add_css_class("body");
 
-    // Create scrolled window for the message
     let message_scrolled_window = ScrolledWindow::new();
     message_scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
     message_scrolled_window.set_child(Some(&welcome_message_label));
@@ -660,12 +606,10 @@ pub fn show_welcome_dialog() {
 
     content_box.append(&message_scrolled_window);
 
-    // Button box
     let button_container = GtkBox::new(Orientation::Horizontal, 12);
     button_container.set_halign(gtk4::Align::Center);
     button_container.set_margin_top(8);
 
-    // Learn More about GPG button
     let learn_more_button = Button::new();
     learn_more_button.set_label("Learn More about GPG");
     learn_more_button.add_css_class("flat");
@@ -674,7 +618,6 @@ pub fn show_welcome_dialog() {
         show_gpg_info_dialog();
     });
 
-    // Get Started button
     let get_started_button = Button::new();
     get_started_button.set_label("Get Started");
     get_started_button.add_css_class("suggested-action");
@@ -682,9 +625,8 @@ pub fn show_welcome_dialog() {
 
     let window_ref = welcome_window.clone();
     get_started_button.connect_clicked(move |_| {
-        // Mark first run as complete
         if let Err(error_message) = mark_first_run_complete() {
-            eprintln!("Failed to mark first run complete: {}", error_message);
+            eprintln!("Failed to mark first run complete: {error_message}");
         }
         window_ref.close();
     });
@@ -708,16 +650,13 @@ fn show_gpg_info_dialog() {
     info_window.set_default_size(600, 500);
     info_window.add_css_class("info-dialog");
 
-    // Create header bar
     let header_bar = HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("GPG Setup"))));
     header_bar.add_css_class("flat");
 
-    // Create main content with proper libadwaita layout
     let main_container = GtkBox::new(Orientation::Vertical, 0);
     main_container.append(&header_bar);
 
-    // Create clamp for content width
     let clamp = Clamp::new();
     clamp.set_maximum_size(500);
     clamp.set_tightening_threshold(400);
@@ -728,7 +667,6 @@ fn show_gpg_info_dialog() {
     content_box.set_margin_start(24);
     content_box.set_margin_end(24);
 
-    // Title with icon
     let title_container = GtkBox::new(Orientation::Horizontal, 12);
     title_container.set_halign(gtk4::Align::Center);
 
@@ -742,7 +680,6 @@ fn show_gpg_info_dialog() {
     title_container.append(&dialog_title);
     content_box.append(&title_container);
 
-    // GPG instructions with better formatting
     let instructions_box = GtkBox::new(Orientation::Vertical, 16);
 
     let intro_text =
@@ -772,7 +709,6 @@ fn show_gpg_info_dialog() {
     instructions_box.append(&commands_title);
     instructions_box.append(&commands_label);
 
-    // Create scrolled window for the instructions
     let scrolled = ScrolledWindow::new();
     scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
     scrolled.set_child(Some(&instructions_box));
@@ -783,11 +719,9 @@ fn show_gpg_info_dialog() {
 
     content_box.append(&scrolled);
 
-    // Button box
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(gtk4::Align::Center);
 
-    // Close button
     let close_button = Button::new();
     close_button.set_label("Close");
     close_button.add_css_class("suggested-action");
@@ -829,18 +763,15 @@ pub fn show_confirmation_dialog<F>(
     dialog.set_title(Some(title));
     dialog.add_css_class("confirmation-dialog");
 
-    // Add custom buttons
     dialog.add_button("Cancel", ResponseType::Cancel);
     dialog.add_button(confirm_label, ResponseType::Accept);
 
-    // Style the confirm button as destructive
     if let Some(confirm_button) = dialog.widget_for_response(ResponseType::Accept) {
         confirm_button.add_css_class("destructive-action");
     }
 
     dialog.set_default_response(ResponseType::Cancel);
 
-    // Connect response handler
     dialog.connect_response(move |dialog, response| {
         if response == ResponseType::Accept {
             on_confirm();
@@ -852,24 +783,21 @@ pub fn show_confirmation_dialog<F>(
 }
 
 /// Shows the TOTP setup dialog for enabling 2FA on a vault
-pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_totp_setup_dialog(vault_name: &str) {
     let totp_window = PreferencesWindow::new();
     totp_window.set_title(Some("Enable Two-Factor Authentication"));
     totp_window.set_modal(true);
     totp_window.set_default_size(600, 650);
     totp_window.set_search_enabled(false);
 
-    // Create preferences page
     let page = adw::PreferencesPage::new();
     page.set_title("Two-Factor Authentication");
     page.set_icon_name(Some("security-high-symbolic"));
 
-    // Create setup group
     let setup_group = PreferencesGroup::new();
-    setup_group.set_title(&format!("Enable 2FA for \"{}\"", vault_name));
+    setup_group.set_title(&format!("Enable 2FA for \"{vault_name}\""));
     setup_group.set_description(Some("Secure your vault with two-factor authentication"));
 
-    // Instructions row
     let instructions_row = ActionRow::new();
     instructions_row.set_title("Setup Instructions");
     instructions_row.set_subtitle(
@@ -885,7 +813,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
     // Show loading message initially
     let loading_row = ActionRow::new();
     loading_row.set_title("Generating QR code...");
-    loading_row.set_subtitle("Please wait while we prepare your 2FA setup");
+    loading_row.set_subtitle("Please wait while the 2FA QR code is generated...");
     qr_group.add(&loading_row);
 
     // Verification group (will be populated after setup)
@@ -906,12 +834,10 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
             // Remove loading message
             qr_group.remove(&loading_row);
 
-            // Add QR Code display
             let qr_row = ActionRow::new();
             qr_row.set_title("QR Code");
-            qr_row.set_subtitle(&format!("Secret: {}", secret_b32));
+            qr_row.set_subtitle(&format!("Secret: {secret_b32}"));
 
-            // Create QR code image
             if let Ok(qr_image) = generate_qr_code_image(&otpauth_uri) {
                 let qr_image_widget = Image::from_pixbuf(Some(&qr_image));
                 qr_image_widget.set_pixel_size(200);
@@ -942,11 +868,9 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
             button_box.append(&verify_button);
             verification_row.add_suffix(&button_box);
 
-            // Connect verification logic
             let vault_name_clone = vault_name.to_string();
             let secret_clone = secret.clone();
             let window_clone = totp_window.clone();
-            let content_area_clone = content_area.clone();
 
             verify_button.connect_clicked(move |_| {
                 let code = code_entry.text();
@@ -954,11 +878,9 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
                     match verify_totp_code_with_secret(&secret_clone, &code) {
                         Ok(true) => {
                             if let Err(e) = confirm_totp_setup(&vault_name_clone, &secret_clone) {
-                                eprintln!("Failed to confirm TOTP setup: {}", e);
+                                eprintln!("Failed to confirm TOTP setup: {e}");
                             } else {
                                 window_clone.close();
-                                // Refresh the content area to show updated TOTP status
-                                // This would typically trigger a UI refresh
                             }
                         }
                         Ok(false) => {
@@ -971,7 +893,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
                             });
                         }
                         Err(e) => {
-                            eprintln!("TOTP verification error: {}", e);
+                            eprintln!("TOTP verification error: {e}");
                         }
                     }
                 }
@@ -985,7 +907,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
 
             let error_row = ActionRow::new();
             error_row.set_title("Setup Failed");
-            error_row.set_subtitle(&format!("Failed to prepare 2FA: {}", e));
+            error_row.set_subtitle(&format!("Failed to prepare 2FA: {e}"));
             qr_group.add(&error_row);
         }
     }
@@ -999,17 +921,14 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     totp_window.set_default_size(600, 500);
     totp_window.set_search_enabled(false);
 
-    // Create preferences page
     let page = adw::PreferencesPage::new();
     page.set_title("Two-Factor Authentication");
     page.set_icon_name(Some("security-high-symbolic"));
 
-    // Create status group
     let status_group = PreferencesGroup::new();
-    status_group.set_title(&format!("2FA Settings for \"{}\"", vault_name));
+    status_group.set_title(&format!("2FA Settings for \"{vault_name}\""));
     status_group.set_description(Some("Manage your two-factor authentication settings"));
 
-    // Status row
     let status_row = ActionRow::new();
     status_row.set_title("Status");
     status_row.set_subtitle("Two-factor authentication is currently enabled");
@@ -1019,19 +938,16 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     status_row.add_prefix(&status_icon);
     status_group.add(&status_row);
 
-    // Get existing TOTP info
     match get_totp_qr_info(vault_name) {
         Ok((secret, otpauth_uri)) => {
-            // QR Code group (for backup/re-setup)
-            let qr_group = PreferencesGroup::new();
+            let qr_group: PreferencesGroup = PreferencesGroup::new();
             qr_group.set_title("Backup QR Code");
             qr_group.set_description(Some("Use this QR code to set up 2FA on additional devices"));
 
             let qr_row = ActionRow::new();
             qr_row.set_title("QR Code");
-            qr_row.set_subtitle(&format!("Secret: {}", secret));
+            qr_row.set_subtitle(&format!("Secret: {secret}"));
 
-            // Create QR code image
             if let Ok(qr_image) = generate_qr_code_image(&otpauth_uri) {
                 let qr_image_widget = Image::from_pixbuf(Some(&qr_image));
                 qr_image_widget.set_pixel_size(200);
@@ -1040,12 +956,10 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
 
             qr_group.add(&qr_row);
 
-            // Actions group
             let actions_group = PreferencesGroup::new();
             actions_group.set_title("Actions");
             actions_group.set_description(Some("Manage your two-factor authentication"));
 
-            // Disable 2FA row
             let disable_row = ActionRow::new();
             disable_row.set_title("Disable Two-Factor Authentication");
             disable_row.set_subtitle("Remove 2FA protection from this vault");
@@ -1061,7 +975,7 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
             disable_button.connect_clicked(move |_| {
                 show_confirmation_dialog(
                     "Disable Two-Factor Authentication",
-                    &format!("Are you sure you want to disable 2FA for vault \"{}\"?\n\nThis will make your vault less secure.", vault_name_clone),
+                    &format!("Are you sure you want to disable 2FA for vault \"{vault_name_clone}\"?\n\nThis will make your vault less secure."),
                     "Disable 2FA",
                     Some(&window_clone),
                     {
@@ -1072,13 +986,11 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                             match disable_totp(&vault_name_clone2) {
                                 Ok(()) => {
                                     window_clone2.close();
-                                    // Refresh sidebar to update 2FA status indicator
                                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2);
-                                    // Refresh the vault view to update 2FA status
                                     crate::gui::content::show_vault_view(&content_area_clone2, &vault_name_clone2);
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to disable 2FA: {}", e);
+                                    eprintln!("Failed to disable 2FA: {e}");
                                 }
                             }
                         }
@@ -1097,7 +1009,7 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
         Err(e) => {
             let error_row = ActionRow::new();
             error_row.set_title("Error Loading 2FA Information");
-            error_row.set_subtitle(&format!("Failed to load 2FA info: {}", e));
+            error_row.set_subtitle(&format!("Failed to load 2FA info: {e}"));
             status_group.add(&error_row);
 
             page.add(&status_group);
@@ -1116,8 +1028,8 @@ fn generate_qr_code_image(otpauth_uri: &str) -> Result<Pixbuf, Box<dyn std::erro
     // Use the QR code renderer's built-in scaling for much better performance
     let image = qr_code
         .render::<Luma<u8>>()
-        .min_dimensions(300, 300) // Set minimum size to 300x300 for good visibility
-        .module_dimensions(15, 15) // Each module is 15x15 pixels (very large and clear)
+        .min_dimensions(300, 300)
+        .module_dimensions(15, 15)
         .build();
 
     // Convert to RGB for GTK
@@ -1130,8 +1042,8 @@ fn generate_qr_code_image(otpauth_uri: &str) -> Result<Pixbuf, Box<dyn std::erro
     let pixbuf = Pixbuf::from_bytes(
         &bytes,
         Colorspace::Rgb,
-        false, // has_alpha
-        8,     // bits_per_sample
+        false,
+        8,
         width as i32,
         height as i32,
         (width * 3) as i32, // rowstride (3 bytes per pixel for RGB)
@@ -1153,7 +1065,7 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Create Backup for '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Create Backup for '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1186,16 +1098,13 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     let dialog_clone = dialog.clone();
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
-    backup_button.connect_clicked(move |_| {
-        match create_backup(&vault_name_clone) {
-            Ok(()) => {
-                dialog_clone.close();
-                // Refresh the vault view to update backup status
-                crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
-            }
-            Err(e) => {
-                eprintln!("Failed to create backup: {}", e);
-            }
+    backup_button.connect_clicked(move |_| match create_backup(&vault_name_clone) {
+        Ok(()) => {
+            dialog_clone.close();
+            crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
+        }
+        Err(e) => {
+            eprintln!("Failed to create backup: {e}");
         }
     });
 
@@ -1220,7 +1129,7 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Restore Backup for '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Restore Backup for '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1261,7 +1170,7 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
             }
             Err(e) => {
-                eprintln!("Failed to restore backup: {}", e);
+                eprintln!("Failed to restore backup: {e}");
             }
         }
     });
@@ -1287,7 +1196,7 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Delete Backup for '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Delete Backup for '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1320,16 +1229,13 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
     let dialog_clone = dialog.clone();
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
-    delete_button.connect_clicked(move |_| {
-        match delete_backup(&vault_name_clone) {
-            Ok(()) => {
-                dialog_clone.close();
-                // Refresh the vault view to update backup status
-                crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
-            }
-            Err(e) => {
-                eprintln!("Failed to delete backup: {}", e);
-            }
+    delete_button.connect_clicked(move |_| match delete_backup(&vault_name_clone) {
+        Ok(()) => {
+            dialog_clone.close();
+            crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
+        }
+        Err(e) => {
+            eprintln!("Failed to delete backup: {e}");
         }
     });
 
@@ -1354,7 +1260,7 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Rename Vault '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Rename Vault '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1395,19 +1301,16 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match rename_vault(&vault_name_clone, &new_name) {
                 Ok(()) => {
                     dialog_clone.close();
-                    // Refresh sidebar to show new name
                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                    // Navigate to the renamed vault
                     crate::gui::content::show_vault_view(&content_area_clone, &new_name);
                 }
                 Err(e) => {
-                    eprintln!("Failed to rename vault: {}", e);
+                    eprintln!("Failed to rename vault: {e}");
                 }
             }
         }
     });
 
-    // Allow Enter key to trigger rename
     let rename_button_clone = rename_button.clone();
     name_entry.connect_activate(move |_| {
         rename_button_clone.emit_clicked();
@@ -1434,7 +1337,7 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Delete Vault '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Delete Vault '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1447,8 +1350,7 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     warning.set_halign(gtk4::Align::Center);
     content_box.append(&warning);
 
-    let confirmation_label =
-        Label::new(Some(&format!("Type '{}' to confirm deletion:", vault_name)));
+    let confirmation_label = Label::new(Some(&format!("Type '{vault_name}' to confirm deletion:")));
     confirmation_label.set_halign(gtk4::Align::Start);
     content_box.append(&confirmation_label);
 
@@ -1467,14 +1369,13 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     let delete_button = Button::new();
     delete_button.set_label("Delete Vault");
     delete_button.add_css_class("destructive-action");
-    delete_button.set_sensitive(false); // Initially disabled
+    delete_button.set_sensitive(false);
 
     let dialog_clone = dialog.clone();
     cancel_button.connect_clicked(move |_| {
         dialog_clone.close();
     });
 
-    // Enable delete button only when correct name is typed
     let delete_button_clone = delete_button.clone();
     let vault_name_clone = vault_name.to_string();
     confirmation_entry.connect_changed(move |entry| {
@@ -1492,13 +1393,11 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match delete_vault(&vault_name_clone) {
                 Ok(()) => {
                     dialog_clone.close();
-                    // Refresh sidebar to remove deleted vault
                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                    // Navigate back to home view
                     crate::gui::content::show_home_view(&content_area_clone);
                 }
                 Err(e) => {
-                    eprintln!("Failed to delete vault: {}", e);
+                    eprintln!("Failed to delete vault: {e}");
                 }
             }
         }
@@ -1525,7 +1424,7 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Rename Account '{}'", account_name)));
+    let title = Label::new(Some(&format!("Rename Account '{account_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
@@ -1567,7 +1466,6 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
             match rename_account(&vault_name_clone, &account_name_clone, &new_name) {
                 Ok(()) => {
                     dialog_clone.close();
-                    // Navigate to the renamed account
                     crate::gui::content::show_account_view_with_mode(
                         &content_area_clone,
                         &vault_name_clone,
@@ -1576,13 +1474,12 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                     );
                 }
                 Err(e) => {
-                    eprintln!("Failed to rename account: {}", e);
+                    eprintln!("Failed to rename account: {e}");
                 }
             }
         }
     });
 
-    // Allow Enter key to trigger rename
     let rename_button_clone = rename_button.clone();
     name_entry.connect_activate(move |_| {
         rename_button_clone.emit_clicked();
@@ -1607,19 +1504,16 @@ pub fn show_add_field_dialog(
     dialog.set_modal(true);
     dialog.set_default_size(400, 300);
 
-    // Create main content box
     let content_box = GtkBox::new(Orientation::Vertical, 16);
     content_box.set_margin_top(20);
     content_box.set_margin_bottom(20);
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    // Title
     let title_label = Label::new(Some("Add a new field to this account"));
     title_label.add_css_class("title-4");
     content_box.append(&title_label);
 
-    // Field name input
     let name_label = Label::new(Some("Field Name:"));
     name_label.set_halign(gtk4::Align::Start);
     name_label.add_css_class("dim-label");
@@ -1630,7 +1524,6 @@ pub fn show_add_field_dialog(
     name_entry.set_hexpand(true);
     content_box.append(&name_entry);
 
-    // Field value input
     let value_label = Label::new(Some("Field Value:"));
     value_label.set_halign(gtk4::Align::Start);
     value_label.add_css_class("dim-label");
@@ -1642,7 +1535,6 @@ pub fn show_add_field_dialog(
     value_entry.set_hexpand(true);
     content_box.append(&value_entry);
 
-    // Buttons
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(gtk4::Align::End);
     button_box.set_margin_top(20);
@@ -1654,13 +1546,11 @@ pub fn show_add_field_dialog(
     add_button.set_label("Add Field");
     add_button.add_css_class("suggested-action");
 
-    // Connect cancel button
     let dialog_clone = dialog.clone();
     cancel_button.connect_clicked(move |_| {
         dialog_clone.close();
     });
 
-    // Connect add button
     let dialog_clone = dialog.clone();
     let account_rc_clone = account_rc.clone();
     let name_entry_clone = name_entry.clone();
@@ -1672,43 +1562,38 @@ pub fn show_add_field_dialog(
         let field_value = value_entry_clone.text().to_string().trim().to_string();
 
         if !field_name.is_empty() && !field_value.is_empty() {
-            // Check if field name already exists
             let mut account = account_rc_clone.borrow_mut();
             if account.additional_fields.contains_key(&field_name) {
-                // Show error - field already exists
-                drop(account); // Release the borrow
+                drop(account);
                 show_error_dialog(
                     "Field Already Exists",
                     &format!(
-                        "A field named \"{}\" already exists. Please choose a different name.",
-                        field_name
+                        "A field named \"{field_name}\" already exists. Please choose a different name."
+                        
                     ),
                 );
                 return;
             }
 
-            // Add the new field
             account.additional_fields.insert(field_name, field_value);
             account.update_modified_time();
             let account_name = account.name.clone();
 
-            // Save the account to disk
-            match crate::vault::update_account(&vault_name_clone, &*account) {
+            match crate::vault::update_account(&vault_name_clone, &account) {
                 Ok(()) => {
-                    drop(account); // Release the borrow
+                    drop(account);
                     dialog_clone.close();
 
-                    // Refresh the account view to show the new field
                     crate::gui::content::show_account_view_with_mode(
                         &content_area_clone,
                         &vault_name_clone,
                         &account_name,
-                        true, // Keep in edit mode
+                        true,
                     );
                 }
                 Err(e) => {
                     drop(account);
-                    eprintln!("Failed to save account: {}", e);
+                    eprintln!("Failed to save account: {e}");
                     show_error_dialog(
                         "Save Error",
                         "Failed to save the new field. Please try again.",
@@ -1716,12 +1601,10 @@ pub fn show_add_field_dialog(
                 }
             }
         } else {
-            // Show error - empty fields
             show_error_dialog("Invalid Input", "Both field name and value are required.");
         }
     });
 
-    // Allow Enter key to trigger add
     let add_button_clone = add_button.clone();
     value_entry.connect_activate(move |_| {
         add_button_clone.emit_clicked();
@@ -1768,6 +1651,7 @@ fn show_error_dialog(title: &str, message: &str) {
     dialog.present();
 }
 
+#[allow(clippy::too_many_lines)]
 /// Shows the edit field dialog for editing an additional field's name and value
 pub fn show_edit_field_dialog(
     account_rc: &Rc<RefCell<Account>>,
@@ -1780,19 +1664,16 @@ pub fn show_edit_field_dialog(
     dialog.set_modal(true);
     dialog.set_default_size(400, 300);
 
-    // Create main content box
     let content_box = GtkBox::new(Orientation::Vertical, 16);
     content_box.set_margin_top(20);
     content_box.set_margin_bottom(20);
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    // Title
     let title_label = Label::new(Some("Edit Field"));
     title_label.add_css_class("title-4");
     content_box.append(&title_label);
 
-    // Get current field value
     let current_value = {
         let account = account_rc.borrow();
         account
@@ -1802,7 +1683,6 @@ pub fn show_edit_field_dialog(
             .unwrap_or_default()
     };
 
-    // Field name section
     let name_section = GtkBox::new(Orientation::Vertical, 8);
     let name_label = Label::new(Some("Field Name:"));
     name_label.add_css_class("dim-label");
@@ -1816,7 +1696,6 @@ pub fn show_edit_field_dialog(
     name_section.append(&name_entry);
     content_box.append(&name_section);
 
-    // Field value section
     let value_section = GtkBox::new(Orientation::Vertical, 8);
     let value_label = Label::new(Some("Field Value:"));
     value_label.add_css_class("dim-label");
@@ -1830,7 +1709,6 @@ pub fn show_edit_field_dialog(
     value_section.append(&value_entry);
     content_box.append(&value_section);
 
-    // Buttons
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(gtk4::Align::End);
     button_box.set_margin_top(20);
@@ -1842,13 +1720,11 @@ pub fn show_edit_field_dialog(
     save_button.set_label("Save");
     save_button.add_css_class("suggested-action");
 
-    // Connect cancel button
     let dialog_clone = dialog.clone();
     cancel_button.connect_clicked(move |_| {
         dialog_clone.close();
     });
 
-    // Connect save button
     let dialog_clone = dialog.clone();
     let account_rc_clone = account_rc.clone();
     let name_entry_clone = name_entry.clone();
@@ -1863,7 +1739,6 @@ pub fn show_edit_field_dialog(
         if !new_field_name.is_empty() && !new_field_value.is_empty() {
             let mut account = account_rc_clone.borrow_mut();
 
-            // Check if new field name already exists (and it's different from the old name)
             if new_field_name != old_field_name
                 && account.additional_fields.contains_key(&new_field_name)
             {
@@ -1871,32 +1746,27 @@ pub fn show_edit_field_dialog(
                 show_error_dialog(
                     "Field Already Exists",
                     &format!(
-                        "A field named '{}' already exists. Please choose a different name.",
-                        new_field_name
+                        "A field named '{new_field_name}' already exists. Please choose a different name."
                     ),
                 );
                 return;
             }
 
-            // Remove the old field if the name changed
             if new_field_name != old_field_name {
                 account.additional_fields.remove(&old_field_name);
             }
 
-            // Add/update the field with the new name and value
             account
                 .additional_fields
                 .insert(new_field_name, new_field_value);
             account.update_modified_time();
             let account_name = account.name.clone();
 
-            // Save the account to disk
-            match crate::vault::update_account(&vault_name_clone, &*account) {
+            match crate::vault::update_account(&vault_name_clone, &account) {
                 Ok(()) => {
                     drop(account);
                     dialog_clone.close();
 
-                    // Refresh the account view
                     crate::gui::content::show_account_view_with_mode(
                         &content_area_clone,
                         &vault_name_clone,
@@ -1906,7 +1776,7 @@ pub fn show_edit_field_dialog(
                 }
                 Err(e) => {
                     drop(account);
-                    eprintln!("Failed to save account: {}", e);
+                    eprintln!("Failed to save account: {e}");
                     show_error_dialog(
                         "Save Error",
                         "Failed to save the field changes. Please try again.",
@@ -1918,7 +1788,6 @@ pub fn show_edit_field_dialog(
         }
     });
 
-    // Allow Enter key to trigger save from either entry
     let save_button_clone = save_button.clone();
     name_entry.connect_activate(move |_| {
         save_button_clone.emit_clicked();
@@ -1949,14 +1818,12 @@ pub fn show_delete_field_dialog(
     dialog.set_modal(true);
     dialog.set_default_size(400, 200);
 
-    // Create main content box
     let content_box = GtkBox::new(Orientation::Vertical, 16);
     content_box.set_margin_top(20);
     content_box.set_margin_bottom(20);
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    // Warning icon and title
     let title_box = GtkBox::new(Orientation::Horizontal, 12);
     title_box.set_halign(gtk4::Align::Center);
 
@@ -1972,8 +1839,7 @@ pub fn show_delete_field_dialog(
 
     // Confirmation message
     let message = format!(
-        "Are you sure you want to delete the field '{}'?\n\nThis action cannot be undone.",
-        field_name
+        "Are you sure you want to delete the field '{field_name}'?\n\nThis action cannot be undone."
     );
     let message_label = Label::new(Some(&message));
     message_label.set_wrap(true);
@@ -1981,7 +1847,6 @@ pub fn show_delete_field_dialog(
     message_label.set_justify(gtk4::Justification::Center);
     content_box.append(&message_label);
 
-    // Buttons
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(gtk4::Align::Center);
     button_box.set_margin_top(20);
@@ -1993,13 +1858,11 @@ pub fn show_delete_field_dialog(
     delete_button.set_label("Delete");
     delete_button.add_css_class("destructive-action");
 
-    // Connect cancel button
     let dialog_clone = dialog.clone();
     cancel_button.connect_clicked(move |_| {
         dialog_clone.close();
     });
 
-    // Connect delete button
     let dialog_clone = dialog.clone();
     let account_rc_clone = account_rc.clone();
     let content_area_clone = content_area.clone();
@@ -2011,8 +1874,7 @@ pub fn show_delete_field_dialog(
         account.update_modified_time();
         let account_name = account.name.clone();
 
-        // Save the account to disk
-        match crate::vault::update_account(&vault_name_clone, &*account) {
+        match crate::vault::update_account(&vault_name_clone, &account) {
             Ok(()) => {
                 drop(account);
                 dialog_clone.close();
@@ -2027,7 +1889,7 @@ pub fn show_delete_field_dialog(
             }
             Err(e) => {
                 drop(account);
-                eprintln!("Failed to save account: {}", e);
+                eprintln!("Failed to save account: {e}");
                 show_error_dialog(
                     "Save Error",
                     "Failed to delete the field. Please try again.",
@@ -2060,26 +1922,23 @@ where
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    // Title
-    let title = Label::new(Some(&format!("Access Vault '{}'", vault_name)));
+    let title = Label::new(Some(&format!("Access Vault '{vault_name}'")));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);
 
-    // Instructions
     let instructions = Label::new(Some("Enter the 6-digit code from your authenticator app"));
     instructions.add_css_class("body");
     instructions.set_halign(gtk4::Align::Center);
     instructions.set_margin_bottom(12);
     content_box.append(&instructions);
 
-    // Code entry container
     let code_container = GtkBox::new(Orientation::Vertical, 8);
     code_container.set_halign(gtk4::Align::Center);
 
     let code_entry = Entry::new();
     code_entry.set_placeholder_text(Some("000000"));
-    code_entry.set_max_length(8); // Allow some flexibility
+    code_entry.set_max_length(8);
     code_entry.set_width_chars(10);
     code_entry.set_halign(gtk4::Align::Center);
     code_entry.add_css_class("totp-code-entry");
@@ -2087,33 +1946,27 @@ where
     code_container.append(&code_entry);
     content_box.append(&code_container);
 
-    // Status label for feedback
     let status_label = Label::new(None);
     status_label.set_halign(gtk4::Align::Center);
     content_box.append(&status_label);
 
-    // Button box
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(gtk4::Align::Center);
     button_box.set_margin_top(16);
 
-    // Cancel button
     let cancel_button = Button::new();
     cancel_button.set_label("Cancel");
     cancel_button.add_css_class("flat");
 
-    // Verify button
     let verify_button = Button::new();
     verify_button.set_label("Enter");
     verify_button.add_css_class("suggested-action");
 
-    // Connect cancel button
     let dialog_clone = dialog.clone();
     cancel_button.connect_clicked(move |_| {
         dialog_clone.close();
     });
 
-    // Connect verify button
     let vault_name_clone = vault_name.to_string();
     let dialog_clone = dialog.clone();
     let code_entry_clone = code_entry.clone();
@@ -2127,7 +1980,6 @@ where
                 status_label_clone.set_text("✅ Authentication successful!");
                 status_label_clone.add_css_class("success");
 
-                // Close dialog after a brief delay and call success callback
                 let dialog_clone2 = dialog_clone.clone();
                 let on_success_clone2 = on_success_clone.clone();
                 glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
@@ -2140,17 +1992,16 @@ where
                 status_label_clone.set_text("❌ Invalid code. Please try again.");
                 status_label_clone.remove_css_class("success");
                 status_label_clone.add_css_class("error");
-                code_entry_clone.select_region(0, -1); // Select all text for easy replacement
+                code_entry_clone.select_region(0, -1);
             }
             Err(e) => {
-                status_label_clone.set_text(&format!("❌ Error: {}", e));
+                status_label_clone.set_text(&format!("❌ Error: {e}"));
                 status_label_clone.remove_css_class("success");
                 status_label_clone.add_css_class("error");
             }
         }
     });
 
-    // Allow Enter key to trigger verification
     let verify_button_clone = verify_button.clone();
     code_entry.connect_activate(move |_| {
         verify_button_clone.emit_clicked();

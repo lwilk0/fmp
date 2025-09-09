@@ -678,11 +678,9 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Prefe
         setup_row.add_suffix(&enable_button);
         setup_row.set_activatable_widget(Some(&enable_button));
 
-        // Connect enable button
-        let content_area_clone = content_area.clone();
         let vault_name_clone = vault_name.to_string();
         enable_button.connect_clicked(move |_| {
-            show_totp_setup_dialog(&vault_name_clone, &content_area_clone);
+            show_totp_setup_dialog(&vault_name_clone);
         });
 
         group.add(&setup_row);

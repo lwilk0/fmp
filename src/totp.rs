@@ -123,22 +123,6 @@ pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> 
     Ok(())
 }
 
-/// Enable 2FA for a vault.
-///
-/// # Arguments:
-/// * `vault_name` - The name of the vault.
-///
-/// # Returns:
-/// * `Result<(String, String), Error>` - Returns a Base32-encoded secret and an otp URI on success, and an `Error` of failure.
-///
-/// # Errors:
-/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, check if a gate exists or add a vault to the ledger.
-pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
-    let (secret, secret_b32, otpauth_uri) = prepare_totp_setup(vault_name)?;
-    confirm_totp_setup(vault_name, &secret)?;
-    Ok((secret_b32, otpauth_uri))
-}
-
 /// Gets the existing TOTP secret and URI for a vault that already has 2FA enabled
 ///
 /// # Arguments:
