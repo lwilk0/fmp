@@ -340,16 +340,6 @@ fn create_welcome_section() -> Box {
     title.set_margin_bottom(4);
     welcome_box.append(&title);
 
-    let description = Label::new(Some(
-        "A Safe, Secure Password Manager\n\nManage your passwords securely with GPG encryption.\nCreate vaults to organize your accounts and keep your data safe.",
-    ));
-    description.add_css_class("body");
-    description.set_halign(gtk4::Align::Center);
-    description.set_justify(gtk4::Justification::Center);
-    description.set_margin_top(0);
-    description.set_margin_bottom(8);
-    welcome_box.append(&description);
-
     welcome_box
 }
 
