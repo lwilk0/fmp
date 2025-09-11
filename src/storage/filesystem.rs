@@ -17,12 +17,14 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::storage::locations::Locations;
-use crate::totp::update_totp_ledgers_on_rename;
+use crate::{storage::locations::Locations, totp::update_totp_ledgers_on_rename};
 use anyhow::Error;
 use fs_extra::dir::{CopyOptions, copy};
-use std::fs::{create_dir_all, read_dir, remove_dir_all, rename};
-use std::path::PathBuf;
+use std::{
+    collections::HashMap,
+    fs::{create_dir_all, read_dir, read_to_string, remove_dir_all, rename, write},
+    path::PathBuf,
+};
 
 /// Reads all directories in the specified directory and returns their names as a vector of strings.
 ///
@@ -265,8 +267,6 @@ pub fn delete_backup(vault_name: &str) -> Result<(), Error> {
 /// # Returns
 /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure
 fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
-    use std::fs;
-
     let locations = Locations::new("", "");
     let stats_file = locations.fmp.join("vault_stats.txt");
 
@@ -274,14 +274,14 @@ fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
         return Ok(()); // No stats file, nothing to remove
     }
 
-    let content = fs::read_to_string(&stats_file)?;
+    let content = read_to_string(&stats_file)?;
     let updated_content: String = content
         .lines()
         .filter(|line| !line.starts_with(&format!("{vault_name}:")))
         .collect::<Vec<_>>()
         .join("\n");
 
-    fs::write(&stats_file, updated_content)?;
+    write(&stats_file, updated_content)?;
 
     Ok(())
 }
@@ -295,8 +295,6 @@ fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
 /// # Returns
 /// * `Result<(), Error>` - Returns `Ok(())` on success, or an error on failure
 fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Error> {
-    use std::fs;
-
     let locations = Locations::new("", "");
     let stats_file = locations.fmp.join("vault_stats.txt");
 
@@ -304,7 +302,7 @@ fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Er
         return Ok(()); // No stats file, nothing to update
     }
 
-    let content = fs::read_to_string(&stats_file)?;
+    let content = read_to_string(&stats_file)?;
     let updated_content: String = content
         .lines()
         .map(|line| {
@@ -317,7 +315,123 @@ fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Er
         .collect::<Vec<_>>()
         .join("\n");
 
-    fs::write(&stats_file, updated_content)?;
+    write(&stats_file, updated_content)?;
 
     Ok(())
+}
+
+/// Increments the usage count for a vault
+pub fn increment_vault_usage(vault_name: &str) {
+    let stats_file = get_vault_stats_file();
+    let mut usage_counts = HashMap::new();
+
+    if let Ok(content) = read_to_string(&stats_file) {
+        for line in content.lines() {
+            if let Some((name, count_str)) = line.split_once(':') {
+                if let Ok(count) = count_str.parse::<u32>() {
+                    usage_counts.insert(name.to_string(), count);
+                }
+            }
+        }
+    }
+
+    let current_count = usage_counts.get(vault_name).unwrap_or(&0);
+    usage_counts.insert(vault_name.to_string(), current_count + 1);
+
+    let mut content = String::new();
+    for (name, count) in usage_counts {
+        use std::fmt::Write;
+        writeln!(content, "{name}:{count}").unwrap();
+    }
+
+    if let Err(e) = write(&stats_file, content) {
+        eprintln!("Failed to write vault stats: {e}");
+    }
+}
+
+fn get_vault_stats_file() -> PathBuf {
+    let locations = crate::vault::Locations::new("", "");
+    locations.fmp.join("vault_stats.txt")
+}
+
+/// Append the given vault name to the recent list (most recent first, unique)
+pub fn record_recent_vault(vault_name: &str) {
+    let file = get_recent_vaults_file();
+    let mut items: Vec<String> = Vec::new();
+
+    if let Ok(content) = read_to_string(&file) {
+        for line in content.lines() {
+            let name = line.trim();
+            if !name.is_empty() && name != vault_name {
+                items.push(name.to_string());
+            }
+        }
+    }
+
+    // Prepend current vault
+    items.insert(0, vault_name.to_string());
+
+    // Cap to 10 items
+    if items.len() > 10 {
+        items.truncate(10);
+    }
+
+    let mut out = String::new();
+    for name in items {
+        use std::fmt::Write;
+        writeln!(out, "{name}").ok();
+    }
+
+    if let Err(e) = write(&file, out) {
+        eprintln!("Failed to write recent vaults: {e}");
+    }
+}
+
+/// Read recent vaults (most recent first), limited to `limit`
+pub fn get_recent_vaults(limit: usize) -> Vec<String> {
+    let file = get_recent_vaults_file();
+    if let Ok(content) = read_to_string(&file) {
+        let mut lines: Vec<String> = content
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if lines.len() > limit {
+            lines.truncate(limit);
+        }
+        lines
+    } else {
+        Vec::new()
+    }
+}
+
+fn get_recent_vaults_file() -> PathBuf {
+    let locations = crate::vault::Locations::new("", "");
+    locations.fmp.join("recent_vaults.txt")
+}
+
+/// Gets the most used vault name
+pub fn get_most_used_vault() -> String {
+    let stats_file = get_vault_stats_file();
+    let mut max_count = 0;
+    let mut most_used = "None".to_string();
+
+    if let Ok(content) = read_to_string(&stats_file) {
+        for line in content.lines() {
+            if let Some((name, count_str)) = line.split_once(':') {
+                if let Ok(count) = count_str.parse::<u32>() {
+                    if count > max_count {
+                        max_count = count;
+                        most_used = name.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if max_count == 0 {
+        "None".to_string()
+    } else {
+        most_used
+    }
 }

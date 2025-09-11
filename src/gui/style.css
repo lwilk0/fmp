@@ -2,7 +2,6 @@
     background-color: #2d3142;
     border-right: 1px solid #4f5b66;
     min-width: 180px;
-    max-width: 320px;
 }
 
 .sidebar-title {
@@ -10,7 +9,6 @@
     font-weight: 600;
     font-size: 1.1em;
     padding: 2px 0;
-    text-align: center;
 }
 
 .sidebar-divider {
@@ -80,14 +78,12 @@
 .sidebar-vault-label {
     color: #ffffff;
     font-weight: 500;
-    text-align: left;
     font-size: 0.9em;
 }
 
 .sidebar-empty-message {
     color: rgba(255, 255, 255, 0.6);
     font-style: italic;
-    text-align: left;
 }
 
 .dim-label {
@@ -138,15 +134,9 @@ searchentry {
     margin-bottom: 8px;
 }
 
-.sidebar preferencesgroup {
-    margin-start: 0;
-    margin-end: 0;
-}
+.sidebar preferencesgroup {}
 
-.sidebar actionrow {
-    margin-start: 0;
-    margin-end: 0;
-}
+.sidebar actionrow {}
 
 .account-section,
 .home-section {
@@ -276,7 +266,6 @@ preferencesgroup actionrow {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
     font-size: 16px;
     font-weight: 600;
-    text-align: center;
     letter-spacing: 1px;
     padding: 10px;
     border-radius: 6px;
@@ -293,7 +282,6 @@ preferencesgroup actionrow {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
     font-size: 16px;
     font-weight: 600;
-    text-align: center;
     letter-spacing: 1px;
     padding: 10px;
     border-radius: 6px;
@@ -341,7 +329,6 @@ preferencesgroup actionrow {
     font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco", monospace;
     font-size: 14px;
     font-weight: 500;
-    text-align: center;
     letter-spacing: 1px;
     padding: 12px;
     border-radius: 8px;
@@ -482,10 +469,7 @@ button.success {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.account-card label {
-    text-overflow: ellipsis;
-    overflow: hidden;
-}
+.account-card label {}
 
 .account-card .title-4 {
     line-height: 1.2;
@@ -521,35 +505,15 @@ button.success {
     padding: 2px 0;
 }
 
-.title-1 {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
+.title-1 {}
 
-.title-4 {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
+.title-4 {}
 
-.dim-label {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
+.dim-label {}
 
-.caption {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
+.caption {}
 
-.body {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
+.body {}
 
 .totp-step {
     background-color: rgba(0, 0, 0, 0.02);
@@ -569,7 +533,6 @@ button.success {
     border-radius: 6px;
     padding: 12px;
     font-size: 11px;
-    word-break: break-all;
 }
 
 .status-message {
@@ -652,13 +615,7 @@ toast.info-toast {
     border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-    .settings-card {
-        background-color: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-}
+
 
 .settings-card>box {
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -672,11 +629,7 @@ toast.info-toast {
     margin-bottom: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-    .settings-card>box {
-        border-bottom-color: rgba(255, 255, 255, 0.1);
-    }
-}
+
 
 .loading-overlay {
     background-color: transparent;
@@ -684,12 +637,10 @@ toast.info-toast {
     padding: 48px;
     min-width: 280px;
     min-height: 200px;
-    margin: auto;
 }
 
 .loading-spinner {
     opacity: 0.9;
-    margin: 0 auto;
 }
 
 @keyframes spin {
@@ -718,12 +669,7 @@ spinner:disabled {
     animation-play-state: paused;
 }
 
-@media (prefers-color-scheme: dark) {
-    spinner {
-        border: 3px solid rgba(255, 255, 255, 0.1);
-        border-top: 3px solid @accent_bg_color;
-    }
-}
+
 
 button .loading-spinner {
     margin-right: 8px;
@@ -743,11 +689,7 @@ button:disabled {
     background-color: rgba(0, 0, 0, 0.03);
 }
 
-@media (prefers-color-scheme: dark) {
-    .settings-row:hover {
-        background-color: rgba(255, 255, 255, 0.05);
-    }
-}
+
 
 switch {
     border-radius: 16px;
@@ -807,11 +749,7 @@ progressbar trough {
     background-color: rgba(0, 0, 0, 0.1);
 }
 
-@media (prefers-color-scheme: dark) {
-    progressbar trough {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-}
+
 
 entry.success {
     border-color: #26a269;
@@ -821,16 +759,4 @@ entry.success {
 entry.error {
     border-color: #e01b24;
     box-shadow: 0 0 0 1px #e01b24;
-}
-
-@media (prefers-color-scheme: dark) {
-    entry.success {
-        border-color: #2ec27e;
-        box-shadow: 0 0 0 1px #2ec27e;
-    }
-
-    entry.error {
-        border-color: #f66151;
-        box-shadow: 0 0 0 1px #f66151;
-    }
 }

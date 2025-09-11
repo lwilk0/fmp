@@ -12,7 +12,7 @@ use crate::{
             LoadingOverlay, create_loading_button, set_button_loading_state,
         },
     },
-    storage::filesystem::{backup_exists, read_directory},
+    storage::filesystem::{backup_exists, read_directory, get_recent_vaults, increment_vault_usage, record_recent_vault, get_most_used_vault},
     totp::{is_totp_enabled, is_totp_required},
     vault::{
         Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
@@ -27,8 +27,6 @@ use gtk4::{
 };
 use std::{
     cell::RefCell,
-    collections::HashMap,
-    fs,
     path::PathBuf,
     rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
@@ -103,13 +101,40 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     main_box.set_margin_start(24);
     main_box.set_margin_end(24);
 
-    let header_group = PreferencesGroup::new();
-    header_group.set_title(vault_name);
-    header_group.set_description(Some(
-        "Secure vault for managing your accounts and passwords",
-    ));
+    let header_box = Box::new(Orientation::Horizontal, 16);
+    header_box.set_halign(gtk4::Align::Fill);
 
-    main_box.append(&header_group);
+    let info_box = Box::new(Orientation::Vertical, 4);
+    info_box.set_hexpand(true);
+
+    let title = Label::new(Some(vault_name));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Start);
+    title.set_ellipsize(EllipsizeMode::End);
+    title.set_max_width_chars(50);
+    title.set_wrap(true);
+    title.set_lines(2);
+
+    let account_count = get_available_accounts(vault_name).len();
+    let subtitle_text = if account_count == 1 {
+        format!("Vault • {account_count} account")
+    } else {
+        format!("Vault • {account_count} accounts")
+    };
+
+    let subtitle = Label::new(Some(&subtitle_text));
+    subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
+    subtitle.set_halign(gtk4::Align::Start);
+    subtitle.set_ellipsize(EllipsizeMode::End);
+    subtitle.set_max_width_chars(55);
+    subtitle.set_tooltip_text(Some(&subtitle_text));
+
+    info_box.append(&title);
+    info_box.append(&subtitle);
+
+    header_box.append(&info_box);
+    main_box.append(&header_box);
 
     let totp_section = create_totp_management_section(content_area, vault_name);
     main_box.append(&totp_section);
@@ -858,21 +883,37 @@ fn create_account_header(
     info_box.set_hexpand(true);
 
     let account = account_rc.borrow();
-    let title = Label::new(Some(&account.name));
+
+    // Primary title: prefer stored account name, fallback to provided name
+    let display_name = if account.name.trim().is_empty() {
+        account_name.to_string()
+    } else {
+        account.name.clone()
+    };
+
+    let title = Label::new(Some(&display_name));
     title.add_css_class("title-1");
     title.set_halign(gtk4::Align::Start);
     title.set_ellipsize(EllipsizeMode::End);
-    title.set_max_width_chars(50); // Increased from 30
-    title.set_tooltip_text(Some(&account.name));
+    title.set_max_width_chars(50);
+    title.set_tooltip_text(Some(&display_name));
     title.set_wrap(true);
     title.set_lines(2);
 
-    let subtitle = Label::new(Some(&account.account_type));
+    let acct_type = if account.account_type.trim().is_empty() {
+        "Account".to_string()
+    } else {
+        account.account_type.clone()
+    };
+    let subtitle_text = format!("{acct_type} • in {vault_name}");
+
+    let subtitle = Label::new(Some(&subtitle_text));
     subtitle.add_css_class("dim-label");
+    subtitle.add_css_class("caption");
     subtitle.set_halign(gtk4::Align::Start);
     subtitle.set_ellipsize(EllipsizeMode::End);
-    subtitle.set_max_width_chars(55); // Increased from 35
-    subtitle.set_tooltip_text(Some(&account.account_type));
+    subtitle.set_max_width_chars(55);
+    subtitle.set_tooltip_text(Some(&subtitle_text));
 
     info_box.append(&title);
     info_box.append(&subtitle);
@@ -1338,8 +1379,8 @@ fn create_additional_fields_section(
                 show_delete_field_dialog(
                     &account_rc_delete,
                     &content_area_delete,
-                    &field_name_delete,
                     &vault_name_delete,
+                    &field_name_delete,
                 );
             });
 
@@ -1757,121 +1798,3 @@ fn get_account_directory(vault_name: &str) -> PathBuf {
     let locations = Locations::new(vault_name, "");
     locations.account
 }
-
-/// Increments the usage count for a vault
-pub fn increment_vault_usage(vault_name: &str) {
-    let stats_file = get_vault_stats_file();
-    let mut usage_counts = HashMap::new();
-
-    if let Ok(content) = fs::read_to_string(&stats_file) {
-        for line in content.lines() {
-            if let Some((name, count_str)) = line.split_once(':') {
-                if let Ok(count) = count_str.parse::<u32>() {
-                    usage_counts.insert(name.to_string(), count);
-                }
-            }
-        }
-    }
-
-    let current_count = usage_counts.get(vault_name).unwrap_or(&0);
-    usage_counts.insert(vault_name.to_string(), current_count + 1);
-
-    let mut content = String::new();
-    for (name, count) in usage_counts {
-        use std::fmt::Write;
-        writeln!(content, "{name}:{count}").unwrap();
-    }
-
-    if let Err(e) = fs::write(&stats_file, content) {
-        eprintln!("Failed to write vault stats: {e}");
-    }
-}
-
-fn get_vault_stats_file() -> PathBuf {
-    let locations = crate::vault::Locations::new("", "");
-    locations.fmp.join("vault_stats.txt")
-}
-
-/// Append the given vault name to the recent list (most recent first, unique)
-pub fn record_recent_vault(vault_name: &str) {
-    let file = get_recent_vaults_file();
-    let mut items: Vec<String> = Vec::new();
-
-    if let Ok(content) = fs::read_to_string(&file) {
-        for line in content.lines() {
-            let name = line.trim();
-            if !name.is_empty() && name != vault_name {
-                items.push(name.to_string());
-            }
-        }
-    }
-
-    // Prepend current vault
-    items.insert(0, vault_name.to_string());
-
-    // Cap to 10 items
-    if items.len() > 10 {
-        items.truncate(10);
-    }
-
-    let mut out = String::new();
-    for name in items {
-        use std::fmt::Write;
-        writeln!(out, "{name}").ok();
-    }
-
-    if let Err(e) = fs::write(&file, out) {
-        eprintln!("Failed to write recent vaults: {e}");
-    }
-}
-
-/// Read recent vaults (most recent first), limited to `limit`
-pub fn get_recent_vaults(limit: usize) -> Vec<String> {
-    let file = get_recent_vaults_file();
-    if let Ok(content) = fs::read_to_string(&file) {
-        let mut lines: Vec<String> = content
-            .lines()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if lines.len() > limit {
-            lines.truncate(limit);
-        }
-        lines
-    } else {
-        Vec::new()
-    }
-}
-
-fn get_recent_vaults_file() -> PathBuf {
-    let locations = crate::vault::Locations::new("", "");
-    locations.fmp.join("recent_vaults.txt")
-}
-
-/// Gets the most used vault name
-fn get_most_used_vault() -> String {
-    let stats_file = get_vault_stats_file();
-    let mut max_count = 0;
-    let mut most_used = "None".to_string();
-
-    if let Ok(content) = fs::read_to_string(&stats_file) {
-        for line in content.lines() {
-            if let Some((name, count_str)) = line.split_once(':') {
-                if let Ok(count) = count_str.parse::<u32>() {
-                    if count > max_count {
-                        max_count = count;
-                        most_used = name.to_string();
-                    }
-                }
-            }
-        }
-    }
-
-    if max_count == 0 {
-        "None".to_string()
-    } else {
-        most_used
-    }
-}
-
-

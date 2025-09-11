@@ -56,7 +56,7 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     search_entry.set_placeholder_text(Some("Search vaults..."));
     search_entry.set_margin_start(8);
     search_entry.set_margin_end(8);
-    search_entry.set_margin_top(4);
+    search_entry.set_margin_top(8);
     search_entry.set_margin_bottom(4);
     sidebar.append(&search_entry);
 
