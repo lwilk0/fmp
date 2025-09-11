@@ -262,7 +262,7 @@ pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, E
 ///
 /// # Returns:
 /// * Numeric OTP for authentication
-fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
+pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
     let mut counter_bytes = [0u8; 8];
     counter_bytes.copy_from_slice(&counter.to_be_bytes());
 

@@ -31,6 +31,15 @@ impl SecureClipboardString {
             inner_content: clipboard_content,
         }
     }
+
+    #[allow(dead_code)] // Used for testing
+    /// Provides controlled access to the clipboard content
+    pub fn with_exposed<F, R>(&self, operation_function: F) -> R
+    where
+        F: FnOnce(&str) -> R,
+    {
+        operation_function(&self.inner_content)
+    }
 }
 
 impl Drop for SecureClipboardString {
@@ -40,7 +49,7 @@ impl Drop for SecureClipboardString {
 
         // Add extra security measures for secure overwriting
         unsafe {
-            let content_bytes = self.inner_content.as_bytes_mut();
+            let content_bytes = self.inner_content.as_mut_vec();
             secure_overwrite(content_bytes);
         }
     }

@@ -36,7 +36,7 @@ impl Default for PasswordConfig {
 const LOWERCASE: &str = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const NUMBERS: &str = "0123456789";
-const SYMBOLS: &str = "!\"#%&'()*+,-./:;<=>?@[\\]^_`{|}-";
+pub const SYMBOLS: &str = "!\"#%&'()*+,-./:;<=>?@[\\]^_`{|}-";
 const EXTENDED: &str = "áÁàÀâÂäÄãÃåÅæÆçÇéÉèÈêÊëËíÍìÌîÎïÏñÑóÓòÒôÔöÖõÕøØœŒßúÚùÙûÛüÜ";
 
 /// Generates a random password based on the provided configuration.
