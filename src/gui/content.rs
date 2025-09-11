@@ -68,6 +68,9 @@ pub fn show_home_view(content_area: &Box) {
     let actions_section = create_quick_actions_section(content_area);
     main_box.append(&actions_section);
 
+    let recent_section = create_recent_vaults_section(content_area);
+    main_box.append(&recent_section);
+
     clamp.set_child(Some(&main_box));
     scrolled_window.set_child(Some(&clamp));
     content_area.append(&scrolled_window);
@@ -80,6 +83,7 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     let current_loading_id = VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
 
     increment_vault_usage(vault_name);
+    record_recent_vault(vault_name);
 
     let loading_overlay = Rc::new(LoadingOverlay::new());
     content_area.append(loading_overlay.widget());
@@ -341,6 +345,48 @@ fn create_welcome_section() -> Box {
     welcome_box.append(&title);
 
     welcome_box
+}
+
+/// Creates the recent vaults section for the home view (bottom panel)
+fn create_recent_vaults_section(content_area: &Box) -> PreferencesGroup {
+    use gtk4::Align;
+    let group = PreferencesGroup::new();
+    group.set_title("Recently Accessed Vaults");
+    group.set_description(Some("Open a vault you used recently"));
+
+    let recent = get_recent_vaults(5);
+    if recent.is_empty() {
+        let row = ActionRow::new();
+        row.set_title("No recent vaults yet");
+        row.set_subtitle("Open a vault to see it here");
+        row.set_activatable(false);
+        group.add(&row);
+        return group;
+    }
+
+    for name in recent {
+        let row = ActionRow::new();
+        row.set_title(&name);
+        row.set_subtitle("Click to open");
+        row.set_activatable(true);
+
+        let open_btn = Button::new();
+        open_btn.set_label("Open");
+        open_btn.add_css_class("suggested-action");
+        open_btn.set_valign(Align::Center);
+        row.add_suffix(&open_btn);
+        row.set_activatable_widget(Some(&open_btn));
+
+        let content_area_clone = content_area.clone();
+        let name_clone = name.clone();
+        open_btn.connect_clicked(move |_| {
+            show_vault_view(&content_area_clone, &name_clone);
+        });
+
+        group.add(&row);
+    }
+
+    group
 }
 
 /// Creates the statistics section showing vault and account counts
@@ -1744,6 +1790,62 @@ pub fn increment_vault_usage(vault_name: &str) {
 fn get_vault_stats_file() -> PathBuf {
     let locations = crate::vault::Locations::new("", "");
     locations.fmp.join("vault_stats.txt")
+}
+
+/// Append the given vault name to the recent list (most recent first, unique)
+pub fn record_recent_vault(vault_name: &str) {
+    let file = get_recent_vaults_file();
+    let mut items: Vec<String> = Vec::new();
+
+    if let Ok(content) = fs::read_to_string(&file) {
+        for line in content.lines() {
+            let name = line.trim();
+            if !name.is_empty() && name != vault_name {
+                items.push(name.to_string());
+            }
+        }
+    }
+
+    // Prepend current vault
+    items.insert(0, vault_name.to_string());
+
+    // Cap to 10 items
+    if items.len() > 10 {
+        items.truncate(10);
+    }
+
+    let mut out = String::new();
+    for name in items {
+        use std::fmt::Write;
+        writeln!(out, "{name}").ok();
+    }
+
+    if let Err(e) = fs::write(&file, out) {
+        eprintln!("Failed to write recent vaults: {e}");
+    }
+}
+
+/// Read recent vaults (most recent first), limited to `limit`
+pub fn get_recent_vaults(limit: usize) -> Vec<String> {
+    let file = get_recent_vaults_file();
+    if let Ok(content) = fs::read_to_string(&file) {
+        let mut lines: Vec<String> = content
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if lines.len() > limit {
+            lines.truncate(limit);
+        }
+        lines
+    } else {
+        Vec::new()
+    }
+}
+
+fn get_recent_vaults_file() -> PathBuf {
+    let locations = crate::vault::Locations::new("", "");
+    locations.fmp.join("recent_vaults.txt")
 }
 
 /// Gets the most used vault name
