@@ -37,3 +37,20 @@ version = "0.8.0"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.62.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+incremental = false
+panic = "abort"
+debug = 0
+
+[profile.dev]
+opt-level = 1
+incremental = true
+debug = 1
+
+[profile.test]
+opt-level = 1

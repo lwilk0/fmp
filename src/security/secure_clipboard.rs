@@ -25,20 +25,34 @@ pub struct SecureClipboardString {
 }
 
 impl SecureClipboardString {
+    /// Creates a new secure clipboard string
     pub(crate) fn new(clipboard_content: String) -> Self {
+        // Lock the clipboard content in memory to prevent swapping
         lock_memory(clipboard_content.as_bytes());
         Self {
             inner_content: clipboard_content,
         }
     }
 
-    #[allow(dead_code)] // Used for testing
+    #[allow(dead_code)] // Used for testing only as of current
     /// Provides controlled access to the clipboard content
     pub fn with_exposed<F, R>(&self, operation_function: F) -> R
     where
         F: FnOnce(&str) -> R,
     {
-        operation_function(&self.inner_content)
+        // Add some timing obfuscation to prevent timing attacks
+        let operation_start_time = std::time::Instant::now();
+
+        let result = operation_function(&self.inner_content);
+
+        // Ensure minimum execution time to prevent timing analysis
+        let minimum_duration = std::time::Duration::from_millis(5);
+        let elapsed_time = operation_start_time.elapsed();
+        if elapsed_time < minimum_duration {
+            std::thread::sleep(minimum_duration - elapsed_time);
+        }
+
+        result
     }
 }
 
@@ -52,6 +66,9 @@ impl Drop for SecureClipboardString {
             let content_bytes = self.inner_content.as_mut_vec();
             secure_overwrite(content_bytes);
         }
+
+        // Add a small delay to make timing attacks harder
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
 

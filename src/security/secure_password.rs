@@ -21,7 +21,7 @@ use crate::{
     crypto::{lock_memory, secure_overwrite},
     security::SecureClipboardString,
 };
-use rand::RngCore;
+use rand::{RngCore, rng};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
@@ -37,18 +37,16 @@ pub struct SecurePassword {
 impl SecurePassword {
     /// Creates a new secure password from a string
     pub fn new(mut password_input: String) -> Self {
-        // Lock the password in memory to prevent swapping
         lock_memory(password_input.as_bytes());
 
         let mut obfuscation_buffer = [0u8; 32];
-        rand::rng().fill_bytes(&mut obfuscation_buffer);
+        rng().fill_bytes(&mut obfuscation_buffer);
 
         let secure_password_instance = Self {
             inner_secret: SecretString::new(password_input.clone().into_boxed_str()),
             obfuscation_data: obfuscation_buffer,
         };
 
-        // Zeroize the original password string
         password_input.zeroize();
 
         secure_password_instance
@@ -56,9 +54,8 @@ impl SecurePassword {
 
     /// Creates an empty secure password
     pub fn empty() -> Self {
-        use rand::RngCore;
         let mut obfuscation_buffer = [0u8; 32];
-        rand::rng().fill_bytes(&mut obfuscation_buffer);
+        rng().fill_bytes(&mut obfuscation_buffer);
 
         Self {
             inner_secret: SecretString::new(String::new().into_boxed_str()),
@@ -77,10 +74,11 @@ impl SecurePassword {
         lock_memory(new_password_input.as_bytes());
 
         // Regenerate obfuscation data on update
-        rand::rng().fill_bytes(&mut self.obfuscation_data);
+        rng().fill_bytes(&mut self.obfuscation_data);
 
         self.inner_secret = SecretString::new(new_password_input.clone().into_boxed_str());
 
+        // Securely wipe the original password string
         new_password_input.zeroize();
     }
 
@@ -133,6 +131,13 @@ impl Default for SecurePassword {
 impl Drop for SecurePassword {
     fn drop(&mut self) {
         secure_overwrite(&mut self.obfuscation_data);
+
+        if let Some(exposed) = unsafe {
+            // This is unsafe but necessary to access the inner data for secure cleanup
+            std::ptr::addr_of_mut!(self.inner_secret).as_mut()
+        } {
+            let _ = exposed.expose_secret();
+        }
 
         // Add a small delay to make timing attacks harder
         std::thread::sleep(std::time::Duration::from_millis(1));

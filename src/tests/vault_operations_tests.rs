@@ -16,10 +16,6 @@ fn test_create_vault_successfully() {
 
     match result {
         Ok(_) => {
-            // If successful, the vault should be created
-            // We can't verify the actual creation without file system access
-            assert!(true);
-            // Clean up the test vault if it was created successfully
             cleanup_test_vault("test_vault");
         }
         Err(e) => {
@@ -54,9 +50,7 @@ fn test_create_account_successfully() {
 
     // This will likely fail without proper vault setup
     match result {
-        Ok(_) => {
-            assert!(true);
-        }
+        Ok(_) => {}
         Err(e) => {
             let error_msg = e.to_string();
             assert!(
