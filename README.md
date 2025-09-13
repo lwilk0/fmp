@@ -5,53 +5,68 @@
 
 A password manager written in memory-safe Rust.
 
-Forgot My Password (FMP) is a password manager that safely allows you to generate, store, and manage your passwords in encrypted vaults. It uses GPG to protect your sensitive data.
+Forgot My Password (FMP) lets you generate, store, and manage passwords in encrypted vaults. It uses GPG to protect your sensitive data and provides a fast, intuitive GUI.
+
+## Table of Contents
+- [Features](#features)
+- [Security](#security)
+- [Requirements](#requirements)
+- [Quickstart](#quickstart)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
-- **GUI:** Intuitive and fast GUI
+- **GUI:** Intuitive and fast GUI.
 - **Create Vaults:** Create encrypted vaults to store your passwords.
 - **Modify Accounts:** Add, delete, and rename accounts within a vault.
 - **Passwords:** Generate strong passwords and estimate their entropy.
 - **Backups:** Backup and restore vaults securely.
 - **Modify Account Info:** Update account usernames and passwords.
-- **Cross-platform compatibility:** FMP is available on Unix and Windows
+- **Cross-platform compatibility:** FMP is available on Unix and Windows.
 
 ## Security
-- **Encryption With GPG:** All data is encrypted using GPG. Only users with the correct GPG key can decrypt the vault contents.
-- **No Plaintext Passwords on Disk:** All sensitive information is encrypted before being saved.
-- **Sensitive Variables Cannot Be Written to Disk:** Sensitive variables are not written to disk in any form except encrypted.
-- **Sensitive Variables Are Obfuscated in Memory:** The program uses secure memory handling (Rust’s secrecy crate, memory locking) to prevent secrets from being easily read from RAM.
-- **Sensitive Variables Are Cleared from Memory:** The program zeroizes (overwrites) memory holding secrets when they are no longer needed.
-- **Memory Locking:** System calls (like mlock) prevent sensitive memory from being swapped to disk.
-- **File Permitions:** Strict file permissions are placed on sensitive files.
-- **Recipient Verification:** Encryption is tied to a specific GPG recipient.
-- **Cross-Platform Secure Handling:** Secure memory and file handling are implemented for both Unix and Windows.
+- **Encryption with GPG:** All data is encrypted using GPG. Only users with the correct GPG key can decrypt vault contents.
+- **No plaintext passwords on disk:** Sensitive information is always encrypted.
+- **Sensitive variables cannot be written to disk:** Secrets are never written while unencrypted.
+- **Sensitive variables are obfuscated in memory:** Secure memory handling (Rust’s `secrecy` crate, memory locking) helps prevent secrets from being scraped from RAM.
+- **Sensitive variables are cleared from memory:** Memory holding secrets is zeroized when no longer needed.
+- **Memory locking:** System calls (like `mlock`) prevent sensitive memory from being swapped to disk.
+- **File permissions:** Strict file permissions on sensitive files.
+- **Recipient verification:** Encryption is tied to a specific GPG recipient.
+- **Cross-platform secure handling:** Secure memory and file handling for both Unix and Windows.
 
-## Installation
+## Requirements
+- **Rust toolchain and Cargo**
+- **GPGME** and **libgpg-error**
+- **GTK4** and **libadwaita** (for the GUI)
 
-1. **Prerequisites**:
-   Before installing FMP, make sure the following are installed on your system:
-   - [gpgme](https://gpgme.org/)
-   - [libgpg-error](https://www.gnupg.org/software/libgpg-error/index.html)
-   - [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
-   - [rust](https://www.rust-lang.org/tools/install)
+See [distribution-specific instructions](https://codeberg.org/lwilko/fmp/wiki/Distro-Specific+Install.-) for OS-specific setup instructions.
 
-  See [INSTALLATION.md](INSTALLATION.md) for OS specific installations.
-  
-2. **Clone the Repository**:
+## Quickstart
+1. **Clone the repository**
    ```bash
    git clone https://codeberg.org/lwilko/fmp.git
    cd fmp
    ```
-
-3. **Build and Install FMP**:
+2. **Build and install**
    ```bash
    cargo build --release
    cargo install --path .
    ```
+3. **Run**
+   ```bash
+   fmp
+   ```
+
+## Usage
+- Launch the app with `fmp` (or `cargo run --release` during development).
+- Create a new vault or open an existing one.
+- Add and manage accounts, generate passwords, and make backups via the GUI.
 
 ## Testing
-
 Run all tests:
 ```bash
 cargo test
@@ -59,33 +74,34 @@ cargo test
 
 Run specific tests:
 ```bash
-cargo test --test vault_tests
-cargo test --test crypto_tests
+# Filter by module or test name (unit tests live under src/)
+cargo test vault_operations_tests
+cargo test crypto_tests
+
+# Run a single test with full path
+cargo test tests::crypto_tests::test_secure_overwrite_data
 ```
 
-**Note**: Update the file in `src/tests/recipient.txt` to match a valid recipient in your GPG keyring.
+Note:
+- Update `src/tests/recipient.txt` to match a valid recipient in your GPG keyring.
 
 ## Troubleshooting
-
-**Problem**: `fmp` command not found after installation.  
-**Solution**: Make sure `~/.cargo/bin` is added to your PATH:
-```bash
-export PATH=$PATH:~/.cargo/bin/
-```
-
-**Problem**: GPG key not found in your keyring.  
-**Solution**: Make sure the recipient email matches a key in your GPG keyring. Use:
-```bash
-gpg --list-keys
-```
+- **`fmp` command not found after installation**
+  - Ensure `~/.cargo/bin` is in your PATH:
+    ```bash
+    export PATH=$PATH:~/.cargo/bin/
+    ```
+- **GPG key not found in your keyring**
+  - Ensure the recipient email matches a key in your keyring:
+    ```bash
+    gpg --list-keys
+    ```
 
 ## Contributing
-
-Contributions are welcome! Please follow these steps to contribute:
+Contributions are welcome! Please:
 1. Fork this repository.
-2. Create a new branch for your feature or bug-fix.
-3. Submit a pull request with a detailed description of your changes.
+2. Create a new branch for your feature or bug fix.
+3. Submit a pull request with a clear description of your changes.
 
 ## License
-
 This project is licensed under the GPLv3 License. See the [LICENSE](LICENSE) file for details.
