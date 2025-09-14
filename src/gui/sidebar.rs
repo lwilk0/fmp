@@ -1,249 +1,227 @@
 use crate::{
-    gui::FmpApp,
-    totp::{ensure_gate_exists, is_totp_enabled, is_totp_required},
-    vault::{get_account_details, warm_up_gpg},
+    gui::content::{proceed_with_gate_warmup, show_home_view},
+    storage::filesystem::read_directory,
+    vault::Locations,
 };
-use egui_toast::ToastKind;
-use log::error;
+use adw::{ButtonContent, Clamp, HeaderBar, PreferencesGroup, prelude::*};
+use gtk4::{Box, Button, Label, Orientation, Paned, PolicyType, ScrolledWindow, SearchEntry};
+use std::path::PathBuf;
 
-/// Small reusable UI helper that renders:
-/// - a single-line text input with a hint,
-/// - a Clear ('×') button,
-/// - a sort order toggle ("A>Z"/"Z>A"),
-/// - a case sensitivity toggle ("Aa"/"aA").
-///
-/// Mutates `filter`, `sort_asc`, and `case_sensitive` in-place based on user interactions.
-///
-/// Arguments:
-/// - `ui` - egui UI handle
-/// - `filter` - bound filter string
-/// - `sort_asc` - whether sorting is ascending (A>Z)
-/// - `case_sensitive` - whether filtering/sorting is case sensitive
-/// - `hint` - placeholder/hint text for the input
-/// - `input_enabled` - whether the text input is enabled
-/// - `controls_enabled` - whether the sort and case-sensitivity buttons are enabled
-fn filter_bar(
-    ui: &mut egui::Ui,
-    filter: &mut String,
-    sort_asc: &mut bool,
-    case_sensitive: &mut bool,
-    hint: &str,
-    input_enabled: bool,
-    controls_enabled: bool,
-) {
-    ui.horizontal(|ui| {
-        let text_box = egui::TextEdit::singleline(filter)
-            .hint_text(hint)
-            .desired_width(100.0);
-        ui.add_enabled(input_enabled, text_box);
+const SIDEBAR_WIDTH: i32 = 270;
 
-        let clear_button = egui::Button::new("×");
-        if ui.add_enabled(!filter.is_empty(), clear_button).clicked() {
-            filter.clear();
-        }
-
-        let sort_label = if *sort_asc { "A>Z" } else { "Z>A" };
-        let sort_button = egui::Button::new(sort_label);
-        if ui.add_enabled(controls_enabled, sort_button).clicked() {
-            *sort_asc = !*sort_asc;
-        }
-
-        let cs_label = if *case_sensitive { "Aa" } else { "aA" };
-        let cs_button = egui::Button::new(cs_label);
-        if ui.add_enabled(controls_enabled, cs_button).clicked() {
-            *case_sensitive = !*case_sensitive;
-        }
-    });
+/// Gets the vaults directory path
+fn get_vaults_directory() -> PathBuf {
+    let locations = Locations::new("", "");
+    locations.fmp.join("vaults")
 }
 
-/// Draw a section header with title and a Refresh button.
-/// Returns true if the Refresh button was clicked.
-fn header_with_refresh(ui: &mut egui::Ui, title: &str, refresh_enabled: bool) -> bool {
-    ui.horizontal(|ui| {
-        ui.heading(title);
-        let refresh_btn = egui::Button::new("Refresh");
-        ui.add_enabled(refresh_enabled, refresh_btn).clicked()
+/// Reads available vaults from the vaults directory
+pub fn get_available_vaults() -> Vec<String> {
+    let vaults_dir = get_vaults_directory();
+
+    read_directory(&vaults_dir).unwrap_or_else(|e| {
+        eprintln!(
+            "Failed to read vaults directory: {} - Error: {}",
+            vaults_dir.display(),
+            e
+        );
+        Vec::new()
     })
-    .inner
 }
 
-/// Generic selectable list. Highlights the `selected` value and returns the
-/// clicked item (owned `String`) if any.
-fn selectable_list<'a, I>(ui: &mut egui::Ui, items: I, selected: &str) -> Option<String>
-where
-    I: IntoIterator<Item = &'a str>,
-{
-    let mut clicked: Option<String> = None;
-    for item in items {
-        if ui.selectable_label(selected == item, item).clicked() {
-            clicked = Some(item.to_string());
-            break;
+/// Creates a responsive paned layout with sidebar that can update the main content
+pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box) -> Paned {
+    let sidebar = create_sidebar_with_callbacks(content_area);
+
+    let paned = Paned::new(Orientation::Horizontal);
+    paned.set_start_child(Some(&sidebar));
+    paned.set_end_child(Some(main_content));
+    paned.set_position(SIDEBAR_WIDTH);
+    paned.set_shrink_start_child(false);
+    paned.set_resize_start_child(true);
+    paned.set_wide_handle(false);
+
+    paned
+}
+
+/// Creates a sidebar with navigation items that can update content
+pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
+    let sidebar = Box::new(Orientation::Vertical, 0);
+    sidebar.add_css_class("sidebar");
+
+    let header_bar = create_header_bar(content_area);
+    sidebar.append(&header_bar);
+
+    let search_entry = SearchEntry::new();
+    search_entry.set_placeholder_text(Some("Search vaults..."));
+    search_entry.set_margin_start(8);
+    search_entry.set_margin_end(8);
+    search_entry.set_margin_top(8);
+    search_entry.set_margin_bottom(4);
+    sidebar.append(&search_entry);
+
+    let scrolled_window = ScrolledWindow::new();
+    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+    scrolled_window.set_vexpand(true);
+    scrolled_window.set_hexpand(true);
+
+    let clamp = Clamp::new();
+    clamp.set_maximum_size(320);
+    clamp.set_tightening_threshold(240);
+    clamp.set_margin_start(8);
+    clamp.set_margin_end(8);
+
+    let vault_group = create_vault_preferences_group(content_area, "");
+    clamp.set_child(Some(&vault_group));
+    scrolled_window.set_child(Some(&clamp));
+
+    connect_search_to_vault_group(&search_entry, &vault_group, content_area);
+
+    sidebar.append(&scrolled_window);
+    sidebar
+}
+
+/// Creates the header bar with navigation buttons
+fn create_header_bar(content_area: &Box) -> HeaderBar {
+    let header_bar = HeaderBar::new();
+    let title_label = Label::new(None);
+    title_label.add_css_class("heading");
+    header_bar.set_title_widget(Some(&title_label));
+    header_bar.add_css_class("flat");
+    header_bar.set_show_end_title_buttons(false);
+
+    let home_button = create_icon_button("go-home-symbolic");
+    home_button.set_tooltip_text(Some("Home"));
+    header_bar.pack_start(&home_button);
+
+    let content_area_home = content_area.clone();
+    home_button.connect_clicked(move |_| {
+        show_home_view(&content_area_home);
+    });
+
+    header_bar
+}
+
+/// Creates a vault preferences group with filtering capability
+fn create_vault_preferences_group(content_area: &Box, filter: &str) -> adw::PreferencesGroup {
+    let group = PreferencesGroup::new();
+
+    // Get available vaults and apply filtering
+    let all_vaults = get_available_vaults();
+    let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
+
+    if filtered_vaults.is_empty() {
+        let empty_row = create_empty_state_action_row(filter);
+        group.add(&empty_row);
+    } else {
+        for vault_name in filtered_vaults {
+            let vault_row = create_vault_action_row(vault_name, content_area);
+            group.add(&vault_row);
         }
     }
-    clicked
+
+    group
 }
 
-/// Optional "X matching" summary next to a total label.
-fn render_count_row(ui: &mut egui::Ui, total_label: String, matching: Option<usize>) {
-    ui.horizontal(|ui| {
-        ui.label(total_label);
-        if let Some(m) = matching {
-            ui.label(format!("• {m} matching"));
+/// Creates an empty state action row for when no vaults are found
+fn create_empty_state_action_row(filter: &str) -> adw::ActionRow {
+    use adw::ActionRow;
+
+    let row = ActionRow::new();
+    row.set_activatable(false);
+
+    if filter.is_empty() {
+        row.set_title("No vaults found");
+        row.set_subtitle("Create your first vault to get started");
+    } else {
+        row.set_title("No vaults match your search");
+        row.set_subtitle("Try a different search term");
+    }
+
+    row
+}
+
+/// Creates an action row for a specific vault
+fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionRow {
+    use adw::ActionRow;
+
+    let row = ActionRow::new();
+    row.set_title(vault_name);
+    row.set_subtitle("Password vault");
+    row.set_activatable(true);
+
+    let open_button = Button::new();
+    open_button.set_label("Open");
+    open_button.add_css_class("flat");
+    open_button.set_valign(gtk4::Align::Center);
+    row.add_suffix(&open_button);
+    row.set_activatable_widget(Some(&open_button));
+
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+    open_button.connect_clicked(move |_| {
+        proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
+    });
+
+    row
+}
+
+/// Connects the search entry to update the vault preferences group when text changes
+fn connect_search_to_vault_group(
+    search_entry: &SearchEntry,
+    vault_group: &adw::PreferencesGroup,
+    content_area: &Box,
+) {
+    let vault_group_clone = vault_group.clone();
+    let content_area_clone = content_area.clone();
+
+    search_entry.connect_search_changed(move |entry| {
+        let filter_text = entry.text().to_string();
+
+        while let Some(child) = vault_group_clone.first_child() {
+            vault_group_clone.remove(&child);
+        }
+
+        let all_vaults = get_available_vaults();
+        let filtered_vaults =
+            crate::gui::widgets::filtering::sort_vaults(&all_vaults, &filter_text);
+
+        if filtered_vaults.is_empty() {
+            let empty_row = create_empty_state_action_row(&filter_text);
+            vault_group_clone.add(&empty_row);
+        } else {
+            for vault_name in filtered_vaults {
+                let vault_row = create_vault_action_row(vault_name, &content_area_clone);
+                vault_group_clone.add(&vault_row);
+            }
         }
     });
 }
 
-/// Compute how many entries match a filter (using the same `make_view` as lists).
-fn compute_filtered_len(names: &[String], filter: &str, case_sensitive: bool) -> usize {
-    FmpApp::make_view(names, filter, true, case_sensitive).len()
+/// Creates a button with an icon
+pub fn create_icon_button(icon_name: &str) -> Button {
+    let button = Button::new();
+    let button_content = ButtonContent::builder()
+        .icon_name(icon_name)
+        .use_underline(true)
+        .build();
+    button.set_child(Some(&button_content));
+    button.add_css_class("flat");
+    button.set_margin_start(2);
+    button.set_margin_end(2);
+    button
 }
 
-/// Apply all side effects when a vault is selected (resets state and flags).
-fn select_vault(app: &mut FmpApp, vault: String) {
-    app.clear_account_data();
-    app.vault_name = vault;
-    app.account_names.clear();
-    app.account_name.clear();
-    app.account_name_create.clear();
-    app.change_account_info = false;
-    app.change_vault_name = false;
-    app.random_password = false;
-    app.show_password_retrieve = false;
+/// Refreshes the sidebar from the content area (convenience function)
+pub fn refresh_sidebar_from_content_area(content_area: &Box) {
+    if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok()) {
+        if let Some(paned) = main_content
+            .parent()
+            .and_then(|p| p.downcast::<Paned>().ok())
+        {
+            let new_sidebar = create_sidebar_with_callbacks(content_area);
 
-    app.needs_refresh_accounts = true;
-
-    app.totp_enabled = is_totp_enabled(&app.vault_name);
-    app.totp_required = is_totp_required(&app.vault_name);
-    app.show_totp_setup_popup = false;
-    app.totp_secret_b32.clear();
-    app.totp_otpauth_uri.clear();
-    app.totp_code_input.clear();
-    app.totp_verified_until = None;
-
-    if app.totp_required {
-        app.show_totp_popup = true;
-    }
-
-    if let Err(e) = ensure_gate_exists(&app.vault_name) {
-        log::error!("Failed to ensure gate file: {e}");
-    }
-    if !app.totp_required {
-        if let Err(e) = warm_up_gpg(&app.vault_name) {
-            app.display_toast(
-                format!("Unlock canceled or failed: {e}").as_str(),
-                3.0,
-                ToastKind::Error,
-            );
-            app.vault_name.clear();
-            app.account_names.clear();
-            app.account_name.clear();
+            paned.set_start_child(Some(&new_sidebar));
         }
     }
-}
-
-/// Apply side effects when an account is selected and load its details.
-/// Returns Ok(()) on success, Err(()) on failure (already logged).
-fn select_account(app: &mut FmpApp, account: &str) -> Result<(), ()> {
-    app.change_vault_name = false;
-    app.change_account_info = false;
-    app.random_password = false;
-    app.account_name = account.to_string();
-
-    match get_account_details(&app.vault_name, account) {
-        Ok(userpass) => {
-            app.userpass = userpass;
-            Ok(())
-        }
-        Err(e) => {
-            error!("Failed to fetch account details. Error: {e}");
-            Err(())
-        }
-    }
-}
-
-/// Render the `Vaults` section.
-fn render_vaults_section(app: &mut FmpApp, ui: &mut egui::Ui) {
-    if header_with_refresh(ui, "Vaults", true) {
-        app.needs_refresh_vaults = true;
-    }
-
-    filter_bar(
-        ui,
-        &mut app.vault_filter,
-        &mut app.vault_sort_asc,
-        &mut app.sort_case_sensitive,
-        "Filter vaults...",
-        true,
-        true,
-    );
-
-    let vault_view = FmpApp::make_view(
-        &app.vault_names,
-        &app.vault_filter,
-        app.vault_sort_asc,
-        app.sort_case_sensitive,
-    );
-
-    if let Some(vault) = selectable_list(ui, vault_view, &app.vault_name) {
-        select_vault(app, vault);
-    }
-
-    let matching = if app.vault_filter.is_empty() {
-        None
-    } else {
-        Some(compute_filtered_len(
-            &app.vault_names,
-            &app.vault_filter,
-            app.sort_case_sensitive,
-        ))
-    };
-    render_count_row(ui, format!("{} vault(s)", app.vault_names.len()), matching);
-}
-
-/// Render the `Accounts` section.
-fn render_accounts_section(app: &mut FmpApp, ui: &mut egui::Ui) {
-    let accounts_enabled = !app.vault_name.is_empty();
-
-    if header_with_refresh(ui, "Accounts", accounts_enabled) {
-        app.needs_refresh_accounts = true;
-    }
-
-    filter_bar(
-        ui,
-        &mut app.account_filter,
-        &mut app.account_sort_asc,
-        &mut app.sort_case_sensitive,
-        "Filter accounts...",
-        accounts_enabled,
-        accounts_enabled,
-    );
-
-    let account_view = if app.vault_name.is_empty() {
-        Vec::<&str>::new()
-    } else {
-        FmpApp::make_view(
-            &app.account_names,
-            &app.account_filter,
-            app.account_sort_asc,
-            app.sort_case_sensitive,
-        )
-    };
-
-    if let Some(account) = selectable_list(ui, account_view, &app.account_name) {
-        if select_account(app, account.as_str()).is_err() {}
-    }
-}
-
-/// Sidebar entry point: now very small, delegates to section helpers.
-pub fn sidebar(app: &mut FmpApp, ui: &mut egui::Ui) {
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.add_space(40.0);
-        ui.separator();
-
-        render_vaults_section(app, ui);
-
-        ui.separator();
-
-        render_accounts_section(app, ui);
-    });
 }

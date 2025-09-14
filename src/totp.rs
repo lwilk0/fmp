@@ -22,8 +22,7 @@ use anyhow::Error;
 use base32::Alphabet;
 use gpgme::{Context, Protocol};
 use hmac::{Hmac, Mac};
-use rand::Rng;
-use rand::rng;
+use rand::{Rng, rng};
 use sha1::Sha1;
 use std::collections::HashSet;
 use std::fs::{File, create_dir_all, remove_file};
@@ -72,27 +71,70 @@ pub fn is_totp_required(vault_name: &str) -> bool {
     false
 }
 
-/// Enable 2FA for a vault.
+/// Prepare 2FA setup for a vault without immediately enabling it.
+/// This generates the secret and URI but doesn't store anything until confirmed.
 ///
 /// # Arguments:
 /// * `vault_name` - The name of the vault.
 ///
 /// # Returns:
-/// * `Result<(String, String), Error>` - Returns a Base32-encoded secret and an otp URI on success, and an `Error` of failure.
+/// * `Result<(Vec<u8>, String, String), Error>` - Returns the raw secret, Base32-encoded secret and an otp URI on success, and an `Error` of failure.
 ///
 /// # Errors:
-/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, check if a gate exists or add a vault to the ledger.
-pub fn enable_totp(vault_name: &str) -> Result<(String, String), Error> {
-    let locations = Locations::new(vault_name, "");
+/// * Fails when unable to check if a gate exists.
+pub fn prepare_totp_setup(vault_name: &str) -> Result<(Vec<u8>, String, String), Error> {
+    ensure_gate_exists(vault_name)?;
 
     let mut secret = [0u8; 20];
     rng().fill(&mut secret);
 
-    encrypt_and_store_secret(&locations, &secret)?;
-    ensure_gate_exists(vault_name)?;
+    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
+
+    let issuer = "FMP";
+    let label = format!("{issuer}:{vault_name}");
+    let otpauth_uri = format!(
+        "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
+        urlencoding::encode(&label),
+        secret_b32,
+        urlencoding::encode(issuer)
+    );
+
+    Ok((secret.to_vec(), secret_b32, otpauth_uri))
+}
+
+/// Confirm and finalize 2FA setup for a vault using a prepared secret.
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+/// * `secret` - The raw secret bytes to store.
+///
+/// # Returns:
+/// * `Result<(), Error>` - Returns `Ok(())` on success, and an `Error` of failure.
+///
+/// # Errors:
+/// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, or add a vault to the ledger.
+pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> {
+    let locations = Locations::new(vault_name, "");
+
+    encrypt_and_store_secret(&locations, secret)?;
     ledger_add(vault_name)?;
 
-    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
+    Ok(())
+}
+
+/// Gets the existing TOTP secret and URI for a vault that already has 2FA enabled
+///
+/// # Arguments:
+/// * `vault_name` - The name of the vault.
+///
+/// # Returns:
+/// * `Result<(String, String), Error>` - Returns a tuple containing the base32-encoded secret and the otpauth URI on success, or an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to decrypt the existing TOTP secret or if 2FA is not enabled for the vault.
+pub fn get_totp_qr_info(vault_name: &str) -> Result<(String, String), Error> {
+    let secret_bytes = decrypt_secret(vault_name)?;
+    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret_bytes);
 
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
@@ -169,6 +211,47 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
     Ok(valid)
 }
 
+/// Verify a user-provided 6-digit TOTP code using a prepared secret (for setup verification).
+///
+/// # Arguments:
+/// * `secret` - The raw secret bytes.
+/// * `code` - The user imputed 2FA code.
+///
+/// # Returns:
+/// * `Result<bool, Error>` - Returns a `bool` indicating if the code is valid on success, and an `Error` on failure.
+///
+/// # Errors:
+/// * Fails when unable to calculate the time since the Unix Epoch.
+pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
+    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
+    if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
+        return Ok(false);
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow::anyhow!("System time error: {}", e))?
+        .as_secs() as i64;
+
+    let step = 30i64;
+    let digits = 6u32;
+
+    let mut valid = false;
+    for skew in [-1i64, 0, 1] {
+        #[allow(clippy::cast_sign_loss)]
+        let counter = ((now / step) + skew) as u64;
+        let hotp_val = hotp(secret, counter, digits);
+        let candidate = format!("{:0width$}", hotp_val, width = digits as usize);
+        if candidate == code {
+            valid = true;
+            break;
+        }
+    }
+
+    Ok(valid)
+}
+
 /// RFC 4226 HOTP calculation using HMAC-SHA1.
 ///
 /// # Arguments:
@@ -178,7 +261,7 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
 ///
 /// # Returns:
 /// * Numeric OTP for authentication
-fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
+pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
     let mut counter_bytes = [0u8; 8];
     counter_bytes.copy_from_slice(&counter.to_be_bytes());
 
@@ -433,6 +516,29 @@ fn ledger_remove(vault: &str) -> Result<(), Error> {
         let mut set = load_ledger_at(&p);
         set.remove(vault);
         save_ledger_at(&p, &set)?;
+    }
+    Ok(())
+}
+
+/// Updates the TOTP ledgers when a vault is renamed
+///
+/// # Arguments:
+/// * `old_name` - The old name of the vault
+/// * `new_name` - The new name of the vault
+///
+/// # Returns:
+/// * `Result<(), Error>` - Ok on success, Err for IO errors
+///
+/// # Errors:
+/// * Returns an error if a ledger file or directory cannot be written/created
+pub fn update_totp_ledgers_on_rename(old_name: &str, new_name: &str) -> Result<(), Error> {
+    for p in [ledger_path_config(), ledger_path_data()] {
+        let mut set = load_ledger_at(&p);
+        if set.remove(old_name) {
+            // Only add the new name if the old name was present
+            set.insert(new_name.to_string());
+            save_ledger_at(&p, &set)?;
+        }
     }
     Ok(())
 }

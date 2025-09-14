@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Forgot My Password
+GenericName=Password Manager
+Comment=Generate, store, and manage passwords in encrypted vaults
+Exec=fmp %U
+TryExec=fmp
+Icon=com.fmp
+Terminal=false
+Categories=Utility;Security;GTK;
+Keywords=Password;Manager;Vault;GPG;TOTP;GTK;
+StartupNotify=true
+DBusActivatable=true

@@ -1,0 +1,10 @@
+pub mod account_tests;
+pub mod crypto_tests;
+pub mod filesystem_tests;
+pub mod locations_tests;
+pub mod password_tests;
+pub mod secure_clipboard_tests;
+pub mod secure_password_tests;
+pub mod store_tests;
+pub mod totp_tests;
+pub mod vault_operations_tests;
