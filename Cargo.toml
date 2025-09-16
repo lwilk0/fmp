@@ -1,12 +1,12 @@
 [package]
 name = "fmp"
-description = "A simple secure password manager written in rust."
+description = "A simple and secure password manager written in rust."
 repository = "https://codeberg.org/lwilko/fmp.git"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 version = "1.5.0"
 edition = "2024"
 license = "GPL-3.0"
-keywords = ["password-manager", "cli", "crypto", "cryptography", "rust"]
+keywords = ["password-manager", "cli", "crypto", "cryptography", "rust", "gui"]
 
 [dependencies]
 image = "0.25.8"
