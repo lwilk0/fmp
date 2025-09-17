@@ -1,7 +1,6 @@
 [package]
 name = "fmp"
 description = "A simple and secure password manager written in rust."
-repository = "https://codeberg.org/lwilko/fmp.git"
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
 version = "1.5.0"
 edition = "2024"
