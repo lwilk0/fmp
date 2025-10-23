@@ -427,14 +427,14 @@ fn ledger_path_data() -> PathBuf {
 /// # Errors:
 /// * Returns empty set if the file or its contents are invalid, but does NOT propagate IO errors.
 fn load_ledger_at(path: &PathBuf) -> HashSet<String> {
-    if let Ok(bytes) = std::fs::read(path) {
-        if let Ok(text) = String::from_utf8(bytes) {
-            return text
-                .lines()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-        }
+    if let Ok(bytes) = std::fs::read(path)
+        && let Ok(text) = String::from_utf8(bytes)
+    {
+        return text
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
     }
     HashSet::new()
 }

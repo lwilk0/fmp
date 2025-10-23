@@ -269,19 +269,26 @@ pub fn delete_backup(vault_name: &str) -> Result<(), Error> {
 fn remove_vault_from_stats(vault_name: &str) -> Result<(), Error> {
     let locations = Locations::new("", "");
     let stats_file = locations.fmp.join("vault_stats.txt");
+    let recents_file = locations.fmp.join("recent_vaults.txt");
 
-    if !stats_file.exists() {
+    remove_mentions_from_file(stats_file, vault_name)?;
+    remove_mentions_from_file(recents_file, vault_name)?;
+    Ok(())
+}
+
+fn remove_mentions_from_file(file: PathBuf, filter_string: &str) -> Result<(), Error> {
+    if !file.exists() {
         return Ok(()); // No stats file, nothing to remove
     }
 
-    let content = read_to_string(&stats_file)?;
+    let content = read_to_string(&file)?;
     let updated_content: String = content
         .lines()
-        .filter(|line| !line.starts_with(&format!("{vault_name}:")))
+        .filter(|line| !line.contains(filter_string))
         .collect::<Vec<_>>()
         .join("\n");
 
-    write(&stats_file, updated_content)?;
+    write(&file, updated_content)?;
 
     Ok(())
 }
@@ -327,10 +334,10 @@ pub fn increment_vault_usage(vault_name: &str) {
 
     if let Ok(content) = read_to_string(&stats_file) {
         for line in content.lines() {
-            if let Some((name, count_str)) = line.split_once(':') {
-                if let Ok(count) = count_str.parse::<u32>() {
-                    usage_counts.insert(name.to_string(), count);
-                }
+            if let Some((name, count_str)) = line.split_once(':')
+                && let Ok(count) = count_str.parse::<u32>()
+            {
+                usage_counts.insert(name.to_string(), count);
             }
         }
     }
@@ -418,13 +425,12 @@ pub fn get_most_used_vault() -> String {
 
     if let Ok(content) = read_to_string(&stats_file) {
         for line in content.lines() {
-            if let Some((name, count_str)) = line.split_once(':') {
-                if let Ok(count) = count_str.parse::<u32>() {
-                    if count > max_count {
-                        max_count = count;
-                        most_used = name.to_string();
-                    }
-                }
+            if let Some((name, count_str)) = line.split_once(':')
+                && let Ok(count) = count_str.parse::<u32>()
+                && count > max_count
+            {
+                max_count = count;
+                most_used = name.to_string();
             }
         }
     }

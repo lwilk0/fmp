@@ -129,6 +129,8 @@ fn create_empty_state_action_row(filter: &str) -> adw::ActionRow {
 
     let row = ActionRow::new();
     row.set_activatable(false);
+    row.set_margin_start(8);
+    row.set_margin_end(8);
 
     if filter.is_empty() {
         row.set_title("No vaults found");
@@ -149,6 +151,8 @@ fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionR
     row.set_title(vault_name);
     row.set_subtitle("Password vault");
     row.set_activatable(true);
+    row.set_margin_start(8);
+    row.set_margin_end(8);
 
     let open_button = Button::new();
     open_button.set_label("Open");
@@ -214,14 +218,12 @@ pub fn create_icon_button(icon_name: &str) -> Button {
 
 /// Refreshes the sidebar from the content area (convenience function)
 pub fn refresh_sidebar_from_content_area(content_area: &Box) {
-    if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok()) {
-        if let Some(paned) = main_content
+    if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok())
+        && let Some(paned) = main_content
             .parent()
             .and_then(|p| p.downcast::<Paned>().ok())
-        {
-            let new_sidebar = create_sidebar_with_callbacks(content_area);
-
-            paned.set_start_child(Some(&new_sidebar));
-        }
+    {
+        let new_sidebar = create_sidebar_with_callbacks(content_area);
+        paned.set_start_child(Some(&new_sidebar));
     }
 }

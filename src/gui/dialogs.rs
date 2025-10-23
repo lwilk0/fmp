@@ -451,26 +451,22 @@ fn create_password_display_preferences_group(
         let end_iter = buffer.end_iter();
         let password_text = buffer.text(&start_iter, &end_iter, false);
 
-        if !password_text.is_empty()
-            && password_text != "Click 'Generate Password' to create a password"
-        {
-            if let Some(display) = gdk::Display::default() {
-                let clipboard = display.clipboard();
-                clipboard.set_text(&password_text);
+        if !password_text.is_empty() && password_text != "Click 'Generate Password' to create a password" && let Some(display) = gdk::Display::default() {
+            let clipboard = display.clipboard();
+            clipboard.set_text(&password_text);
 
-                // Visual feedback for copy action
-                let copy_content_ref = copy_content.clone();
-                copy_content_ref.set_label("Copied!");
-                copy_button_ref.add_css_class("success");
+            // Visual feedback for copy action
+            let copy_content_ref = copy_content.clone();
+            copy_content_ref.set_label("Copied!");
+            copy_button_ref.add_css_class("success");
 
-                let button_clone = copy_button_ref.clone();
-                let content_clone = copy_content.clone();
-                glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
-                    content_clone.set_label("Copy");
-                    button_clone.remove_css_class("success");
-                    glib::ControlFlow::Break
-                });
-            }
+            let button_clone = copy_button_ref.clone();
+            let content_clone = copy_content.clone();
+            glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
+                content_clone.set_label("Copy");
+                button_clone.remove_css_class("success");
+                glib::ControlFlow::Break
+            });
         }
     });
 

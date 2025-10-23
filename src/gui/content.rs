@@ -385,6 +385,9 @@ fn create_recent_vaults_section(content_area: &Box) -> PreferencesGroup {
         row.set_title("No recent vaults yet");
         row.set_subtitle("Open a vault to see it here");
         row.set_activatable(false);
+        row.set_margin_start(8);
+        row.set_margin_end(8);
+
         group.add(&row);
         return group;
     }
@@ -394,6 +397,8 @@ fn create_recent_vaults_section(content_area: &Box) -> PreferencesGroup {
         row.set_title(&name);
         row.set_subtitle("Click to open");
         row.set_activatable(true);
+        row.set_margin_start(8);
+        row.set_margin_end(8);
 
         let open_btn = Button::new();
         open_btn.set_label("Open");
@@ -430,6 +435,8 @@ fn create_statistics_section() -> PreferencesGroup {
     let vault_row = ActionRow::new();
     vault_row.set_title("Vaults");
     vault_row.set_subtitle("Total number of vaults");
+    vault_row.set_margin_start(8);
+    vault_row.set_margin_end(8);
 
     let vault_label = Label::new(Some(&vault_count.to_string()));
     vault_label.add_css_class("title-3");
@@ -439,6 +446,8 @@ fn create_statistics_section() -> PreferencesGroup {
     let account_row = ActionRow::new();
     account_row.set_title("Accounts");
     account_row.set_subtitle("Total number of accounts");
+    account_row.set_margin_start(8);
+    account_row.set_margin_end(8);
 
     let account_label = Label::new(Some(&total_accounts.to_string()));
     account_label.add_css_class("title-3");
@@ -450,6 +459,8 @@ fn create_statistics_section() -> PreferencesGroup {
     let most_used_row = ActionRow::new();
     most_used_row.set_title("Most Used Vault");
     most_used_row.set_subtitle("Your frequently accessed vault");
+    most_used_row.set_margin_start(8);
+    most_used_row.set_margin_end(8);
 
     let most_used_label = Label::new(Some(&most_used));
     most_used_label.add_css_class("title-3");
@@ -470,6 +481,8 @@ fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
     create_vault_row.set_title("Create New Vault");
     create_vault_row.set_subtitle("Set up a new secure vault for your passwords");
     create_vault_row.set_activatable(true);
+    create_vault_row.set_margin_start(8);
+    create_vault_row.set_margin_end(8);
 
     let create_vault_button = Button::new();
     create_vault_button.set_label("Create");
@@ -489,6 +502,8 @@ fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
     password_row.set_title("Generate Password");
     password_row.set_subtitle("Create a secure password with customizable options");
     password_row.set_activatable(true);
+    password_row.set_margin_start(8);
+    password_row.set_margin_end(8);
 
     let password_button = Button::new();
     password_button.set_label("Generate");
@@ -621,7 +636,9 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
         empty_row.set_title("No accounts yet");
         empty_row.set_subtitle("Create your first account to get started");
         empty_row.set_activatable(true);
-
+        empty_row.set_margin_start(8);
+        empty_row.set_margin_end(8);
+        
         let add_button = Button::new();
         add_button.set_label("Add Account");
         add_button.add_css_class("suggested-action");
@@ -641,7 +658,9 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
         add_row.set_title("Add New Account");
         add_row.set_subtitle("Create a new account entry");
         add_row.set_activatable(true);
-
+        add_row.set_margin_start(8);
+        add_row.set_margin_end(8);
+        
         let add_button = Button::new();
         add_button.set_label("Add");
         add_button.add_css_class("suggested-action");
@@ -673,6 +692,8 @@ fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) 
     row.set_title(account_name);
     row.set_subtitle("Password Account");
     row.set_activatable(true);
+    row.set_margin_start(8);
+    row.set_margin_end(8);
 
     let view_button = Button::new();
     view_button.set_label("View");
@@ -705,6 +726,8 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Prefe
         status_row.set_title("TOTP Status");
         status_row.set_subtitle("Two-factor authentication is enabled and active");
         status_row.set_activatable(true);
+        status_row.set_margin_start(8);
+        status_row.set_margin_end(8);
 
         let status_label = Label::new(Some("✅ Enabled"));
         status_label.add_css_class("success");
@@ -731,6 +754,8 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Prefe
         setup_row.set_title("Enable Two-Factor Authentication");
         setup_row.set_subtitle("Add an extra layer of security to your vault");
         setup_row.set_activatable(true);
+        setup_row.set_margin_start(8);
+        setup_row.set_margin_end(8);
 
         let enable_button = Button::new();
         enable_button.set_label("Enable 2FA");
@@ -760,6 +785,8 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     backup_row.set_title("Create Backup");
     backup_row.set_subtitle("Create a backup of this vault");
     backup_row.set_activatable(true);
+    backup_row.set_margin_start(8);
+    backup_row.set_margin_end(8);
 
     let backup_button = Button::new();
     backup_button.set_label("Backup");
@@ -780,6 +807,8 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     restore_row.set_title("Restore Backup");
     restore_row.set_subtitle("Restore vault from backup");
     restore_row.set_activatable(true);
+    restore_row.set_margin_start(8);
+    restore_row.set_margin_end(8);
 
     let restore_button = Button::new();
     restore_button.set_label("Restore");
@@ -806,6 +835,8 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     delete_backup_row.set_title("Delete Backup");
     delete_backup_row.set_subtitle("Delete vault backup");
     delete_backup_row.set_activatable(true);
+    delete_backup_row.set_margin_start(8);
+    delete_backup_row.set_margin_end(8);
 
     let delete_backup_button = Button::new();
     delete_backup_button.set_label("Delete");
@@ -829,6 +860,8 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     rename_row.set_title("Rename Vault");
     rename_row.set_subtitle("Change the name of this vault");
     rename_row.set_activatable(true);
+    rename_row.set_margin_start(8);
+    rename_row.set_margin_end(8);
 
     let rename_button = Button::new();
     rename_button.set_label("Rename");
@@ -849,6 +882,8 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     delete_row.set_title("Delete Vault");
     delete_row.set_subtitle("Permanently delete this vault and all its data");
     delete_row.set_activatable(true);
+    delete_row.set_margin_start(8);
+    delete_row.set_margin_end(8);
 
     let delete_button = Button::new();
     delete_button.set_label("Delete");

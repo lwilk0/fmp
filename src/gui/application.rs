@@ -6,7 +6,7 @@ use crate::gui::{
     sidebar::create_paned_layout_with_callbacks,
 };
 use adw::{Application, ApplicationWindow, HeaderBar};
-use gtk4::{Box, CssProvider, Label, Orientation, gdk, style_context_add_provider_for_display};
+use gtk4::{gdk, style_context_add_provider_for_display, Box, CssProvider, Label, Orientation};
 
 pub fn run_gui() {
     let application = Application::builder().application_id("com.fmp").build();
