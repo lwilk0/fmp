@@ -279,6 +279,7 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     // Account name
     let name_row = create_editable_field_row("Account Name", "", &new_account, "name");
     form_box.append(&name_row);
+    form_box.set_margin_top(0);
 
     // Account type
     let type_row = create_editable_field_row(
@@ -1630,8 +1631,8 @@ fn create_password_field_row(
 ) -> Box {
     let row_box = Box::new(Orientation::Horizontal, 16);
     row_box.set_halign(gtk4::Align::Fill);
-    row_box.set_margin_top(4);
-    row_box.set_margin_bottom(4);
+    row_box.set_margin_top(2);
+    row_box.set_margin_bottom(2);
 
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
@@ -1707,8 +1708,8 @@ fn create_editable_field_row(
 ) -> Box {
     let row_box = Box::new(Orientation::Horizontal, 16);
     row_box.set_halign(gtk4::Align::Fill);
-    row_box.set_margin_top(4);
-    row_box.set_margin_bottom(4);
+    row_box.set_margin_top(2);
+    row_box.set_margin_bottom(2);
 
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
@@ -1723,7 +1724,7 @@ fn create_editable_field_row(
     entry.set_text(initial_value);
     entry.set_hexpand(true);
     entry.set_size_request(250, -1);
-    entry.add_css_class("password-field");
+    //entry.add_css_class("password-field");
 
     let account_rc_clone = account_rc.clone();
     let field_name_owned = field_name.to_string();

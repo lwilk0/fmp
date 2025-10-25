@@ -112,6 +112,8 @@ fn create_password_length_preferences_group(
     let length_row = ActionRow::new();
     length_row.set_title("Length");
     length_row.set_subtitle("Number of characters in the password");
+    length_row.set_margin_start(8);
+    length_row.set_margin_end(8);
 
     let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
     let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);
@@ -178,6 +180,8 @@ fn create_character_types_preferences_group(
         let row = ActionRow::new();
         row.set_title(title);
         row.set_subtitle(subtitle);
+        row.set_margin_start(8);
+        row.set_margin_end(8);
 
         let switch = Switch::new();
         switch.set_active(default_enabled);
@@ -258,6 +262,8 @@ fn create_custom_characters_preferences_group(
     let additional_row = ActionRow::new();
     additional_row.set_title("Additional Characters");
     additional_row.set_subtitle("Extra characters to include in passwords");
+    additional_row.set_margin_start(8);
+    additional_row.set_margin_end(8);
 
     let additional_entry = Entry::new();
     additional_entry.set_placeholder_text(Some("e.g., @#$"));
@@ -281,6 +287,8 @@ fn create_custom_characters_preferences_group(
     let excluded_row = ActionRow::new();
     excluded_row.set_title("Excluded Characters");
     excluded_row.set_subtitle("Characters to avoid in passwords (e.g., confusing characters)");
+    excluded_row.set_margin_start(8);
+    excluded_row.set_margin_end(8);
 
     let excluded_entry = Entry::new();
     excluded_entry.set_placeholder_text(Some("e.g., 0O1l"));
@@ -316,6 +324,8 @@ fn create_password_display_preferences_group(
     let password_row = ActionRow::new();
     password_row.set_title("Password");
     password_row.set_subtitle("Generated password will appear here");
+    password_row.set_margin_start(8);
+    password_row.set_margin_end(8);
 
     let password_display = TextView::new();
     password_display.set_editable(false);
@@ -348,6 +358,8 @@ fn create_password_display_preferences_group(
 
     let strength_row = ActionRow::new();
     strength_row.set_title("Password Strength");
+    strength_row.set_margin_start(8);
+    strength_row.set_margin_end(8);
 
     let strength_progress = ProgressBar::new();
     strength_progress.set_show_text(true);
@@ -388,6 +400,8 @@ fn create_password_display_preferences_group(
     let actions_row = ActionRow::new();
     actions_row.set_title("Actions");
     actions_row.set_subtitle("Generate, copy, or use the password");
+    actions_row.set_margin_start(8);
+    actions_row.set_margin_end(8);
 
     let button_container = GtkBox::new(Orientation::Horizontal, 8);
     button_container.set_halign(gtk4::Align::End);
@@ -398,7 +412,7 @@ fn create_password_display_preferences_group(
     generate_content.set_icon_name("view-refresh-symbolic");
     generate_button.set_child(Some(&generate_content));
     generate_button.add_css_class("suggested-action");
-    generate_button.set_tooltip_text(Some("Generate a new password (Ctrl+G or F5)"));
+    generate_button.set_tooltip_text(Some("Generate a new password"));
 
     let display_ref = password_display.clone();
     let config_ref = password_config.clone();
@@ -441,7 +455,7 @@ fn create_password_display_preferences_group(
     copy_content.set_icon_name("edit-copy-symbolic");
     copy_button.set_child(Some(&copy_content));
     copy_button.add_css_class("flat");
-    copy_button.set_tooltip_text(Some("Copy password to clipboard (Ctrl+C)"));
+    copy_button.set_tooltip_text(Some("Copy password to clipboard"));
 
     let display_copy_ref = password_display.clone();
     let copy_button_ref = copy_button.clone();
