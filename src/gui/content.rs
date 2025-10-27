@@ -12,7 +12,10 @@ use crate::{
             LoadingOverlay, create_loading_button, set_button_loading_state,
         },
     },
-    storage::filesystem::{backup_exists, read_directory, get_recent_vaults, increment_vault_usage, record_recent_vault, get_most_used_vault},
+    storage::filesystem::{
+        backup_exists, get_most_used_vault, get_recent_vaults, increment_vault_usage,
+        read_directory, record_recent_vault,
+    },
     totp::{is_totp_enabled, is_totp_required},
     vault::{
         Account, Locations, create_account, create_vault, delete_account, get_full_account_details,
@@ -204,11 +207,9 @@ pub fn show_account_view_with_mode(
     main_box.set_margin_end(24);
 
     // Wrap account data in Rc<RefCell<>> for sharing between sections
-    let account_rc = Rc::new(RefCell::new(account_data.unwrap_or_else(|| {
-        Account {
-            name: account_name.to_string(),
-            ..Default::default()
-        }
+    let account_rc = Rc::new(RefCell::new(account_data.unwrap_or_else(|| Account {
+        name: account_name.to_string(),
+        ..Default::default()
     })));
 
     let header_section = create_account_header(
@@ -287,7 +288,7 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
         "Password Account",
         &new_account,
         "account_type",
-    );    // Account name
+    ); // Account name
 
     form_box.append(&type_row);
 
@@ -375,46 +376,43 @@ fn create_welcome_section() -> Box {
 
 /// Creates the recent vaults section for the home view (bottom panel)
 fn create_recent_vaults_section(content_area: &Box) -> PreferencesGroup {
-    use gtk4::Align;
     let group = PreferencesGroup::new();
+
+    let content_area_clone = content_area.clone();
+
     group.set_title("Recently Accessed Vaults");
     group.set_description(Some("Open a vault you used recently"));
 
     let recent = get_recent_vaults(5);
     if recent.is_empty() {
-        let row = ActionRow::new();
-        row.set_title("No recent vaults yet");
-        row.set_subtitle("Open a vault to see it here");
-        row.set_activatable(false);
-        row.set_margin_start(8);
-        row.set_margin_end(8);
+        group.add(
+            &CreateActionRow::<fn()>::new()
+                .title("No Recent Vaults Yet")
+                .subtitle("Open a vault to see it here")
+                .activatable(false)
+                .add_button(false)
+                .build(),
+        );
 
-        group.add(&row);
         return group;
     }
 
     for name in recent {
-        let row = ActionRow::new();
-        row.set_title(&name);
-        row.set_subtitle("Click to open");
-        row.set_activatable(true);
-        row.set_margin_start(8);
-        row.set_margin_end(8);
-
-        let open_btn = Button::new();
-        open_btn.set_label("Open");
-        open_btn.add_css_class("suggested-action");
-        open_btn.set_valign(Align::Center);
-        row.add_suffix(&open_btn);
-        row.set_activatable_widget(Some(&open_btn));
-
-        let content_area_clone = content_area.clone();
         let name_clone = name.clone();
-        open_btn.connect_clicked(move |_| {
-            show_vault_view(&content_area_clone, &name_clone);
-        });
 
-        group.add(&row);
+        group.add(
+            &CreateActionRow::new()
+                .title(&name)
+                .subtitle("Click to open")
+                .button_label("Open")
+                .css_class("suggested-action")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let name = name_clone.clone();
+                    move || show_vault_view(&content_area, &name)
+                })
+                .build(),
+        );
     }
 
     group
@@ -428,45 +426,48 @@ fn create_statistics_section() -> PreferencesGroup {
 
     let vaults = crate::gui::sidebar::get_available_vaults();
     let vault_count = vaults.len();
+    let most_used = get_most_used_vault();
     let total_accounts: usize = vaults
         .iter()
         .map(|vault_name| get_available_accounts(vault_name).len())
         .sum();
 
-    let vault_row = ActionRow::new();
-    vault_row.set_title("Vaults");
-    vault_row.set_subtitle("Total number of vaults");
-    vault_row.set_margin_start(8);
-    vault_row.set_margin_end(8);
-
     let vault_label = Label::new(Some(&vault_count.to_string()));
     vault_label.add_css_class("title-3");
-    vault_row.add_suffix(&vault_label);
-    group.add(&vault_row);
-
-    let account_row = ActionRow::new();
-    account_row.set_title("Accounts");
-    account_row.set_subtitle("Total number of accounts");
-    account_row.set_margin_start(8);
-    account_row.set_margin_end(8);
-
     let account_label = Label::new(Some(&total_accounts.to_string()));
     account_label.add_css_class("title-3");
-    account_row.add_suffix(&account_label);
-    group.add(&account_row);
-
-    let most_used = get_most_used_vault();
-
-    let most_used_row = ActionRow::new();
-    most_used_row.set_title("Most Used Vault");
-    most_used_row.set_subtitle("Your frequently accessed vault");
-    most_used_row.set_margin_start(8);
-    most_used_row.set_margin_end(8);
-
     let most_used_label = Label::new(Some(&most_used));
     most_used_label.add_css_class("title-3");
-    most_used_row.add_suffix(&most_used_label);
-    group.add(&most_used_row);
+
+    group.add(
+        &CreateActionRow::<fn()>::new()
+            .title("Vaults")
+            .subtitle("Total number of vaults")
+            .suffix(&vault_label)
+            .activatable(false)
+            .add_button(false)
+            .build(),
+    );
+
+    group.add(
+        &CreateActionRow::<fn()>::new()
+            .title("Accounts")
+            .subtitle("Total number of accounts")
+            .suffix(&account_label)
+            .activatable(false)
+            .add_button(false)
+            .build(),
+    );
+
+    group.add(
+        &CreateActionRow::<fn()>::new()
+            .title("Most Used Vault")
+            .subtitle("Your frequently used vaults")
+            .suffix(&most_used_label)
+            .activatable(false)
+            .add_button(false)
+            .build(),
+    );
 
     group
 }
@@ -477,47 +478,30 @@ fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
     group.set_title("Quick Actions");
     group.set_description(Some("Get started with common tasks"));
 
-    // Create new vault row
-    let create_vault_row = ActionRow::new();
-    create_vault_row.set_title("Create New Vault");
-    create_vault_row.set_subtitle("Set up a new secure vault for your passwords");
-    create_vault_row.set_activatable(true);
-    create_vault_row.set_margin_start(8);
-    create_vault_row.set_margin_end(8);
-
-    let create_vault_button = Button::new();
-    create_vault_button.set_label("Create");
-    create_vault_button.add_css_class("suggested-action");
-    create_vault_button.set_valign(gtk4::Align::Center);
-    create_vault_row.add_suffix(&create_vault_button);
-    create_vault_row.set_activatable_widget(Some(&create_vault_button));
-
     let content_area_clone = content_area.clone();
-    create_vault_button.connect_clicked(move |_| {
-        show_create_vault_view(&content_area_clone);
-    });
 
-    group.add(&create_vault_row);
+    group.add(
+        &CreateActionRow::new()
+            .title("Create New Vault")
+            .subtitle("Set up a vault for your passwords")
+            .button_label("Create")
+            .css_class("suggested-action")
+            .callback({
+                let content_area = content_area_clone.clone();
+                move || show_create_vault_view(&content_area)
+            })
+            .build(),
+    );
 
-    let password_row = ActionRow::new();
-    password_row.set_title("Generate Password");
-    password_row.set_subtitle("Create a secure password with customizable options");
-    password_row.set_activatable(true);
-    password_row.set_margin_start(8);
-    password_row.set_margin_end(8);
-
-    let password_button = Button::new();
-    password_button.set_label("Generate");
-    password_button.add_css_class("suggested-action");
-    password_button.set_valign(gtk4::Align::Center);
-    password_row.add_suffix(&password_button);
-    password_row.set_activatable_widget(Some(&password_button));
-
-    password_button.connect_clicked(move |_| {
-        show_standalone_password_generator_dialog();
-    });
-
-    group.add(&password_row);
+    group.add(
+        &CreateActionRow::new()
+            .title("Generate Password")
+            .subtitle("Create a secure password with customisable options")
+            .button_label("Generate")
+            .css_class("suggested-action")
+            .callback(move || show_standalone_password_generator_dialog())
+            .build(),
+    );
 
     group
 }
@@ -632,52 +616,38 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
 
     let all_accounts = get_available_accounts(vault_name);
 
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+
     if all_accounts.is_empty() {
-        let empty_row = ActionRow::new();
-        empty_row.set_title("No accounts yet");
-        empty_row.set_subtitle("Create your first account to get started");
-        empty_row.set_activatable(true);
-        empty_row.set_margin_start(8);
-        empty_row.set_margin_end(8);
-        
-        let add_button = Button::new();
-        add_button.set_label("Add Account");
-        add_button.add_css_class("suggested-action");
-        add_button.set_valign(gtk4::Align::Center);
-        empty_row.add_suffix(&add_button);
-        empty_row.set_activatable_widget(Some(&add_button));
-
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        add_button.connect_clicked(move |_| {
-            show_new_account_view(&content_area_clone, &vault_name_clone);
-        });
-
-        group.add(&empty_row);
+        group.add(
+            &CreateActionRow::new()
+                .title("No Accounts Yet")
+                .subtitle("Create your first account to get started")
+                .button_label("Add Account")
+                .css_class("suggested-action")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_new_account_view(&content_area, &vault_name)
+                })
+                .build(),
+        );
     } else {
-        let add_row = ActionRow::new();
-        add_row.set_title("Add New Account");
-        add_row.set_subtitle("Create a new account entry");
-        add_row.set_activatable(true);
-        add_row.set_margin_start(8);
-        add_row.set_margin_end(8);
-        
-        let add_button = Button::new();
-        add_button.set_label("Add");
-        add_button.add_css_class("suggested-action");
-        add_button.set_valign(gtk4::Align::Center);
-        add_row.add_suffix(&add_button);
-        add_row.set_activatable_widget(Some(&add_button));
+        group.add(
+            &CreateActionRow::new()
+                .title("Add New Account")
+                .subtitle("Create a new account directory")
+                .button_label("Add")
+                .css_class("suggested-action")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_new_account_view(&content_area, &vault_name)
+                })
+                .build(),
+        );
 
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        add_button.connect_clicked(move |_| {
-            show_new_account_view(&content_area_clone, &vault_name_clone);
-        });
-
-        group.add(&add_row);
-
-        // Account rows
         for account_name in all_accounts {
             let account_row = create_account_row(account_name.as_str(), content_area, vault_name);
             group.add(&account_row);
@@ -689,28 +659,25 @@ fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGrou
 
 /// Creates an account row for the preferences group
 fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) -> ActionRow {
-    let row = ActionRow::new();
-    row.set_title(account_name);
-    row.set_subtitle("Password Account");
-    row.set_activatable(true);
-    row.set_margin_start(8);
-    row.set_margin_end(8);
-
-    let view_button = Button::new();
-    view_button.set_label("View");
-    view_button.add_css_class("flat");
-    view_button.set_valign(gtk4::Align::Center);
-    row.add_suffix(&view_button);
-    row.set_activatable_widget(Some(&view_button));
-
-    let account_name_clone = account_name.to_string();
-    let vault_name_clone = vault_name.to_string();
-    let content_area_clone = content_area.clone();
-    view_button.connect_clicked(move |_| {
-        show_account_view_with_mode(&content_area_clone, &vault_name_clone, &account_name_clone, false);
-    });
-
-    row
+    CreateActionRow::new()
+        .title(account_name)
+        .subtitle("Password Account")
+        .button_label("View")
+        .css_class("flat")
+        .callback({
+            let account_name_clone = account_name.to_string();
+            let vault_name_clone = vault_name.to_string();
+            let content_area_clone = content_area.clone();
+            move || {
+                show_account_view_with_mode(
+                    &content_area_clone,
+                    &vault_name_clone,
+                    &account_name_clone,
+                    false,
+                )
+            }
+        })
+        .build()
 }
 
 /// Creates the TOTP (2FA) management section for the vault view
@@ -719,58 +686,38 @@ fn create_totp_management_section(content_area: &Box, vault_name: &str) -> Prefe
     group.set_title("Two-Factor Authentication");
     group.set_description(Some("Secure your vault with TOTP authentication"));
 
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+
     let is_enabled = is_totp_enabled(vault_name);
 
     if is_enabled {
-        // 2FA is enabled - show status row
-        let status_row = ActionRow::new();
-        status_row.set_title("TOTP Status");
-        status_row.set_subtitle("Two-factor authentication is enabled and active");
-        status_row.set_activatable(true);
-        status_row.set_margin_start(8);
-        status_row.set_margin_end(8);
-
-        let status_label = Label::new(Some("✅ Enabled"));
-        status_label.add_css_class("success");
-        status_row.add_suffix(&status_label);
-
-        let manage_button = Button::new();
-        manage_button.set_label("Manage");
-        manage_button.add_css_class("flat");
-        manage_button.set_valign(gtk4::Align::Center);
-        status_row.add_suffix(&manage_button);
-        status_row.set_activatable_widget(Some(&manage_button));
-
-        // Connect manage button
-        let content_area_clone = content_area.clone();
-        let vault_name_clone = vault_name.to_string();
-        manage_button.connect_clicked(move |_| {
-            show_totp_management_dialog(&vault_name_clone, &content_area_clone);
-        });
-
-        group.add(&status_row);
+        group.add(
+            &CreateActionRow::new()
+                .title("TOTP Status")
+                .subtitle("Two-factor authentication is enabled and active")
+                .button_label("Manage")
+                .css_class("flat")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_totp_management_dialog(&vault_name, &content_area)
+                })
+                .build(),
+        );
     } else {
-        // 2FA is not enabled - show setup row
-        let setup_row = ActionRow::new();
-        setup_row.set_title("Enable Two-Factor Authentication");
-        setup_row.set_subtitle("Add an extra layer of security to your vault");
-        setup_row.set_activatable(true);
-        setup_row.set_margin_start(8);
-        setup_row.set_margin_end(8);
-
-        let enable_button = Button::new();
-        enable_button.set_label("Enable 2FA");
-        enable_button.add_css_class("suggested-action");
-        enable_button.set_valign(gtk4::Align::Center);
-        setup_row.add_suffix(&enable_button);
-        setup_row.set_activatable_widget(Some(&enable_button));
-
-        let vault_name_clone = vault_name.to_string();
-        enable_button.connect_clicked(move |_| {
-            show_totp_setup_dialog(&vault_name_clone);
-        });
-
-        group.add(&setup_row);
+        group.add(
+            &CreateActionRow::new()
+                .title("Enable Two-Factor Authentication")
+                .subtitle("Add an extra layer of security to your vault")
+                .button_label("Enable 2FA")
+                .css_class("suggested-action")
+                .callback({
+                    let vault_name = vault_name_clone.clone();
+                    move || show_totp_setup_dialog(&vault_name)
+                })
+                .build(),
+        );
     }
 
     group
@@ -782,124 +729,82 @@ fn create_vault_management_section(content_area: &Box, vault_name: &str) -> Pref
     group.set_title("Vault Management");
     group.set_description(Some("Backup, restore, rename, and delete vault operations"));
 
-    let backup_row = ActionRow::new();
-    backup_row.set_title("Create Backup");
-    backup_row.set_subtitle("Create a backup of this vault");
-    backup_row.set_activatable(true);
-    backup_row.set_margin_start(8);
-    backup_row.set_margin_end(8);
-
-    let backup_button = Button::new();
-    backup_button.set_label("Backup");
-    backup_button.add_css_class("flat");
-    backup_button.set_valign(gtk4::Align::Center);
-    backup_row.add_suffix(&backup_button);
-    backup_row.set_activatable_widget(Some(&backup_button));
-
-    let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
-    backup_button.connect_clicked(move |_| {
-        show_backup_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
+    let content_area_clone = content_area.clone();
 
-    group.add(&backup_row);
+    group.add(
+        &CreateActionRow::new()
+            .title("Create Backup")
+            .subtitle("Create a backup of this vault")
+            .button_label("Backup")
+            .css_class("flat")
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_backup_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
 
-    let restore_row = ActionRow::new();
-    restore_row.set_title("Restore Backup");
-    restore_row.set_subtitle("Restore vault from backup");
-    restore_row.set_activatable(true);
-    restore_row.set_margin_start(8);
-    restore_row.set_margin_end(8);
-
-    let restore_button = Button::new();
-    restore_button.set_label("Restore");
-    restore_button.add_css_class("flat");
-    restore_button.set_valign(gtk4::Align::Center);
-
-    // Check if backup exists to enable/disable button
     let has_backup = backup_exists(vault_name);
-    restore_button.set_sensitive(has_backup);
-    restore_row.set_sensitive(has_backup);
 
-    restore_row.add_suffix(&restore_button);
-    restore_row.set_activatable_widget(Some(&restore_button));
+    group.add(
+        &CreateActionRow::new()
+            .title("Restore Backup")
+            .subtitle("Restore vault from backup")
+            .button_label("Restore")
+            .css_class("flat")
+            .activatable(has_backup)
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_restore_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
 
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    restore_button.connect_clicked(move |_| {
-        show_restore_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
+    group.add(
+        &CreateActionRow::new()
+            .title("Delete Backup")
+            .subtitle("Delete vault backup")
+            .button_label("Delete")
+            .css_class("destructive-action")
+            .activatable(has_backup)
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_delete_backup_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
 
-    group.add(&restore_row);
+    group.add(
+        &CreateActionRow::new()
+            .title("Rename Vault")
+            .subtitle("Change the name of this vault")
+            .button_label("Rename")
+            .css_class("flat")
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_rename_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
 
-    let delete_backup_row = ActionRow::new();
-    delete_backup_row.set_title("Delete Backup");
-    delete_backup_row.set_subtitle("Delete vault backup");
-    delete_backup_row.set_activatable(true);
-    delete_backup_row.set_margin_start(8);
-    delete_backup_row.set_margin_end(8);
-
-    let delete_backup_button = Button::new();
-    delete_backup_button.set_label("Delete");
-    delete_backup_button.add_css_class("destructive-action");
-    delete_backup_button.set_valign(gtk4::Align::Center);
-    delete_backup_button.set_sensitive(has_backup);
-    delete_backup_row.set_sensitive(has_backup);
-
-    delete_backup_row.add_suffix(&delete_backup_button);
-    delete_backup_row.set_activatable_widget(Some(&delete_backup_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    delete_backup_button.connect_clicked(move |_| {
-        show_delete_backup_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&delete_backup_row);
-
-    let rename_row = ActionRow::new();
-    rename_row.set_title("Rename Vault");
-    rename_row.set_subtitle("Change the name of this vault");
-    rename_row.set_activatable(true);
-    rename_row.set_margin_start(8);
-    rename_row.set_margin_end(8);
-
-    let rename_button = Button::new();
-    rename_button.set_label("Rename");
-    rename_button.add_css_class("flat");
-    rename_button.set_valign(gtk4::Align::Center);
-    rename_row.add_suffix(&rename_button);
-    rename_row.set_activatable_widget(Some(&rename_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    rename_button.connect_clicked(move |_| {
-        show_rename_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&rename_row);
-
-    let delete_row = ActionRow::new();
-    delete_row.set_title("Delete Vault");
-    delete_row.set_subtitle("Permanently delete this vault and all its data");
-    delete_row.set_activatable(true);
-    delete_row.set_margin_start(8);
-    delete_row.set_margin_end(8);
-
-    let delete_button = Button::new();
-    delete_button.set_label("Delete");
-    delete_button.add_css_class("destructive-action");
-    delete_button.set_valign(gtk4::Align::Center);
-    delete_row.add_suffix(&delete_button);
-    delete_row.set_activatable_widget(Some(&delete_button));
-
-    let content_area_clone = content_area.clone();
-    let vault_name_clone = vault_name.to_string();
-    delete_button.connect_clicked(move |_| {
-        show_delete_vault_dialog(&vault_name_clone, &content_area_clone);
-    });
-
-    group.add(&delete_row);
+    group.add(
+        &CreateActionRow::new()
+            .title("Delete Vault")
+            .subtitle("Permanently delete this vault and its data")
+            .button_label("Delete")
+            .css_class("destructive-action")
+            .callback({
+                let vault_name = vault_name_clone;
+                let content_area = content_area_clone;
+                move || show_delete_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
 
     group
 }
@@ -992,11 +897,11 @@ fn create_account_header(
         delete_button.connect_clicked(move |_| {
             let message = format!(
                 "Are you sure you want to delete the account '{account_name_delete}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.");
-            
+
             let content_area_confirm = content_area_delete.clone();
             let vault_name_confirm = vault_name_delete.clone();
             let account_name_confirm = account_name_delete.clone();
-            
+
             show_confirmation_dialog(
                 "Delete Account",
                 &message,
@@ -1534,7 +1439,12 @@ fn create_account_actions_section(
             Ok(()) => {
                 drop(account); // Release the borrow
                 // Exit edit mode and show the updated account
-                show_account_view_with_mode(&content_area_clone3, &vault_name_clone, &account_name, false);
+                show_account_view_with_mode(
+                    &content_area_clone3,
+                    &vault_name_clone,
+                    &account_name,
+                    false,
+                );
             }
             Err(e) => {
                 eprintln!("Failed to save account: {e}");
@@ -1551,7 +1461,12 @@ fn create_account_actions_section(
     let account_rc_clone3 = account_rc.clone();
     cancel_button.connect_clicked(move |_| {
         let account = account_rc_clone3.borrow();
-        show_account_view_with_mode(&content_area_clone2, &vault_name_clone2, &account.name, false);
+        show_account_view_with_mode(
+            &content_area_clone2,
+            &vault_name_clone2,
+            &account.name,
+            false,
+        );
     });
 
     actions_box.append(&cancel_button);
@@ -1762,7 +1677,7 @@ pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
     if is_totp_required(vault_name) {
         let content_area_clone = content_area.clone();
         let vault_name_clone = vault_name.to_string();
-        
+
         show_totp_authentication_dialog(&vault_name_clone.clone(), move || {
             proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
         });
@@ -1833,4 +1748,118 @@ pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
 fn get_account_directory(vault_name: &str) -> PathBuf {
     let locations = Locations::new(vault_name, "");
     locations.account
+}
+
+struct CreateActionRow<F: Fn() + 'static> {
+    title: Option<String>,
+    subtitle: Option<String>,
+    button_label: Option<String>,
+    css_class: Option<String>,
+    callback: Option<F>,
+    activatable: bool,
+    margin_start: i32,
+    margin_end: i32,
+    add_button: bool,
+    suffix_widget: Option<gtk4::Widget>,
+}
+
+impl<F: Fn() + 'static> Default for CreateActionRow<F> {
+    fn default() -> Self {
+        Self {
+            title: None,
+            subtitle: None,
+            button_label: None,
+            css_class: None,
+            activatable: true,
+            margin_start: 8,
+            margin_end: 8,
+            callback: None,
+            add_button: true,
+            suffix_widget: None,
+        }
+    }
+}
+
+impl<F: Fn() + 'static> CreateActionRow<F> {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    fn subtitle(mut self, s: impl Into<String>) -> Self {
+        self.subtitle = Some(s.into());
+        self
+    }
+    fn button_label(mut self, bl: impl Into<String>) -> Self {
+        self.button_label = Some(bl.into());
+        self
+    }
+    fn css_class(mut self, cc: impl Into<String>) -> Self {
+        self.css_class = Some(cc.into());
+        self
+    }
+    fn activatable(mut self, a: bool) -> Self {
+        self.activatable = a;
+        self
+    }
+    fn margin_start(mut self, m: i32) -> Self {
+        self.margin_start = m;
+        self
+    }
+    fn margin_end(mut self, m: i32) -> Self {
+        self.margin_end = m;
+        self
+    }
+    fn callback(mut self, c: F) -> Self {
+        self.callback = Some(c);
+        self
+    }
+    fn add_button(mut self, ab: bool) -> Self {
+        self.add_button = ab;
+        self
+    }
+    fn suffix(mut self, widget: &impl gtk4::prelude::IsA<gtk4::Widget>) -> Self {
+        self.suffix_widget = Some(widget.clone().upcast());
+        self
+    }
+
+    fn build(self) -> ActionRow {
+        let row = ActionRow::new();
+        let button = Button::new();
+
+        if let Some(t) = self.title {
+            row.set_title(&t);
+        }
+        if let Some(s) = self.subtitle {
+            row.set_subtitle(&s);
+        }
+        row.set_activatable(self.activatable);
+        row.set_margin_start(self.margin_start);
+        row.set_margin_end(self.margin_end);
+
+        if let Some(custom_widget) = self.suffix_widget {
+            row.add_suffix(&custom_widget);
+        }
+
+        if self.add_button {
+            if let Some(bl) = self.button_label {
+                button.set_label(&bl)
+            }
+            if let Some(cc) = self.css_class {
+                button.add_css_class(&cc)
+            }
+
+            button.set_valign(gtk4::Align::Center);
+            row.add_suffix(&button);
+            row.set_activatable_widget(Some(&button));
+
+            if let Some(c) = self.callback {
+                button.connect_clicked(move |_| c());
+            }
+        }
+
+        row
+    }
 }
