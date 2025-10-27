@@ -239,6 +239,9 @@ preferencesgroup actionrow {
 .strength-strong {
     background: linear-gradient(90deg, #27ae60, #2ecc71);
 }
+.main-content {
+  background-color: @headerbar_bg_color;
+}
 
 .totp-section {
     background-color: @headerbar_bg_color;
