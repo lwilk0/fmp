@@ -25,7 +25,7 @@ use crate::{
 use adw::{ActionRow, ButtonContent, Clamp, PreferencesGroup, prelude::*};
 
 use gtk4::{
-    Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
+    Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
     pango::EllipsizeMode,
 };
 use std::{
@@ -54,11 +54,13 @@ pub fn show_home_view(content_area: &Box) {
     clamp.set_maximum_size(800);
     clamp.set_tightening_threshold(600);
 
-    let main_box = Box::new(Orientation::Vertical, 16);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 16))
+        .top(24)
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .build();
 
     let welcome_section = create_welcome_section();
     main_box.append(&welcome_section);
@@ -98,11 +100,13 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     clamp.set_maximum_size(800);
     clamp.set_tightening_threshold(600);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .top(24)
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .build();
 
     let header_box = Box::new(Orientation::Horizontal, 16);
     header_box.set_halign(gtk4::Align::Fill);
@@ -200,11 +204,13 @@ pub fn show_account_view_with_mode(
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    let main_box = Box::new(Orientation::Vertical, 0);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 0))
+        .top(24)
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .build();
 
     // Wrap account data in Rc<RefCell<>> for sharing between sections
     let account_rc = Rc::new(RefCell::new(account_data.unwrap_or_else(|| Account {
@@ -253,11 +259,13 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     scrolled_window.set_vexpand(true);
     scrolled_window.set_hexpand(true);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(24);
-    main_box.set_margin_bottom(24);
-    main_box.set_margin_start(24);
-    main_box.set_margin_end(24);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .top(24)
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .build();
 
     let header_box = Box::new(Orientation::Vertical, 8);
 
@@ -310,9 +318,11 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
 
     main_box.append(&form_box);
 
-    let actions_box = Box::new(Orientation::Horizontal, 12);
-    actions_box.set_halign(gtk4::Align::Center);
-    actions_box.set_margin_top(24);
+    let actions_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .top(24)
+        .halign(Align::Center)
+        .build();
 
     let cancel_button = Button::new();
     cancel_button.set_label("Cancel");
@@ -549,9 +559,11 @@ fn show_create_vault_view(content_area: &Box) {
 
     main_box.append(&form_box);
 
-    let actions_box = Box::new(Orientation::Horizontal, 12);
-    actions_box.set_halign(gtk4::Align::Center);
-    actions_box.set_margin_top(24);
+    let actions_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .top(24)
+        .halign(Align::Center)
+        .build();
 
     let cancel_button = Button::new();
     cancel_button.set_label("Cancel");
@@ -948,11 +960,13 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     section.add_css_class("account-section");
     section.set_margin_top(20);
 
-    let header_box = Box::new(Orientation::Vertical, 8);
-    header_box.set_margin_top(16);
-    header_box.set_margin_bottom(0);
-    header_box.set_margin_start(24);
-    header_box.set_margin_end(24);
+    let header_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 8))
+        .top(16)
+        .bottom(0)
+        .start(24)
+        .end(24)
+        .build();
 
     let title = Label::new(Some("Account Details"));
     title.add_css_class("title-3");
@@ -967,11 +981,13 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
     header_box.append(&subtitle);
     section.append(&header_box);
 
-    let details_box = Box::new(Orientation::Vertical, 18);
-    details_box.set_margin_bottom(20);
-    details_box.set_margin_start(24);
-    details_box.set_margin_end(24);
-    details_box.set_halign(gtk4::Align::Center);
+    let details_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 18))
+        .bottom(20)
+        .start(24)
+        .end(24)
+        .halign(Align::Center)
+        .build();
 
     let account = account_rc.borrow();
 
@@ -1010,11 +1026,13 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
     section.add_css_class("account-section");
     section.set_margin_top(20);
 
-    let header_box = Box::new(Orientation::Horizontal, 12);
-    header_box.set_margin_top(20);
-    header_box.set_margin_bottom(0);
-    header_box.set_margin_start(24);
-    header_box.set_margin_end(24);
+    let header_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .top(20)
+        .bottom(0)
+        .start(24)
+        .end(24)
+        .build();
 
     let title_box = Box::new(Orientation::Vertical, 4);
     title_box.set_hexpand(true);
@@ -1043,12 +1061,13 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
     section.append(&header_box);
 
-    // Password field with reveal/copy buttons - bigger spacing
-    let password_box = Box::new(Orientation::Horizontal, 12);
-    password_box.set_margin_bottom(24);
-    password_box.set_margin_start(24);
-    password_box.set_margin_end(24);
-    password_box.set_halign(gtk4::Align::Center);
+    let password_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .halign(Align::Center)
+        .build();
 
     let password_entry = Entry::new();
     let account = account_rc.borrow();
@@ -1171,11 +1190,13 @@ fn create_additional_fields_section(
     section.add_css_class("account-section");
     section.set_margin_top(16);
 
-    let header_box = Box::new(Orientation::Horizontal, 12);
-    header_box.set_margin_top(20);
-    header_box.set_margin_bottom(0);
-    header_box.set_margin_start(24);
-    header_box.set_margin_end(24);
+    let header_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .top(20)
+        .bottom(0)
+        .start(24)
+        .end(24)
+        .build();
 
     let title_box = Box::new(Orientation::Vertical, 4);
     title_box.set_hexpand(true);
@@ -1213,11 +1234,13 @@ fn create_additional_fields_section(
 
     section.append(&header_box);
 
-    let fields_box = Box::new(Orientation::Vertical, 8);
-    fields_box.set_margin_bottom(20);
-    fields_box.set_margin_start(24);
-    fields_box.set_margin_end(24);
-    fields_box.set_halign(gtk4::Align::Center);
+    let fields_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 8))
+        .bottom(20)
+        .start(24)
+        .end(24)
+        .halign(Align::Center)
+        .build();
 
     let account = account_rc.borrow();
     for (field_name, field_value) in &account.additional_fields {
@@ -1358,11 +1381,13 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
     section.add_css_class("account-section");
     section.set_margin_top(20);
 
-    let header_box = Box::new(Orientation::Vertical, 8);
-    header_box.set_margin_top(20);
-    header_box.set_margin_bottom(0);
-    header_box.set_margin_start(24);
-    header_box.set_margin_end(24);
+    let header_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 8))
+        .top(20)
+        .bottom(0)
+        .start(24)
+        .end(24)
+        .build();
 
     let title = Label::new(Some("Notes"));
     title.add_css_class("title-3");
@@ -1377,11 +1402,13 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
     header_box.append(&subtitle);
     section.append(&header_box);
 
-    let notes_box = Box::new(Orientation::Vertical, 16);
-    notes_box.set_margin_bottom(24);
-    notes_box.set_margin_start(24);
-    notes_box.set_margin_end(24);
-    notes_box.set_halign(gtk4::Align::Center);
+    let notes_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 16))
+        .bottom(24)
+        .start(24)
+        .end(24)
+        .halign(Align::Center)
+        .build();
 
     // Notes text area (using Entry for now, could be TextView for multiline)
     let notes_entry = Entry::new();
@@ -1707,13 +1734,15 @@ fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
 fn show_error_message(content_area: &Box, title: &str, message: &str) {
     clear_content(content_area);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(48);
-    main_box.set_margin_bottom(48);
-    main_box.set_margin_start(48);
-    main_box.set_margin_end(48);
-    main_box.set_halign(gtk4::Align::Center);
-    main_box.set_valign(gtk4::Align::Center);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .top(48)
+        .bottom(48)
+        .start(48)
+        .end(48)
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .build();
 
     let error_title = Label::new(Some(title));
     error_title.add_css_class("title-1");
@@ -1861,5 +1890,85 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
         }
 
         row
+    }
+}
+
+struct CreateBox {
+    new_box: Box,
+    top: Option<i32>,
+    bottom: Option<i32>,
+    start: Option<i32>,
+    end: Option<i32>,
+    halign: Option<Align>,
+    valign: Option<Align>,
+}
+
+impl Default for CreateBox {
+    fn default() -> Self {
+        Self {
+            new_box: Box::new(Orientation::Vertical, 0),
+            top: None,
+            bottom: None,
+            start: None,
+            end: None,
+            halign: None,
+            valign: None,
+        }
+    }
+}
+
+impl CreateBox {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn new_box(mut self, nb: Box) -> Self {
+        self.new_box = nb;
+        self
+    }
+    fn top(mut self, t: impl Into<i32>) -> Self {
+        self.top = Some(t.into());
+        self
+    }
+    fn bottom(mut self, b: impl Into<i32>) -> Self {
+        self.bottom = Some(b.into());
+        self
+    }
+    fn start(mut self, s: impl Into<i32>) -> Self {
+        self.start = Some(s.into());
+        self
+    }
+    fn end(mut self, e: impl Into<i32>) -> Self {
+        self.end = Some(e.into());
+        self
+    }
+    fn halign(mut self, h: impl Into<Align>) -> Self {
+        self.halign = Some(h.into());
+        self
+    }
+    fn valign(mut self, v: impl Into<Align>) -> Self {
+        self.valign = Some(v.into());
+        self
+    }
+
+    fn build(self) -> Box {
+        let nbox = self.new_box;
+
+        if let Some(t) = self.top {
+            nbox.set_margin_top(t)
+        }
+        if let Some(b) = self.bottom {
+            nbox.set_margin_bottom(b)
+        }
+        if let Some(s) = self.start {
+            nbox.set_margin_top(s)
+        }
+        if let Some(e) = self.end {
+            nbox.set_margin_bottom(e)
+        }
+        if let Some(h) = self.halign {
+            nbox.set_halign(h)
+        }
+
+        nbox
     }
 }
