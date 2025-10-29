@@ -134,10 +134,6 @@ searchentry {
     margin-bottom: 8px;
 }
 
-.sidebar preferencesgroup {}
-
-.sidebar actionrow {}
-
 .account-section,
 .home-section {
     background-color: @headerbar_bg_color;
@@ -472,8 +468,6 @@ button.success {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.account-card label {}
-
 .account-card .title-4 {
     line-height: 1.2;
     margin-bottom: 4px;
@@ -507,16 +501,6 @@ button.success {
     font-size: 0.95em;
     padding: 2px 0;
 }
-
-.title-1 {}
-
-.title-4 {}
-
-.dim-label {}
-
-.caption {}
-
-.body {}
 
 .totp-step {
     background-color: rgba(0, 0, 0, 0.02);
@@ -618,8 +602,6 @@ toast.info-toast {
     border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-
-
 .settings-card>box {
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     padding-bottom: 12px;
@@ -631,8 +613,6 @@ toast.info-toast {
     padding-bottom: 0;
     margin-bottom: 0;
 }
-
-
 
 .loading-overlay {
     background-color: transparent;
@@ -672,8 +652,6 @@ spinner:disabled {
     animation-play-state: paused;
 }
 
-
-
 button .loading-spinner {
     margin-right: 8px;
 }
@@ -691,8 +669,6 @@ button:disabled {
 .settings-row:hover {
     background-color: rgba(0, 0, 0, 0.03);
 }
-
-
 
 switch {
     border-radius: 16px;
@@ -751,8 +727,6 @@ progressbar trough {
     border-radius: 8px;
     background-color: rgba(0, 0, 0, 0.1);
 }
-
-
 
 entry.success {
     border-color: #26a269;

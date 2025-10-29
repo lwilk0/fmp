@@ -45,21 +45,13 @@ pub fn show_home_view(content_area: &Box) {
     // Cancel any pending vault loading operations
     VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst);
 
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
-
-    let clamp = Clamp::new();
-    clamp.set_maximum_size(800);
-    clamp.set_tightening_threshold(600);
-
     let main_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 16))
-        .top(24)
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .build();
+
+    let scrollable = CreateScrollableView::new()
+        .max_width(800)
+        .tighten_threshold(600)
         .build();
 
     let welcome_section = create_welcome_section();
@@ -74,9 +66,8 @@ pub fn show_home_view(content_area: &Box) {
     let recent_section = create_recent_vaults_section(content_area);
     main_box.append(&recent_section);
 
-    clamp.set_child(Some(&main_box));
-    scrolled_window.set_child(Some(&clamp));
-    content_area.append(&scrolled_window);
+    scrollable.set_child(Some(&main_box));
+    content_area.append(&scrollable);
 }
 
 pub fn show_vault_view(content_area: &Box, vault_name: &str) {
@@ -91,21 +82,13 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
     let loading_overlay = Rc::new(LoadingOverlay::new());
     content_area.append(loading_overlay.widget());
 
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
-
-    let clamp = Clamp::new();
-    clamp.set_maximum_size(800);
-    clamp.set_tightening_threshold(600);
-
     let main_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 24))
-        .top(24)
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .build();
+
+    let scrollable = CreateScrollableView::new()
+        .max_width(800)
+        .tighten_threshold(600)
         .build();
 
     let header_box = Box::new(Orientation::Horizontal, 16);
@@ -151,12 +134,10 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
 
     loading_overlay.show("Loading accounts...");
 
-    // Load accounts asynchronously
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
     let main_box_clone = main_box.clone();
-    let scrolled_window_clone = scrolled_window.clone();
-    let clamp_clone = clamp.clone();
+    let scrollable_clone = scrollable.clone();
     let loading_overlay_clone = loading_overlay.clone();
 
     glib::idle_add_local(move || {
@@ -171,9 +152,8 @@ pub fn show_vault_view(content_area: &Box, vault_name: &str) {
         let accounts_section = create_accounts_grid(&content_area_clone, &vault_name_clone);
         main_box_clone.append(&accounts_section);
 
-        clamp_clone.set_child(Some(&main_box_clone));
-        scrolled_window_clone.set_child(Some(&clamp_clone));
-        content_area_clone.append(&scrolled_window_clone);
+        scrollable_clone.set_child(Some(&main_box_clone));
+        content_area_clone.append(&scrollable_clone);
 
         // Hide loading overlay
         loading_overlay_clone.hide();
@@ -199,17 +179,13 @@ pub fn show_account_view_with_mode(
         }
     };
 
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
-
     let main_box = CreateBox::new()
-        .new_box(Box::new(Orientation::Vertical, 0))
-        .top(24)
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .build();
+
+    let scrolled_window = CreateScrollableView::new()
+        .max_width(800)
+        .tighten_threshold(600)
         .build();
 
     // Wrap account data in Rc<RefCell<>> for sharing between sections
@@ -254,17 +230,13 @@ pub fn show_account_view_with_mode(
 pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     clear_content(content_area);
 
-    let scrolled_window = ScrolledWindow::new();
-    scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled_window.set_vexpand(true);
-    scrolled_window.set_hexpand(true);
-
     let main_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 24))
-        .top(24)
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .build();
+
+    let scrollable = CreateScrollableView::new()
+        .max_width(800)
+        .tighten_threshold(600)
         .build();
 
     let header_box = Box::new(Orientation::Vertical, 8);
@@ -320,7 +292,6 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
 
     let actions_box = CreateBox::new()
         .new_box(Box::new(Orientation::Horizontal, 12))
-        .top(24)
         .halign(Align::Center)
         .build();
 
@@ -363,8 +334,8 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     actions_box.append(&create_button);
     main_box.append(&actions_box);
 
-    scrolled_window.set_child(Some(&main_box));
-    content_area.append(&scrolled_window);
+    scrollable.set_child(Some(&main_box));
+    content_area.append(&scrollable);
 }
 
 /// Creates the welcome section for the home view
@@ -509,7 +480,7 @@ fn create_quick_actions_section(content_area: &Box) -> PreferencesGroup {
             .subtitle("Create a secure password with customisable options")
             .button_label("Generate")
             .css_class("suggested-action")
-            .callback(move || show_standalone_password_generator_dialog())
+            .callback(show_standalone_password_generator_dialog)
             .build(),
     );
 
@@ -561,7 +532,6 @@ fn show_create_vault_view(content_area: &Box) {
 
     let actions_box = CreateBox::new()
         .new_box(Box::new(Orientation::Horizontal, 12))
-        .top(24)
         .halign(Align::Center)
         .build();
 
@@ -962,10 +932,7 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
 
     let header_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 8))
-        .top(16)
-        .bottom(0)
-        .start(24)
-        .end(24)
+        .margins(16, 0, 24, 24)
         .build();
 
     let title = Label::new(Some("Account Details"));
@@ -983,9 +950,7 @@ fn create_account_details_section(account_rc: &Rc<RefCell<Account>>, edit_mode: 
 
     let details_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 18))
-        .bottom(20)
-        .start(24)
-        .end(24)
+        .margins(0, 20, 24, 24)
         .halign(Align::Center)
         .build();
 
@@ -1028,10 +993,7 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
     let header_box = CreateBox::new()
         .new_box(Box::new(Orientation::Horizontal, 12))
-        .top(20)
-        .bottom(0)
-        .start(24)
-        .end(24)
+        .margins(20, 0, 24, 24)
         .build();
 
     let title_box = Box::new(Orientation::Vertical, 4);
@@ -1063,9 +1025,7 @@ fn create_password_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -
 
     let password_box = CreateBox::new()
         .new_box(Box::new(Orientation::Horizontal, 12))
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .margins(0, 24, 24, 24)
         .halign(Align::Center)
         .build();
 
@@ -1192,10 +1152,7 @@ fn create_additional_fields_section(
 
     let header_box = CreateBox::new()
         .new_box(Box::new(Orientation::Horizontal, 12))
-        .top(20)
-        .bottom(0)
-        .start(24)
-        .end(24)
+        .margins(20, 0, 24, 24)
         .build();
 
     let title_box = Box::new(Orientation::Vertical, 4);
@@ -1236,9 +1193,7 @@ fn create_additional_fields_section(
 
     let fields_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 8))
-        .bottom(20)
-        .start(24)
-        .end(24)
+        .margins(0, 20, 24, 24)
         .halign(Align::Center)
         .build();
 
@@ -1383,10 +1338,7 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
 
     let header_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 8))
-        .top(20)
-        .bottom(0)
-        .start(24)
-        .end(24)
+        .margins(20, 0, 24, 24)
         .build();
 
     let title = Label::new(Some("Notes"));
@@ -1404,9 +1356,7 @@ fn create_notes_section(account_rc: &Rc<RefCell<Account>>, edit_mode: bool) -> B
 
     let notes_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 16))
-        .bottom(24)
-        .start(24)
-        .end(24)
+        .margins(0, 24, 24, 24)
         .halign(Align::Center)
         .build();
 
@@ -1736,10 +1686,7 @@ fn show_error_message(content_area: &Box, title: &str, message: &str) {
 
     let main_box = CreateBox::new()
         .new_box(Box::new(Orientation::Vertical, 24))
-        .top(48)
-        .bottom(48)
-        .start(48)
-        .end(48)
+        .margins(48, 48, 48, 48)
         .halign(Align::Center)
         .valign(Align::Center)
         .build();
@@ -1895,10 +1842,10 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
 
 struct CreateBox {
     new_box: Box,
-    top: Option<i32>,
-    bottom: Option<i32>,
-    start: Option<i32>,
-    end: Option<i32>,
+    top: i32,
+    bottom: i32,
+    start: i32,
+    end: i32,
     halign: Option<Align>,
     valign: Option<Align>,
 }
@@ -1907,10 +1854,10 @@ impl Default for CreateBox {
     fn default() -> Self {
         Self {
             new_box: Box::new(Orientation::Vertical, 0),
-            top: None,
-            bottom: None,
-            start: None,
-            end: None,
+            top: 24,
+            bottom: 24,
+            start: 24,
+            end: 24,
             halign: None,
             valign: None,
         }
@@ -1925,20 +1872,11 @@ impl CreateBox {
         self.new_box = nb;
         self
     }
-    fn top(mut self, t: impl Into<i32>) -> Self {
-        self.top = Some(t.into());
-        self
-    }
-    fn bottom(mut self, b: impl Into<i32>) -> Self {
-        self.bottom = Some(b.into());
-        self
-    }
-    fn start(mut self, s: impl Into<i32>) -> Self {
-        self.start = Some(s.into());
-        self
-    }
-    fn end(mut self, e: impl Into<i32>) -> Self {
-        self.end = Some(e.into());
+    pub fn margins(mut self, top: i32, bottom: i32, start: i32, end: i32) -> Self {
+        self.top = top;
+        self.bottom = bottom;
+        self.start = start;
+        self.end = end;
         self
     }
     fn halign(mut self, h: impl Into<Align>) -> Self {
@@ -1951,24 +1889,62 @@ impl CreateBox {
     }
 
     fn build(self) -> Box {
-        let nbox = self.new_box;
+        let content_box = self.new_box;
 
-        if let Some(t) = self.top {
-            nbox.set_margin_top(t)
-        }
-        if let Some(b) = self.bottom {
-            nbox.set_margin_bottom(b)
-        }
-        if let Some(s) = self.start {
-            nbox.set_margin_top(s)
-        }
-        if let Some(e) = self.end {
-            nbox.set_margin_bottom(e)
-        }
+        content_box.set_margin_top(self.top);
+        content_box.set_margin_bottom(self.bottom);
+        content_box.set_margin_start(self.start);
+        content_box.set_margin_end(self.end);
+
         if let Some(h) = self.halign {
-            nbox.set_halign(h)
+            content_box.set_halign(h)
+        }
+        if let Some(v) = self.valign {
+            content_box.set_valign(v)
         }
 
-        nbox
+        content_box
+    }
+}
+
+pub struct CreateScrollableView {
+    max_width: i32,
+    tighten_threshold: i32,
+}
+
+impl Default for CreateScrollableView {
+    fn default() -> Self {
+        Self {
+            max_width: 800,
+            tighten_threshold: 600,
+        }
+    }
+}
+
+impl CreateScrollableView {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn max_width(mut self, width: i32) -> Self {
+        self.max_width = width;
+        self
+    }
+    fn tighten_threshold(mut self, threshold: i32) -> Self {
+        self.tighten_threshold = threshold;
+        self
+    }
+
+    fn build(self) -> ScrolledWindow {
+        let scrolled = ScrolledWindow::new();
+        scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
+        scrolled.set_vexpand(true);
+        scrolled.set_hexpand(true);
+
+        let clamp = Clamp::new();
+        clamp.set_maximum_size(self.max_width);
+        clamp.set_tightening_threshold(self.tighten_threshold);
+
+        scrolled.set_child(Some(&clamp));
+        scrolled
     }
 }
