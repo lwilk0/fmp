@@ -1,5 +1,5 @@
 use crate::{
-    gui::content::{proceed_with_gate_warmup, show_home_view},
+    gui::{content::proceed_with_gate_warmup, views::home_view::HomeView},
     storage::filesystem::read_directory,
     vault::Locations,
 };
@@ -95,9 +95,7 @@ fn create_header_bar(content_area: &Box) -> HeaderBar {
     header_bar.pack_start(&home_button);
 
     let content_area_home = content_area.clone();
-    home_button.connect_clicked(move |_| {
-        show_home_view(&content_area_home);
-    });
+    home_button.connect_clicked(move |_| HomeView::new(&content_area_home).create());
 
     header_bar
 }

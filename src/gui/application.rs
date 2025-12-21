@@ -1,12 +1,12 @@
 use adw::prelude::*;
 
 use crate::gui::{
-    content::show_home_view,
     dialogs::{is_first_run, show_welcome_dialog},
     sidebar::create_paned_layout_with_callbacks,
+    views::home_view::HomeView,
 };
 use adw::{Application, ApplicationWindow, HeaderBar};
-use gtk4::{gdk, style_context_add_provider_for_display, Box, CssProvider, Label, Orientation};
+use gtk4::{Box, CssProvider, Label, Orientation, gdk, style_context_add_provider_for_display};
 
 pub fn run_gui() {
     let application = Application::builder().application_id("com.fmp").build();
@@ -32,7 +32,7 @@ fn run_ui(app: &Application) {
     let content_area = Box::new(Orientation::Vertical, 12);
     content_area.add_css_class("main-content");
 
-    show_home_view(&content_area);
+    HomeView::new(&content_area).create();
 
     main_content.append(&content_area);
 

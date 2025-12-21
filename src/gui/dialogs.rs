@@ -997,7 +997,7 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                                 Ok(()) => {
                                     window_clone2.close();
                                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2);
-                                    crate::gui::content::show_vault_view(&content_area_clone2, &vault_name_clone2);
+                                    crate::gui::views::vault_view::VaultView::new(&content_area_clone2, &vault_name_clone2).create();
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to disable 2FA: {e}");
@@ -1111,7 +1111,7 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
     backup_button.connect_clicked(move |_| match create_backup(&vault_name_clone) {
         Ok(()) => {
             dialog_clone.close();
-            crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
+            crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
         }
         Err(e) => {
             eprintln!("Failed to create backup: {e}");
@@ -1177,7 +1177,7 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             Ok(()) => {
                 dialog_clone.close();
                 // Refresh the vault view
-                crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
+                crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
             }
             Err(e) => {
                 eprintln!("Failed to restore backup: {e}");
@@ -1242,7 +1242,7 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
     delete_button.connect_clicked(move |_| match delete_backup(&vault_name_clone) {
         Ok(()) => {
             dialog_clone.close();
-            crate::gui::content::show_vault_view(&content_area_clone, &vault_name_clone);
+            crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
         }
         Err(e) => {
             eprintln!("Failed to delete backup: {e}");
@@ -1312,7 +1312,7 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 Ok(()) => {
                     dialog_clone.close();
                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                    crate::gui::content::show_vault_view(&content_area_clone, &new_name);
+                    crate::gui::views::vault_view::VaultView::new(&content_area_clone, &new_name).create();
                 }
                 Err(e) => {
                     eprintln!("Failed to rename vault: {e}");
@@ -1404,7 +1404,7 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 Ok(()) => {
                     dialog_clone.close();
                     crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                    crate::gui::content::show_home_view(&content_area_clone);
+                    crate::gui::views::home_view::HomeView::new(&content_area_clone).create()
                 }
                 Err(e) => {
                     eprintln!("Failed to delete vault: {e}");
@@ -1476,12 +1476,12 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
             match rename_account(&vault_name_clone, &account_name_clone, &new_name) {
                 Ok(()) => {
                     dialog_clone.close();
-                    crate::gui::content::show_account_view_with_mode(
+                    crate::gui::views::account_view::AccountView::new(
                         &content_area_clone,
                         &vault_name_clone,
                         &new_name,
                         false,
-                    );
+                    ).create();
                 }
                 Err(e) => {
                     eprintln!("Failed to rename account: {e}");
@@ -1594,12 +1594,12 @@ pub fn show_add_field_dialog(
                     drop(account);
                     dialog_clone.close();
 
-                    crate::gui::content::show_account_view_with_mode(
+                    crate::gui::views::account_view::AccountView::new(
                         &content_area_clone,
                         &vault_name_clone,
                         &account_name,
                         true,
-                    );
+                    ).create();
                 }
                 Err(e) => {
                     drop(account);
@@ -1777,12 +1777,12 @@ pub fn show_edit_field_dialog(
                     drop(account);
                     dialog_clone.close();
 
-                    crate::gui::content::show_account_view_with_mode(
+                    crate::gui::views::account_view::AccountView::new(
                         &content_area_clone,
                         &vault_name_clone,
                         &account_name,
                         true, // Keep in edit mode
-                    );
+                    ).create();
                 }
                 Err(e) => {
                     drop(account);
@@ -1890,12 +1890,12 @@ pub fn show_delete_field_dialog(
                 dialog_clone.close();
 
                 // Refresh the account view
-                crate::gui::content::show_account_view_with_mode(
+                crate::gui::views::account_view::AccountView::new(
                     &content_area_clone,
                     &vault_name_clone,
                     &account_name,
                     true, // Keep in edit mode
-                );
+                ).create();
             }
             Err(e) => {
                 drop(account);
