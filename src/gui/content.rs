@@ -138,13 +138,12 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
 pub fn show_create_vault_view(content_area: &Box) {
     clear_content(content_area);
 
-    let main_box = Box::new(Orientation::Vertical, 24);
-    main_box.set_margin_top(48);
-    main_box.set_margin_bottom(48);
-    main_box.set_margin_start(48);
-    main_box.set_margin_end(48);
-    main_box.set_halign(gtk4::Align::Center);
-    main_box.set_valign(gtk4::Align::Center);
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .margins(48, 48, 48, 48)
+        .halign(gtk4::Align::Center)
+        .valign(gtk4::Align::Center)
+        .build();
 
     let title = Label::new(Some("Create New Vault"));
     title.add_css_class("title-1");
@@ -443,6 +442,7 @@ pub fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> B
     row_box.set_halign(gtk4::Align::Fill);
     row_box.set_margin_top(4);
     row_box.set_margin_bottom(4);
+    
 
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
@@ -765,14 +765,14 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
         self.activatable = a;
         self
     }
-    pub fn margin_start(mut self, m: i32) -> Self {
+    /*pub fn margin_start(mut self, m: i32) -> Self {
         self.margin_start = m;
         self
     }
     pub fn margin_end(mut self, m: i32) -> Self {
         self.margin_end = m;
         self
-    }
+    }*/
     pub fn callback(mut self, c: F) -> Self {
         self.callback = Some(c);
         self

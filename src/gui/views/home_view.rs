@@ -53,7 +53,7 @@ impl<'a> HomeView<'a> {
     pub fn statistics_section(&self) -> PreferencesGroup {
         let group = PreferencesGroup::new();
         group.set_title("Overview");
-        group.set_description(Some("Your vault statistics at a glance"));
+        group.set_description(Some("Your vault statistics"));
 
         let vaults = crate::gui::sidebar::get_available_vaults();
         let vault_count = vaults.len();

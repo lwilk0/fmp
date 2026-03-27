@@ -9,10 +9,10 @@ use crate::{
     },
     vault::{Account, delete_account, get_full_account_details, update_account},
 };
-use adw::{ButtonContent, prelude::*};
+use adw::{ButtonContent, PreferencesGroup, prelude::*};
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
-    pango::EllipsizeMode,
+    pango::EllipsizeMode
 };
 use std::{cell::RefCell, rc::Rc};
 pub struct AccountView<'a> {
@@ -99,14 +99,13 @@ impl<'a> AccountView<'a> {
         title.set_wrap(true);
         title.set_lines(2);
 
-        let acct_type = if account.account_type.trim().is_empty() {
+        let account_type = if account.account_type.trim().is_empty() {
             "Account".to_string()
         } else {
             account.account_type.clone()
         };
 
-        let test = self.vault_name.clone();
-        let subtitle_text = format!("{acct_type} • in {test}");
+        let subtitle_text = format!("{account_type} in {0}", self.vault_name);
 
         let subtitle = Label::new(Some(&subtitle_text));
         subtitle.add_css_class("dim-label");
@@ -156,30 +155,30 @@ impl<'a> AccountView<'a> {
             let vault_name_delete = self.vault_name.to_string();
             let account_name_delete = self.account_name.to_string();
             delete_button.connect_clicked(move |_| {
-            let message = format!(
-                "Are you sure you want to delete the account '{account_name_delete}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.");
+                let message = format!(
+                    "Are you sure you want to delete the account '{account_name_delete}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.");
 
-            let content_area_confirm = content_area_delete.clone();
-            let vault_name_confirm = vault_name_delete.clone();
-            let account_name_confirm = account_name_delete.clone();
+                let content_area_confirm = content_area_delete.clone();
+                let vault_name_confirm = vault_name_delete.clone();
+                let account_name_confirm = account_name_delete.clone();
 
-            show_confirmation_dialog(
-                "Delete Account",
-                &message,
-                "Delete",
-                None::<&gtk4::Window>,
-                move || {
-                    match delete_account(&vault_name_confirm, &account_name_confirm) {
-                        Ok(()) => {
-                            HomeView::new(&content_area_confirm).create();
+                show_confirmation_dialog(
+                    "Delete Account",
+                    &message,
+                    "Delete",
+                    None::<&gtk4::Window>,
+                    move || {
+                        match delete_account(&vault_name_confirm, &account_name_confirm) {
+                            Ok(()) => {
+                                HomeView::new(&content_area_confirm).create();
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to delete account '{account_name_confirm}': {e}");
+                            }
                         }
-                        Err(e) => {
-                            eprintln!("Failed to delete account '{account_name_confirm}': {e}");
-                        }
-                    }
-                },
-            );
-        });
+                    },
+                );
+            });
 
             let content_area_rename = self.content_area.clone();
             let vault_name_rename = self.vault_name.to_string();
@@ -203,107 +202,68 @@ impl<'a> AccountView<'a> {
         header_box
     }
 
-    fn details_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
-        let section = Box::new(Orientation::Vertical, 20);
-        section.add_css_class("account-section");
-        section.set_margin_top(20);
-
-        let header_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Vertical, 8))
-            .margins(16, 0, 24, 24)
-            .build();
-
-        let title = Label::new(Some("Account Details"));
-        title.add_css_class("title-3");
-        title.set_halign(gtk4::Align::Start);
-
-        let subtitle = Label::new(Some("Basic account information and credentials"));
-        subtitle.add_css_class("dim-label");
-        subtitle.add_css_class("caption");
-        subtitle.set_halign(gtk4::Align::Start);
-
-        header_box.append(&title);
-        header_box.append(&subtitle);
-        section.append(&header_box);
-
-        let details_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Vertical, 18))
-            .margins(0, 20, 24, 24)
-            .halign(Align::Center)
-            .build();
+    fn details_section(&self, account_rc: &Rc<RefCell<Account>>) -> PreferencesGroup {
+        let group = PreferencesGroup::new();
+        group.set_title("Account Details");
+        group.set_description(Some("Basic account information and credentials"));
+        group.add_css_class("group_background");
 
         let account = account_rc.borrow();
 
         if self.edit_mode {
             // Editable fields in edit mode
-            let website_row =
-                create_editable_field_row("Website", &account.website, account_rc, "website");
-            details_box.append(&website_row);
+            group.add(
+                &create_editable_field_row("Website", &account.website, account_rc, "website")
+            );
 
-            let username_row =
-                create_editable_field_row("Username", &account.username, account_rc, "username");
-            details_box.append(&username_row);
+            group.add(
+                &create_editable_field_row("Username", &account.username, account_rc, "username")
+            )
         } else {
             // Read-only fields in view mode
-            let website_row = create_field_row("Website", &account.website, true);
-            details_box.append(&website_row);
+            group.add(
+                &create_field_row("Website", &account.website, true)
+            );
 
-            let username_row = create_field_row("Username", &account.username, true);
-            details_box.append(&username_row);
+            group.add(
+                &create_field_row("Username", &account.username, true)
+            )
         }
 
-        let created_row = create_field_row("Created", &account.created_at, false);
-        details_box.append(&created_row);
+        group.add(
+            &create_field_row("Created", &account.created_at, false)
+        );
 
-        let modified_row = create_field_row("Last Modified", &account.modified_at, false);
-        details_box.append(&modified_row);
+        group.add(
+            &create_field_row("Last Modified", &account.modified_at, false)
+        );
 
-        section.append(&details_box);
-        section
+        group
     }
 
     fn password_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
         let section = Box::new(Orientation::Vertical, 20);
         section.add_css_class("account-section");
-        section.set_margin_top(20);
 
-        let header_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Horizontal, 12))
-            .margins(20, 0, 24, 24)
-            .build();
-
-        let title_box = Box::new(Orientation::Vertical, 4);
-        title_box.set_hexpand(true);
-
-        let title = Label::new(Some("Password"));
-        title.add_css_class("title-3");
-        title.set_halign(gtk4::Align::Start);
-
-        let subtitle = Label::new(Some("Account password and security"));
-        subtitle.add_css_class("dim-label");
-        subtitle.add_css_class("caption");
-        subtitle.set_halign(gtk4::Align::Start);
-
-        title_box.append(&title);
-        title_box.append(&subtitle);
+        let group = PreferencesGroup::new();
+        group.set_title("Password");
+        group.set_description(Some("Account password"));
+        group.add_css_class("group_background");
 
         let generate_button = Button::new();
         generate_button.set_label("Generate New");
         generate_button.add_css_class("suggested-action");
         generate_button.set_valign(gtk4::Align::Center);
 
-        header_box.append(&title_box);
-        if self.edit_mode {
-            header_box.append(&generate_button);
-        }
-
-        section.append(&header_box);
-
         let password_box = CreateBox::new()
             .new_box(Box::new(Orientation::Horizontal, 12))
             .margins(0, 24, 24, 24)
             .halign(Align::Center)
             .build();
+
+        if self.edit_mode {
+            password_box.append(&generate_button);
+        }
 
         let password_entry = Entry::new();
         let account = account_rc.borrow();
@@ -407,9 +367,10 @@ impl<'a> AccountView<'a> {
         if !self.edit_mode {
             password_box.append(&reveal_button);
         }
-
         password_box.append(&copy_button);
-        section.append(&password_box);
+        
+        group.add(&password_box);
+        section.append(&group);
 
         section
     }
@@ -417,27 +378,11 @@ impl<'a> AccountView<'a> {
     fn additional_fields_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
         let section = Box::new(Orientation::Vertical, 16);
         section.add_css_class("account-section");
-        section.set_margin_top(16);
 
-        let header_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Horizontal, 12))
-            .margins(20, 0, 24, 24)
-            .build();
-
-        let title_box = Box::new(Orientation::Vertical, 4);
-        title_box.set_hexpand(true);
-
-        let title = Label::new(Some("Additional Fields"));
-        title.add_css_class("title-3");
-        title.set_halign(gtk4::Align::Start);
-
-        let subtitle = Label::new(Some("Custom fields for additional account information"));
-        subtitle.add_css_class("dim-label");
-        subtitle.add_css_class("caption");
-        subtitle.set_halign(gtk4::Align::Start);
-
-        title_box.append(&title);
-        title_box.append(&subtitle);
+        let group = PreferencesGroup::new();
+        group.set_title("Additional Fields");
+        group.set_description(Some("Custom fields for additional account information"));
+        group.add_css_class("group_background");
 
         let add_button = Button::new();
         add_button.set_label("Add Field");
@@ -453,12 +398,9 @@ impl<'a> AccountView<'a> {
             });
         }
 
-        header_box.append(&title_box);
         if self.edit_mode {
-            header_box.append(&add_button);
+            group.add(&add_button);
         }
-
-        section.append(&header_box);
 
         let fields_box = CreateBox::new()
             .new_box(Box::new(Orientation::Vertical, 8))
@@ -472,12 +414,12 @@ impl<'a> AccountView<'a> {
             let field_container = Box::new(Orientation::Vertical, 4);
 
             let field_label = Label::new(Some(field_name));
-            field_label.add_css_class("field-label");
+            field_label.add_css_class("dim-label");
             field_label.set_halign(gtk4::Align::Start);
-            field_label.set_margin_start(4);
+            field_label.set_hexpand(true);
 
             let password_field_box = Box::new(Orientation::Horizontal, 8);
-            password_field_box.set_halign(gtk4::Align::Center);
+            // password_field_box.set_halign(gtk4::Align::Center);
 
             let field_entry = Entry::new();
             field_entry.set_text(field_value);
@@ -595,32 +537,19 @@ impl<'a> AccountView<'a> {
             fields_box.append(&placeholder_box);
         }
 
-        section.append(&fields_box);
+        group.add(&fields_box);
+        section.append(&group);
         section
     }
 
     fn notes_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
         let section = Box::new(Orientation::Vertical, 20);
         section.add_css_class("account-section");
-        section.set_margin_top(20);
 
-        let header_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Vertical, 8))
-            .margins(20, 0, 24, 24)
-            .build();
-
-        let title = Label::new(Some("Notes"));
-        title.add_css_class("title-3");
-        title.set_halign(gtk4::Align::Start);
-
-        let subtitle = Label::new(Some("Additional notes and information"));
-        subtitle.add_css_class("dim-label");
-        subtitle.add_css_class("caption");
-        subtitle.set_halign(gtk4::Align::Start);
-
-        header_box.append(&title);
-        header_box.append(&subtitle);
-        section.append(&header_box);
+        let group = PreferencesGroup::new();
+        group.set_title("Notes");
+        group.set_description(Some("Additional notes and information"));
+        group.add_css_class("group_background");
 
         let notes_box = CreateBox::new()
             .new_box(Box::new(Orientation::Vertical, 16))
@@ -633,7 +562,7 @@ impl<'a> AccountView<'a> {
         let account = account_rc.borrow();
         notes_entry.set_text(&account.notes);
         notes_entry.set_hexpand(true);
-        notes_entry.set_size_request(250, -1); // Reduced width for better responsiveness
+        notes_entry.set_size_request(250, -1);
         notes_entry.set_editable(self.edit_mode);
         notes_entry.add_css_class("notes-field");
 
@@ -648,7 +577,8 @@ impl<'a> AccountView<'a> {
         }
 
         notes_box.append(&notes_entry);
-        section.append(&notes_box);
+        group.add(&notes_box);
+        section.append(&group);
         section
     }
 
@@ -666,7 +596,6 @@ impl<'a> AccountView<'a> {
         save_button.add_css_class("suggested-action");
         save_button.set_size_request(120, -1);
 
-        // Add save functionality
         let account_rc_clone = account_rc.clone();
         let vault_name_clone = self.vault_name.clone();
         let content_area_clone = self.content_area.clone();
@@ -677,7 +606,7 @@ impl<'a> AccountView<'a> {
 
             match update_account(&vault_name_clone, &account) {
                 Ok(()) => {
-                    drop(account); // Release the borrow
+                    drop(account);
                     // Exit edit mode and show the updated account
                     AccountView::new(&content_area_clone, &vault_name_clone, &account_name, false)
                         .create();

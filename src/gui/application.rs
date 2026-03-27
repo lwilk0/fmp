@@ -9,7 +9,7 @@ use adw::{Application, ApplicationWindow, HeaderBar};
 use gtk4::{Box, CssProvider, Label, Orientation, gdk, style_context_add_provider_for_display};
 
 pub fn run_gui() {
-    let application = Application::builder().application_id("com.fmp").build();
+    let application = adw::Application::builder().application_id("com.fmp").build();
     application.connect_activate(|app| {
         run_ui(app);
     });
