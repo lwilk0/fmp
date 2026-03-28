@@ -14,8 +14,8 @@ use crate::{
 };
 use adw::{ButtonContent, PreferencesGroup, prelude::*};
 use gtk4::{
-    Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
-    pango::EllipsizeMode,
+    Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator, TextView,
+    ffi::GTK_WRAP_WORD_CHAR, pango::EllipsizeMode,
 };
 use std::{cell::RefCell, rc::Rc};
 pub struct AccountView<'a> {
@@ -525,7 +525,7 @@ impl<'a> AccountView<'a> {
         let add_button = Button::new();
         add_button.set_label("Add Field");
         add_button.add_css_class("suggested-action");
-        add_button.set_valign(gtk4::Align::Center);
+        add_button.set_halign(gtk4::Align::Center);
 
         if self.edit_mode {
             let account_rc_clone = account_rc.clone();
@@ -623,7 +623,6 @@ impl<'a> AccountView<'a> {
                     .build();
                 delete_button.set_child(Some(&delete_button_content));
                 delete_button.add_css_class("flat");
-                delete_button.add_css_class("destructive-action");
                 delete_button.set_tooltip_text(Some("Delete field"));
 
                 let account_rc_edit = account_rc.clone();
@@ -634,8 +633,8 @@ impl<'a> AccountView<'a> {
                     show_edit_field_dialog(
                         &account_rc_edit,
                         &content_area_edit,
-                        &field_name_edit,
                         &vault_name_edit,
+                        &field_name_edit,
                     );
                 });
 
@@ -695,22 +694,25 @@ impl<'a> AccountView<'a> {
             .halign(Align::Center)
             .build();
 
-        // Notes text area (using Entry for now, could be TextView for multiline)
-        let notes_entry = Entry::new();
+        let notes_entry = TextView::new();
         let account = account_rc.borrow();
-        notes_entry.set_text(&account.notes);
+        let note = notes_entry.buffer();
+        note.set_text(&account.notes);
+
         notes_entry.set_hexpand(true);
         notes_entry.set_size_request(250, -1);
         notes_entry.set_editable(self.edit_mode);
+        notes_entry.set_width_request(450);
+        notes_entry.set_wrap_mode(gtk4::WrapMode::WordChar);
         notes_entry.add_css_class("notes-field");
 
-        // Connect notes changes in edit mode
         if self.edit_mode {
             let account_rc_notes = account_rc.clone();
-            notes_entry.connect_changed(move |entry| {
-                let text = entry.text().to_string();
+            let buffer = notes_entry.buffer();
+            buffer.connect_changed(move |buf| {
+                let text = buf.text(&buf.start_iter(), &buf.end_iter(), true);
                 let mut account = account_rc_notes.borrow_mut();
-                account.notes = text;
+                account.notes = text.to_string();
             });
         }
 

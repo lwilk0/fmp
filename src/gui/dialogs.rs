@@ -1569,6 +1569,7 @@ pub fn show_add_field_dialog(
     let value_entry_clone = value_entry.clone();
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
+
     add_button.connect_clicked(move |_| {
         let field_name = name_entry_clone.text().to_string().trim().to_string();
         let field_value = value_entry_clone.text().to_string().trim().to_string();
@@ -1744,6 +1745,7 @@ pub fn show_edit_field_dialog(
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
     let old_field_name = field_name.to_string();
+
     save_button.connect_clicked(move |_| {
         let new_field_name = name_entry_clone.text().to_string().trim().to_string();
         let new_field_value = value_entry_clone.text().to_string().trim().to_string();
@@ -1764,13 +1766,14 @@ pub fn show_edit_field_dialog(
                 return;
             }
 
-            if new_field_name != old_field_name {
+             if new_field_name != old_field_name {
                 account.additional_fields.remove(&old_field_name);
             }
 
             account
                 .additional_fields
                 .insert(new_field_name, new_field_value);
+
             account.update_modified_time();
             let account_name = account.name.clone();
 

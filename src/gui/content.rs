@@ -231,7 +231,7 @@ impl<F: Fn() + 'static> Default for CreateActionRow<F> {
             subtitle: None,
             button_label: None,
             css_class: None,
-            activatable: true,
+            activatable: false,
             margin_start: 8,
             margin_end: 8,
             callback: None,
@@ -296,7 +296,7 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
         if let Some(s) = self.subtitle {
             row.set_subtitle(&s);
         }
-        row.set_activatable(self.activatable);
+
         row.set_margin_start(self.margin_start);
         row.set_margin_end(self.margin_end);
 
@@ -320,6 +320,8 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
                 button.connect_clicked(move |_| c());
             }
         }
+
+        row.set_activatable(self.activatable);
 
         row
     }
