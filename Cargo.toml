@@ -2,7 +2,7 @@
 name = "fmp"
 description = "A simple and secure password manager written in rust."
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
-version = "1.5.1"
+version = "1.5.2"
 edition = "2024"
 license = "GPL-3.0"
 keywords = ["password-manager", "crypto", "cryptography", "rust", "gui"]
@@ -36,6 +36,16 @@ version = "0.8.0"
 
 [target.'cfg(windows)'.dependencies]
 windows = "0.62.0"
+
+[package.metadata.deb]
+name="fmp"
+maintainer= "Luke Wilkinson <wilkinsonluke@proton.me>"
+depends = ["libgpg-error-dev", "libgpgme-dev", "libadwaita-1-dev", "libgtk-4-dev", "libpango1.0-dev", "libglib2.0-dev"]
+assets = [
+    ["target/release/fmp", "usr/bin/fmp", "0755"],
+    ["data/com.fmp.desktop", "usr/local/share/applications/com.fmp.desktop", "0644"],
+    ["data/com.fmp.png", "usr/local/share/icons/hicolor/256x256/apps/com.fmp.png", "0644"]
+]
 
 [profile.release]
 opt-level = 3
