@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Forgot My Password
+Name=fmp
 GenericName=Password Manager
 Comment=Generate, store, and manage passwords in encrypted vaults
 Exec=fmp %U

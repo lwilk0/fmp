@@ -52,13 +52,20 @@ See [distribution-specific instructions](https://codeberg.org/lwilko/fmp/wiki/Di
    cd fmp
    ```
 2. **Build and install**
+
+   Makefile:
+   ```bash
+      make install-user
+
+      #OR
+
+      sudo make install-system
+   ```
+   Manual:
    ```bash
    cargo build --release
    cargo install --path .
-   ```
-3. **Run**
-   ```bash
-   fmp
+   export PATH=$PATH:~/.cargo/bin/
    ```
 
 ## Usage
