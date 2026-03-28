@@ -1,21 +1,22 @@
 use crate::{
-    storage::filesystem::{backup_exists},
     gui::{
         content::{
-            CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            get_available_accounts, CreateActionRow
+            CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
+            get_available_accounts,
         },
         dialogs::{
             show_backup_vault_dialog, show_delete_backup_dialog, show_delete_vault_dialog,
-            show_rename_vault_dialog, show_restore_vault_dialog, show_totp_management_dialog, show_totp_setup_dialog
+            show_rename_vault_dialog, show_restore_vault_dialog, show_totp_management_dialog,
+            show_totp_setup_dialog,
         },
         views::{account_view::AccountView, account_view::show_new_account_view},
         widgets::loading_spinner::LoadingOverlay,
     },
+    storage::filesystem::backup_exists,
     storage::filesystem::{increment_vault_usage, record_recent_vault},
     totp::is_totp_enabled,
 };
-use adw::{PreferencesGroup, prelude::*, ActionRow};
+use adw::{ActionRow, PreferencesGroup, prelude::*};
 use gtk4::{Box, Label, Orientation};
 use std::{rc::Rc, sync::atomic::Ordering};
 
@@ -128,7 +129,6 @@ impl<'a> VaultView<'a> {
         header_box
     }
 }
-
 
 /// Creates the vault management section with backup and vault operations
 pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
@@ -288,7 +288,6 @@ fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) 
         })
         .build()
 }
-
 
 /// Creates the TOTP (2FA) management section for the vault view
 pub fn create_totp_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {

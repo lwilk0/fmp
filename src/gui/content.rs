@@ -1,12 +1,7 @@
 use crate::{
-    gui::{
-        dialogs::{
-            show_totp_authentication_dialog,
-        },
-        views::{vault_view::VaultView},
-    },
-    storage::filesystem::{read_directory},
-    totp::{is_totp_required},
+    gui::{dialogs::show_totp_authentication_dialog, views::vault_view::VaultView},
+    storage::filesystem::read_directory,
+    totp::is_totp_required,
     vault::{Account, Locations, warm_up_gpg},
 };
 use adw::{ActionRow, ButtonContent, Clamp, prelude::*};
@@ -24,7 +19,6 @@ pub fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> B
     row_box.set_halign(gtk4::Align::Fill);
     row_box.set_margin_top(4);
     row_box.set_margin_bottom(4);
-    
 
     let label = Label::new(Some(label_text));
     label.add_css_class("dim-label");
@@ -80,7 +74,6 @@ pub fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> B
 
     row_box
 }
-
 
 /// Creates an editable field row for account creation/editing
 pub fn create_editable_field_row(

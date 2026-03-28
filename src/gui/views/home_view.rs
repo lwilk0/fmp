@@ -2,16 +2,16 @@ use crate::{
     gui::{
         content::{
             CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            get_available_accounts, proceed_with_gate_warmup
+            get_available_accounts, proceed_with_gate_warmup,
         },
         dialogs::show_standalone_password_generator_dialog,
         widgets::loading_spinner::{create_loading_button, set_button_loading_state},
     },
     storage::filesystem::{get_most_used_vault, get_recent_vaults},
-    vault::create_vault
+    vault::create_vault,
 };
 use adw::{PreferencesGroup, prelude::*};
-use gtk4::{Box, Label, Orientation, Entry, Align, Button};
+use gtk4::{Align, Box, Button, Entry, Label, Orientation};
 use std::sync::atomic::Ordering;
 
 pub struct HomeView<'a> {
@@ -185,7 +185,6 @@ impl<'a> HomeView<'a> {
     }
 }
 
-
 /// Shows the create vault view
 pub fn show_create_vault_view(content_area: &Box) {
     clear_content(content_area);
@@ -285,4 +284,3 @@ pub fn show_create_vault_view(content_area: &Box) {
 
     content_area.append(&main_box);
 }
-

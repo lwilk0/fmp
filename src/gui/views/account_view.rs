@@ -1,18 +1,21 @@
 use crate::{
     gui::{
-        content::{CreateBox, clear_content, create_editable_field_row, create_field_row, CreateScrollableView},
+        content::{
+            CreateBox, CreateScrollableView, clear_content, create_editable_field_row,
+            create_field_row,
+        },
         dialogs::{
             show_add_field_dialog, show_confirmation_dialog, show_delete_field_dialog,
             show_edit_field_dialog, show_password_generator_dialog, show_rename_account_dialog,
         },
-        views::{vault_view::VaultView, home_view::HomeView}
+        views::{home_view::HomeView, vault_view::VaultView},
     },
-    vault::{Account, delete_account, get_full_account_details, update_account, create_account},
+    vault::{Account, create_account, delete_account, get_full_account_details, update_account},
 };
 use adw::{ButtonContent, PreferencesGroup, prelude::*};
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator,
-    pango::EllipsizeMode
+    pango::EllipsizeMode,
 };
 use std::{cell::RefCell, rc::Rc};
 pub struct AccountView<'a> {
@@ -98,7 +101,6 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
 
-
     cancel_button.connect_clicked(move |_| {
         VaultView::new(&content_area_clone, &vault_name_clone).create();
     });
@@ -137,7 +139,6 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
     scrollable.set_child(Some(&main_box));
     content_area.append(&scrollable);
 }
-
 
 impl<'a> AccountView<'a> {
     pub fn new(
@@ -347,31 +348,33 @@ impl<'a> AccountView<'a> {
 
         if self.edit_mode {
             // Editable fields in edit mode
-            group.add(
-                &create_editable_field_row("Website", &account.website, account_rc, "website")
-            );
+            group.add(&create_editable_field_row(
+                "Website",
+                &account.website,
+                account_rc,
+                "website",
+            ));
 
-            group.add(
-                &create_editable_field_row("Username", &account.username, account_rc, "username")
-            )
+            group.add(&create_editable_field_row(
+                "Username",
+                &account.username,
+                account_rc,
+                "username",
+            ))
         } else {
             // Read-only fields in view mode
-            group.add(
-                &create_field_row("Website", &account.website, true)
-            );
+            group.add(&create_field_row("Website", &account.website, true));
 
-            group.add(
-                &create_field_row("Username", &account.username, true)
-            )
+            group.add(&create_field_row("Username", &account.username, true))
         }
 
-        group.add(
-            &create_field_row("Created", &account.created_at, false)
-        );
+        group.add(&create_field_row("Created", &account.created_at, false));
 
-        group.add(
-            &create_field_row("Last Modified", &account.modified_at, false)
-        );
+        group.add(&create_field_row(
+            "Last Modified",
+            &account.modified_at,
+            false,
+        ));
 
         group
     }
@@ -503,7 +506,7 @@ impl<'a> AccountView<'a> {
             password_box.append(&reveal_button);
         }
         password_box.append(&copy_button);
-        
+
         group.add(&password_box);
         section.append(&group);
 

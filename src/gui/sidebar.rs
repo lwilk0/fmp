@@ -178,7 +178,8 @@ fn connect_search_to_vault_group(
     use std::rc::Rc;
 
     let content_area_clone = content_area.clone();
-    let current_group: Rc<RefCell<adw::PreferencesGroup>> = Rc::new(RefCell::new(vault_group.clone()));
+    let current_group: Rc<RefCell<adw::PreferencesGroup>> =
+        Rc::new(RefCell::new(vault_group.clone()));
 
     let cg = current_group.clone();
     search_entry.connect_search_changed(move |entry| {
