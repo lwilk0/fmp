@@ -41,7 +41,7 @@ fn run_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Forgot My Password")
-        .default_width(800)
+        .default_width(850)
         .default_height(600)
         .build();
 

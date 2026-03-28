@@ -2,15 +2,16 @@ use crate::{
     gui::{
         content::{
             CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            get_available_accounts, show_create_vault_view,
+            get_available_accounts, proceed_with_gate_warmup
         },
         dialogs::show_standalone_password_generator_dialog,
-        views::vault_view::VaultView,
+        widgets::loading_spinner::{create_loading_button, set_button_loading_state},
     },
     storage::filesystem::{get_most_used_vault, get_recent_vaults},
+    vault::create_vault
 };
 use adw::{PreferencesGroup, prelude::*};
-use gtk4::{Box, Label, Orientation};
+use gtk4::{Box, Label, Orientation, Entry, Align, Button};
 use std::sync::atomic::Ordering;
 
 pub struct HomeView<'a> {
@@ -95,7 +96,7 @@ impl<'a> HomeView<'a> {
         group.add(
             &CreateActionRow::<fn()>::new()
                 .title("Most Used Vault")
-                .subtitle("Your frequently used vaults")
+                .subtitle("Your most frequently used vault")
                 .suffix(&most_used_label)
                 .activatable(false)
                 .add_button(false)
@@ -174,7 +175,7 @@ impl<'a> HomeView<'a> {
                     .callback({
                         let content_area = content_area.clone();
                         let name = name_clone.clone();
-                        move || VaultView::new(&content_area, &name).create()
+                        move || proceed_with_gate_warmup(&content_area, &name)
                     })
                     .build(),
             );
@@ -183,3 +184,105 @@ impl<'a> HomeView<'a> {
         group
     }
 }
+
+
+/// Shows the create vault view
+pub fn show_create_vault_view(content_area: &Box) {
+    clear_content(content_area);
+
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .margins(48, 48, 48, 48)
+        .halign(gtk4::Align::Center)
+        .valign(gtk4::Align::Center)
+        .build();
+
+    let title = Label::new(Some("Create New Vault"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Center);
+
+    let subtitle = Label::new(Some("Enter a name for your new vault and select a GPG key"));
+    subtitle.add_css_class("dim-label");
+    subtitle.set_halign(gtk4::Align::Center);
+
+    main_box.append(&title);
+    main_box.append(&subtitle);
+
+    let form_box = Box::new(Orientation::Vertical, 16);
+    form_box.set_size_request(400, -1);
+
+    let name_label = Label::new(Some("Vault Name"));
+    name_label.set_halign(gtk4::Align::Start);
+    let name_entry = Entry::new();
+    name_entry.set_placeholder_text(Some("Enter vault name"));
+
+    let recipient_label = Label::new(Some("GPG Key ID"));
+    recipient_label.set_halign(gtk4::Align::Start);
+    let recipient_entry = Entry::new();
+    recipient_entry.set_placeholder_text(Some("Enter GPG key ID or email"));
+
+    form_box.append(&name_label);
+    form_box.append(&name_entry);
+    form_box.append(&recipient_label);
+    form_box.append(&recipient_entry);
+
+    main_box.append(&form_box);
+
+    let actions_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .halign(Align::Center)
+        .build();
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.set_size_request(120, -1);
+
+    let content_area_clone2 = content_area.clone();
+    cancel_button.connect_clicked(move |_| HomeView::new(&content_area_clone2).create());
+
+    let (create_button, _) = create_loading_button("Create Vault", "Creating vault...");
+    create_button.add_css_class("suggested-action");
+    create_button.set_size_request(120, -1);
+
+    let content_area_clone = content_area.clone();
+    create_button.connect_clicked(move |button| {
+        let vault_name = name_entry.text().to_string();
+        let recipient = recipient_entry.text().to_string();
+
+        if vault_name.is_empty() || recipient.is_empty() {
+            return;
+        }
+
+        set_button_loading_state(button, true);
+
+        // Use a timeout to simulate async operation and allow UI to update
+        glib::timeout_add_local(std::time::Duration::from_millis(100), {
+            let content_area_clone = content_area_clone.clone();
+            let vault_name = vault_name.clone();
+            let recipient = recipient.clone();
+            let button = button.clone();
+
+            move || {
+                match create_vault(&vault_name, &recipient) {
+                    Ok(()) => {
+                        // Refresh sidebar to show new vault
+                        crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
+                        proceed_with_gate_warmup(&content_area_clone, &vault_name);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create vault: {e}");
+                        set_button_loading_state(&button, false);
+                    }
+                }
+                glib::ControlFlow::Break
+            }
+        });
+    });
+
+    actions_box.append(&cancel_button);
+    actions_box.append(&create_button);
+    main_box.append(&actions_box);
+
+    content_area.append(&main_box);
+}
+

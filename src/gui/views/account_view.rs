@@ -1,13 +1,13 @@
 use crate::{
     gui::{
-        content::{CreateBox, clear_content, create_editable_field_row, create_field_row},
+        content::{CreateBox, clear_content, create_editable_field_row, create_field_row, CreateScrollableView},
         dialogs::{
             show_add_field_dialog, show_confirmation_dialog, show_delete_field_dialog,
             show_edit_field_dialog, show_password_generator_dialog, show_rename_account_dialog,
         },
-        views::home_view::HomeView,
+        views::{vault_view::VaultView, home_view::HomeView}
     },
-    vault::{Account, delete_account, get_full_account_details, update_account},
+    vault::{Account, delete_account, get_full_account_details, update_account, create_account},
 };
 use adw::{ButtonContent, PreferencesGroup, prelude::*};
 use gtk4::{
@@ -21,6 +21,123 @@ pub struct AccountView<'a> {
     account_name: String,
     edit_mode: bool,
 }
+
+/// Shows the new account creation view
+pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
+    clear_content(content_area);
+
+    let main_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Vertical, 24))
+        .build();
+
+    let scrollable = CreateScrollableView::new()
+        .max_width(800)
+        .tighten_threshold(600)
+        .build();
+
+    let header_box = Box::new(Orientation::Vertical, 8);
+
+    let title = Label::new(Some("Create New Account"));
+    title.add_css_class("title-1");
+    title.set_halign(gtk4::Align::Start);
+
+    let subtitle = Label::new(Some("Enter the details for your new account"));
+    subtitle.add_css_class("dim-label");
+    subtitle.set_halign(gtk4::Align::Start);
+
+    header_box.append(&title);
+    header_box.append(&subtitle);
+    main_box.append(&header_box);
+
+    let new_account = Rc::new(RefCell::new(Account::default()));
+
+    let form_box = Box::new(Orientation::Vertical, 16);
+
+    // Account name
+    let name_row = create_editable_field_row("Account Name", "", &new_account, "name");
+    form_box.append(&name_row);
+    form_box.set_margin_top(0);
+
+    // Account type
+    let type_row = create_editable_field_row(
+        "Account Type",
+        "Password Account",
+        &new_account,
+        "account_type",
+    ); // Account name
+
+    form_box.append(&type_row);
+
+    // Website
+    let website_row = create_editable_field_row("Website", "", &new_account, "website");
+    form_box.append(&website_row);
+
+    // Username
+    let username_row = create_editable_field_row("Username", "", &new_account, "username");
+    form_box.append(&username_row);
+
+    // Password (with show/hide functionality)
+    let password_row = create_password_field_row("Password", "", &new_account);
+    form_box.append(&password_row);
+
+    // Notes
+    let notes_row = create_editable_field_row("Notes", "", &new_account, "notes");
+    form_box.append(&notes_row);
+
+    main_box.append(&form_box);
+
+    let actions_box = CreateBox::new()
+        .new_box(Box::new(Orientation::Horizontal, 12))
+        .halign(Align::Center)
+        .build();
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Cancel");
+    cancel_button.set_size_request(120, -1);
+
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+
+
+    cancel_button.connect_clicked(move |_| {
+        VaultView::new(&content_area_clone, &vault_name_clone).create();
+    });
+
+    let create_button = Button::new();
+    create_button.set_label("Create Account");
+    create_button.add_css_class("suggested-action");
+    create_button.set_size_request(120, -1);
+
+    let account_rc_clone = new_account.clone();
+
+    let content_area_clone2 = content_area.clone();
+    let vault_name_clone2 = vault_name.to_string();
+
+    create_button.connect_clicked(move |_| {
+        let account = account_rc_clone.borrow();
+
+        if account.name.is_empty() {
+            return;
+        }
+
+        match create_account(&vault_name_clone2, &account) {
+            Ok(()) => {
+                VaultView::new(&content_area_clone2, &vault_name_clone2).create();
+            }
+            Err(e) => {
+                eprintln!("Failed to create account: {e}");
+            }
+        }
+    });
+
+    actions_box.append(&cancel_button);
+    actions_box.append(&create_button);
+    main_box.append(&actions_box);
+
+    scrollable.set_child(Some(&main_box));
+    content_area.append(&scrollable);
+}
+
 
 impl<'a> AccountView<'a> {
     pub fn new(
@@ -120,7 +237,16 @@ impl<'a> AccountView<'a> {
 
         let actions_box = Box::new(Orientation::Horizontal, 8);
 
+        let buttons_box = Box::new(Orientation::Horizontal, 4);
+        buttons_box.set_hexpand(true);
+        buttons_box.add_css_class("button_fix");
+
         if !self.edit_mode {
+            let back_button = Button::new();
+            back_button.set_label("Back");
+            back_button.set_tooltip_text(Some("Go back to Vault"));
+            back_button.add_css_class("suggested-action");
+
             let edit_button = Button::new();
             edit_button.set_label("Edit");
             edit_button.set_tooltip_text(Some("Edit account"));
@@ -191,10 +317,19 @@ impl<'a> AccountView<'a> {
                 );
             });
 
-            actions_box.append(&edit_button);
-            actions_box.append(&rename_button);
-            actions_box.append(&delete_button);
+            let content_area_back = self.content_area.clone();
+            let vault_name_back = self.vault_name.to_string();
+            back_button.connect_clicked(move |_| {
+                VaultView::new(&content_area_back, &vault_name_back).create();
+            });
+
+            buttons_box.append(&back_button);
+            buttons_box.append(&edit_button);
+            buttons_box.append(&rename_button);
+            buttons_box.append(&delete_button);
         }
+
+        actions_box.append(&buttons_box);
 
         header_box.append(&info_box);
         header_box.append(&actions_box);
@@ -641,4 +776,80 @@ impl<'a> AccountView<'a> {
         section.append(&actions_box);
         section
     }
+}
+
+/// Creates a password field row with show/hide functionality for account creation
+fn create_password_field_row(
+    label_text: &str,
+    initial_value: &str,
+    account_rc: &Rc<RefCell<Account>>,
+) -> Box {
+    let row_box = Box::new(Orientation::Horizontal, 16);
+    row_box.set_halign(gtk4::Align::Fill);
+    row_box.set_margin_top(2);
+    row_box.set_margin_bottom(2);
+
+    let label = Label::new(Some(label_text));
+    label.add_css_class("dim-label");
+    label.set_halign(gtk4::Align::Start);
+    label.set_valign(gtk4::Align::Center);
+    label.set_size_request(160, -1);
+    label.set_ellipsize(EllipsizeMode::End);
+    label.set_max_width_chars(25);
+    label.set_tooltip_text(Some(label_text));
+
+    let password_container = Box::new(Orientation::Horizontal, 8);
+    password_container.set_hexpand(true);
+
+    let entry = Entry::new();
+    entry.set_text(initial_value);
+    entry.set_hexpand(true);
+    entry.set_size_request(250, -1);
+    entry.set_visibility(false);
+    entry.set_invisible_char(Some('•'));
+
+    let generate_button = Button::new();
+    generate_button.set_label("Generate");
+    generate_button.add_css_class("flat");
+    generate_button.set_tooltip_text(Some("Generate Password"));
+
+    let reveal_button = Button::new();
+    let reveal_button_content = ButtonContent::builder()
+        .icon_name("view-reveal-symbolic")
+        .build();
+    reveal_button.set_child(Some(&reveal_button_content));
+    reveal_button.add_css_class("flat");
+    reveal_button.set_tooltip_text(Some("Show/Hide Password"));
+
+    // Connect entry changes to account data
+    let account_rc_clone = account_rc.clone();
+    entry.connect_changed(move |entry| {
+        let text = entry.text().to_string();
+        let mut account = account_rc_clone.borrow_mut();
+        account.password.update(text);
+    });
+
+    let entry_gen = entry.clone();
+    let account_rc_gen = account_rc.clone();
+    generate_button.connect_clicked(move |_| {
+        show_password_generator_dialog(&entry_gen, &account_rc_gen);
+    });
+
+    let entry_clone = entry.clone();
+    let is_revealed = Rc::new(RefCell::new(false));
+    let is_revealed_clone = is_revealed.clone();
+    reveal_button.connect_clicked(move |_| {
+        let mut revealed = is_revealed_clone.borrow_mut();
+        *revealed = !*revealed;
+        entry_clone.set_visibility(*revealed);
+    });
+
+    password_container.append(&entry);
+    password_container.append(&generate_button);
+    password_container.append(&reveal_button);
+
+    row_box.append(&label);
+    row_box.append(&password_container);
+
+    row_box
 }

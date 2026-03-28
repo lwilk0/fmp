@@ -3,3 +3,8 @@
     padding: 12px;
     border-radius: 12px;
 }
+
+.button_fix {
+    padding-bottom: 20px;
+    padding-top: 20px;
+}

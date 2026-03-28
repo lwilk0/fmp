@@ -1,16 +1,13 @@
 use crate::{
-    password::{
+    gui::views::vault_view::VaultView, password::{
         PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,
         get_strength_description,
-    },
-    storage::filesystem::{
+    }, storage::filesystem::{
         create_backup, delete_backup, delete_vault, install_backup, rename_account, rename_vault,
-    },
-    totp::{
+    }, totp::{
         confirm_totp_setup, disable_totp, get_totp_qr_info, prepare_totp_setup, verify_totp_code,
         verify_totp_code_with_secret,
-    },
-    vault::Account,
+    }, vault::Account
 };
 
 use adw::{
@@ -793,7 +790,7 @@ pub fn show_confirmation_dialog<F>(
 }
 
 /// Shows the TOTP setup dialog for enabling 2FA on a vault
-pub fn show_totp_setup_dialog(vault_name: &str) {
+pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
     let totp_window = PreferencesWindow::new();
     totp_window.set_title(Some("Enable Two-Factor Authentication"));
     totp_window.set_modal(true);
@@ -881,7 +878,8 @@ pub fn show_totp_setup_dialog(vault_name: &str) {
             let vault_name_clone = vault_name.to_string();
             let secret_clone = secret.clone();
             let window_clone = totp_window.clone();
-
+            let content_area_clone = content_area.clone();
+            
             verify_button.connect_clicked(move |_| {
                 let code = code_entry.text();
                 if code.len() == 6 {
@@ -890,6 +888,10 @@ pub fn show_totp_setup_dialog(vault_name: &str) {
                             if let Err(e) = confirm_totp_setup(&vault_name_clone, &secret_clone) {
                                 eprintln!("Failed to confirm TOTP setup: {e}");
                             } else {
+                                VaultView::new(
+                                    &content_area_clone,
+                                    &vault_name_clone,
+                                ).create();
                                 window_clone.close();
                             }
                         }

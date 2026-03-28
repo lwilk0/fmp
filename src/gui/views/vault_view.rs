@@ -1,15 +1,21 @@
 use crate::{
+    storage::filesystem::{backup_exists},
     gui::{
         content::{
             CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            create_accounts_grid, create_totp_management_section, create_vault_management_section,
-            get_available_accounts,
+            get_available_accounts, CreateActionRow
         },
+        dialogs::{
+            show_backup_vault_dialog, show_delete_backup_dialog, show_delete_vault_dialog,
+            show_rename_vault_dialog, show_restore_vault_dialog, show_totp_management_dialog, show_totp_setup_dialog
+        },
+        views::{account_view::AccountView, account_view::show_new_account_view},
         widgets::loading_spinner::LoadingOverlay,
     },
     storage::filesystem::{increment_vault_usage, record_recent_vault},
+    totp::is_totp_enabled,
 };
-use adw::prelude::*;
+use adw::{PreferencesGroup, prelude::*, ActionRow};
 use gtk4::{Box, Label, Orientation};
 use std::{rc::Rc, sync::atomic::Ordering};
 
@@ -121,4 +127,208 @@ impl<'a> VaultView<'a> {
         header_box.append(&info_box);
         header_box
     }
+}
+
+
+/// Creates the vault management section with backup and vault operations
+pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Vault Management");
+    group.set_description(Some("Backup, restore, rename, and delete vault operations"));
+
+    let vault_name_clone = vault_name.to_string();
+    let content_area_clone = content_area.clone();
+
+    group.add(
+        &CreateActionRow::new()
+            .title("Create Backup")
+            .subtitle("Create a backup of this vault")
+            .button_label("Backup")
+            .css_class("suggested-action")
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_backup_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
+
+    let has_backup = backup_exists(vault_name);
+
+    group.add(
+        &CreateActionRow::new()
+            .title("Restore Backup")
+            .subtitle("Restore vault from backup")
+            .button_label("Restore")
+            .css_class("suggested-action")
+            .activatable(has_backup)
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_restore_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
+
+    group.add(
+        &CreateActionRow::new()
+            .title("Rename Vault")
+            .subtitle("Change the name of this vault")
+            .button_label("Rename")
+            .css_class("suggested-action")
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_rename_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
+
+    group.add(
+        &CreateActionRow::new()
+            .title("Delete Backup")
+            .subtitle("Delete vault backup")
+            .button_label("Delete")
+            .css_class("destructive-action")
+            .activatable(has_backup)
+            .callback({
+                let vault_name = vault_name_clone.clone();
+                let content_area = content_area_clone.clone();
+                move || show_delete_backup_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
+
+    group.add(
+        &CreateActionRow::new()
+            .title("Delete Vault")
+            .subtitle("Permanently delete this vault and its data")
+            .button_label("Delete")
+            .css_class("destructive-action")
+            .callback({
+                let vault_name = vault_name_clone;
+                let content_area = content_area_clone;
+                move || show_delete_vault_dialog(&vault_name, &content_area)
+            })
+            .build(),
+    );
+
+    group
+}
+
+/// Creates a modern list layout for accounts using `PreferencesGroup`
+pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Accounts");
+    group.set_description(Some("Manage your account credentials"));
+
+    let all_accounts = get_available_accounts(vault_name);
+
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+
+    if all_accounts.is_empty() {
+        group.add(
+            &CreateActionRow::new()
+                .title("No Accounts Yet")
+                .subtitle("Create your first account to get started")
+                .button_label("Add Account")
+                .css_class("suggested-action")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_new_account_view(&content_area, &vault_name)
+                })
+                .build(),
+        );
+    } else {
+        group.add(
+            &CreateActionRow::new()
+                .title("Add New Account")
+                .subtitle("Create a new account directory")
+                .button_label("Add")
+                .css_class("suggested-action")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_new_account_view(&content_area, &vault_name)
+                })
+                .build(),
+        );
+
+        for account_name in all_accounts {
+            let account_row = create_account_row(account_name.as_str(), content_area, vault_name);
+            group.add(&account_row);
+        }
+    }
+
+    group
+}
+
+/// Creates an account row for the preferences group
+fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) -> ActionRow {
+    CreateActionRow::new()
+        .title(account_name)
+        .subtitle("Password Account")
+        .button_label("View")
+        .css_class("suggested-action")
+        .callback({
+            let account_name_clone = account_name.to_string();
+            let vault_name_clone = vault_name.to_string();
+            let content_area_clone = content_area.clone();
+            move || {
+                AccountView::new(
+                    &content_area_clone,
+                    &vault_name_clone,
+                    &account_name_clone,
+                    false,
+                )
+                .create()
+            }
+        })
+        .build()
+}
+
+
+/// Creates the TOTP (2FA) management section for the vault view
+pub fn create_totp_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+    let group = PreferencesGroup::new();
+    group.set_title("Two-Factor Authentication");
+    group.set_description(Some("Secure your vault with TOTP authentication"));
+
+    let content_area_clone = content_area.clone();
+    let vault_name_clone = vault_name.to_string();
+
+    let is_enabled = is_totp_enabled(vault_name);
+
+    if is_enabled {
+        group.add(
+            &CreateActionRow::new()
+                .title("TOTP Status")
+                .subtitle("Two-factor authentication is enabled and active")
+                .button_label("Manage")
+                .css_class("flat")
+                .callback({
+                    let content_area = content_area_clone.clone();
+                    let vault_name = vault_name_clone.clone();
+                    move || show_totp_management_dialog(&vault_name, &content_area)
+                })
+                .build(),
+        );
+    } else {
+        group.add(
+            &CreateActionRow::new()
+                .title("Enable Two-Factor Authentication")
+                .subtitle("Add an extra layer of security to your vault")
+                .button_label("Enable 2FA")
+                .css_class("suggested-action")
+                .callback({
+                    let vault_name = vault_name_clone.clone();
+                    move || show_totp_setup_dialog(&vault_name, &content_area_clone)
+                })
+                .build(),
+        );
+    }
+
+    group
 }
