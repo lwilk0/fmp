@@ -66,7 +66,7 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     scrolled_window.set_hexpand(true);
 
     let clamp = Clamp::new();
-    clamp.set_maximum_size(320);
+    //clamp.set_maximum_size(320);
     clamp.set_tightening_threshold(240);
     clamp.set_margin_start(8);
     clamp.set_margin_end(8);
@@ -174,29 +174,39 @@ fn connect_search_to_vault_group(
     vault_group: &adw::PreferencesGroup,
     content_area: &Box,
 ) {
-    let vault_group_clone = vault_group.clone();
-    let content_area_clone = content_area.clone();
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
+    let content_area_clone = content_area.clone();
+    let current_group: Rc<RefCell<adw::PreferencesGroup>> = Rc::new(RefCell::new(vault_group.clone()));
+
+    let cg = current_group.clone();
     search_entry.connect_search_changed(move |entry| {
         let filter_text = entry.text().to_string();
 
-        while let Some(child) = vault_group_clone.first_child() {
-            vault_group_clone.remove(&child);
-        }
+        let new_group = create_vault_preferences_group(&content_area_clone, &filter_text);
 
-        let all_vaults = get_available_vaults();
-        let filtered_vaults =
-            crate::gui::widgets::filtering::sort_vaults(&all_vaults, &filter_text);
-
-        if filtered_vaults.is_empty() {
-            let empty_row = create_empty_state_action_row(&filter_text);
-            vault_group_clone.add(&empty_row);
+        if let Some(clamp) = cg
+            .borrow()
+            .parent()
+            .and_then(|p| p.downcast::<Clamp>().ok())
+        {
+            clamp.set_child(Some(&new_group));
+        } else if let Some(scrolled) = cg
+            .borrow()
+            .parent()
+            .and_then(|p| p.downcast::<ScrolledWindow>().ok())
+        {
+            scrolled.set_child(Some(&new_group));
         } else {
-            for vault_name in filtered_vaults {
-                let vault_row = create_vault_action_row(vault_name, &content_area_clone);
-                vault_group_clone.add(&vault_row);
+            if let Some(parent) = cg.borrow().parent() {
+                parent.downcast::<gtk4::Widget>().ok().map(|w| {
+                    w.hide();
+                });
             }
         }
+
+        *cg.borrow_mut() = new_group;
     });
 }
 
