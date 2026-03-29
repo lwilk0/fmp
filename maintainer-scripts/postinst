@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+
+# Called with arguments: <package-name> <action>
+# Run desktop database update if available
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database /usr/share/applications || true
+fi
+
+# Update XDG desktop menus (optional)
+if command -v xdg-desktop-menu >/dev/null 2>&1; then
+  xdg-desktop-menu forceupdate >/dev/null 2>&1 || true
+fi
+
+# Refresh icon caches for GNOME/KDE apps (optional)
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  for dir in /usr/share/icons/*; do
+    [ -d "$dir" ] && gtk-update-icon-cache -t -f "$dir" >/dev/null 2>&1 || true
+  done
+fi
+
+exit 0

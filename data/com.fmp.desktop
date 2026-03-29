@@ -10,4 +10,3 @@ Terminal=false
 Categories=Utility;Security;GTK;
 Keywords=Password;Manager;Vault;GPG;TOTP;GTK;
 StartupNotify=true
-DBusActivatable=true
