@@ -1,3 +1,5 @@
+/// All this code is awful, sorry future me. There must be a better way????
+
 use crate::{
     gui::views::vault_view::VaultView, password::{
         PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,
@@ -11,15 +13,11 @@ use crate::{
 };
 
 use adw::{
-    ActionRow, ButtonContent, Clamp, HeaderBar, PreferencesGroup, PreferencesWindow,
+    ActionRow, ButtonContent, HeaderBar, PreferencesGroup, PreferencesWindow,
     Window as AdwWindow, prelude::*,
 };
 use gtk4::{
-    Adjustment, Box as GtkBox, Button, ButtonsType, Dialog, Entry, Image, Label, MessageDialog,
-    MessageType, Orientation, PolicyType, ProgressBar, ResponseType, ScrolledWindow, SpinButton,
-    Switch, TextView, gdk,
-    gdk_pixbuf::{Colorspace, Pixbuf},
-    glib::{self, Bytes},
+    Adjustment, Box as GtkBox, Button, ButtonsType, Dialog, Entry, Image, Label, MessageDialog, MessageType, Orientation, PolicyType, ProgressBar, ResponseType, ScrolledWindow, SpinButton, Switch, TextView, gdk, gdk_pixbuf::{Colorspace, Pixbuf}, glib::{self, Bytes}
 };
 use image::{DynamicImage, Luma};
 use qrcode::QrCode;
@@ -28,6 +26,7 @@ use std::{
     fs::{File, create_dir_all},
     path::PathBuf,
     rc::Rc,
+    process::{Stdio}
 };
 
 /// Shows the password generator dialog and updates the provided entry field and account
@@ -555,13 +554,14 @@ fn get_config_file_path() -> PathBuf {
     config_dir.join("fmp").join("fmp-ran")
 }
 
-/// Shows the welcome dialog for first-time users
-pub fn show_welcome_dialog() {
+pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     let welcome_window = AdwWindow::new();
-    welcome_window.set_title(Some("Welcome to Forgot My Password"));
+    welcome_window.set_title(Some("Welcome to FMP"));
     welcome_window.set_modal(true);
-    welcome_window.set_default_size(600, 500);
+    welcome_window.set_transient_for(Some(parent));
+    welcome_window.set_default_size(-1, -1);
     welcome_window.add_css_class("welcome-dialog");
+    welcome_window.set_deletable(false);
 
     let header_bar = HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("Welcome"))));
@@ -570,182 +570,190 @@ pub fn show_welcome_dialog() {
     let main_container = GtkBox::new(Orientation::Vertical, 0);
     main_container.append(&header_bar);
 
-    let clamp = Clamp::new();
-    clamp.set_maximum_size(500);
-    clamp.set_tightening_threshold(400);
-
-    let content_box = GtkBox::new(Orientation::Vertical, 24);
-    content_box.set_margin_top(32);
-    content_box.set_margin_bottom(32);
-    content_box.set_margin_start(24);
-    content_box.set_margin_end(24);
+    let content_box = GtkBox::new(Orientation::Vertical, 20);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
 
     let title_container = GtkBox::new(Orientation::Horizontal, 12);
     title_container.set_halign(gtk4::Align::Center);
-
-    let title_icon = Label::new(Some("🔐"));
-    title_icon.add_css_class("title-1");
-
-    let dialog_title = Label::new(Some("Welcome to Forgot My Password!"));
+    let dialog_title = Label::new(Some("FMP"));
     dialog_title.add_css_class("title-1");
-
-    title_container.append(&title_icon);
     title_container.append(&dialog_title);
     content_box.append(&title_container);
 
-    let welcome_message_text = "Thank you for choosing Forgot My Password (FMP), a secure local password manager.\n\nFMP helps you:\n• Store passwords securely with GPG encryption\n• Generate strong, unique passwords\n• Manage TOTP codes for two-factor authentication\n• Keep your sensitive data safe and organized\n\nTo get started:\n1. Create your first vault to store passwords\n2. Add accounts with their login credentials\n3. Use the password generator for strong passwords\n4. Enable TOTP for accounts that support it\n\nYour data is encrypted and stored locally for maximum security.";
+    let intro_label = Label::new(Some(
+        "FMP is a secure local password manager.\nCheck for an existing GPG key by email or create one.",
+    ));
+    intro_label.set_wrap(true);
+    intro_label.add_css_class("body");
+    content_box.append(&intro_label);
 
-    let welcome_message_label = Label::new(Some(welcome_message_text));
-    welcome_message_label.set_wrap(true);
-    welcome_message_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    welcome_message_label.set_justify(gtk4::Justification::Left);
-    welcome_message_label.set_halign(gtk4::Align::Fill);
-    welcome_message_label.set_valign(gtk4::Align::Start);
-    welcome_message_label.add_css_class("body");
+    let email_box = GtkBox::new(Orientation::Vertical, 8);
+    email_box.set_halign(gtk4::Align::Center);
+    email_box.add_css_class("group_background");
 
-    let message_scrolled_window = ScrolledWindow::new();
-    message_scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-    message_scrolled_window.set_child(Some(&welcome_message_label));
-    message_scrolled_window.set_size_request(-1, 280);
-    message_scrolled_window.add_css_class("card");
-    message_scrolled_window.set_margin_top(8);
-    message_scrolled_window.set_margin_bottom(16);
+    let email_title_container = GtkBox::new(Orientation::Horizontal, 12);
+    email_title_container.set_halign(gtk4::Align::Center);
+    let email_title = Label::new(Some("Use an Existing Key:"));
+    email_title.add_css_class("title-2");
+    email_title_container.append(&email_title);
+    email_box.append(&email_title_container);
 
-    content_box.append(&message_scrolled_window);
+    let email_entry = Entry::new();
+    email_entry.set_placeholder_text(Some("Enter email associated with GPG key"));
+    email_entry.set_width_chars(45);
+    email_box.append(&email_entry);
 
-    let button_container = GtkBox::new(Orientation::Horizontal, 12);
-    button_container.set_halign(gtk4::Align::Center);
-    button_container.set_margin_top(8);
+    let check_button = Button::with_label("Check Key");
+    email_box.append(&check_button);
 
-    let learn_more_button = Button::new();
-    learn_more_button.set_label("Learn More about GPG");
-    learn_more_button.add_css_class("flat");
+    content_box.append(&email_box);
 
-    learn_more_button.connect_clicked(move |_| {
-        show_gpg_info_dialog();
-    });
+    let create_box = GtkBox::new(Orientation::Vertical, 8);
+    create_box.set_halign(gtk4::Align::Center);
+    create_box.add_css_class("group_background");
 
-    let get_started_button = Button::new();
-    get_started_button.set_label("Get Started");
-    get_started_button.add_css_class("suggested-action");
-    get_started_button.add_css_class("pill");
+    let create_title_container = GtkBox::new(Orientation::Horizontal, 12);
+    create_title_container.set_halign(gtk4::Align::Center);
+    let create_title = Label::new(Some("Create a New Key:"));
+    create_title.add_css_class("title-2");
+    create_title_container.append(&create_title);
+    create_box.append(&create_title_container);
+    
+    let terminal_button = Button::with_label("Run `gpg --full-generate-key`");
+    create_box.append(&terminal_button);
 
-    let window_ref = welcome_window.clone();
-    get_started_button.connect_clicked(move |_| {
-        if let Err(error_message) = mark_first_run_complete() {
-            eprintln!("Failed to mark first run complete: {error_message}");
-        }
-        window_ref.close();
-    });
+    let create_label = Label::new(Some("It is recomended to use default settings.\nYou do not need to use a valid email, just remember it!"));
+    create_label.set_wrap(true);
+    create_label.add_css_class("body");
+    create_box.append(&create_label);
 
-    button_container.append(&learn_more_button);
-    button_container.append(&get_started_button);
-    content_box.append(&button_container);
+    content_box.append(&create_box);
 
-    clamp.set_child(Some(&content_box));
-    main_container.append(&clamp);
+    let check_result_label = Label::new(None);
+    check_result_label.set_visible(false);
+    check_result_label.set_wrap(true);
+    email_box.append(&check_result_label);
 
+    let sep = gtk4::Separator::new(Orientation::Horizontal);
+    content_box.append(&sep);
+
+    let action_box = GtkBox::new(Orientation::Horizontal, 12);
+    action_box.set_halign(gtk4::Align::Center);
+
+    let finish_button = Button::new();
+    finish_button.set_label("Finish");
+    finish_button.add_css_class("suggested-action");
+    action_box.append(&finish_button);
+
+    content_box.append(&action_box);
+
+    main_container.append(&content_box);
     welcome_window.set_content(Some(&main_container));
     welcome_window.present();
-}
 
-/// Shows the GPG information dialog with setup instructions
-fn show_gpg_info_dialog() {
-    let info_window = AdwWindow::new();
-    info_window.set_title(Some("GPG Setup Information"));
-    info_window.set_modal(true);
-    info_window.set_default_size(600, 500);
-    info_window.add_css_class("info-dialog");
+    let check_result_label_clone = check_result_label.clone();
+    let email_entry_clone = email_entry.clone();
+    check_button.connect_clicked(move |_| {
+        check_result_label_clone.set_visible(true);
+        let email = email_entry_clone.text().to_string();
+        if email.trim().is_empty() {
+            check_result_label_clone.set_text("Please enter an email.");
+            return;
+        }
+        check_result_label_clone.set_text("Checking for GPG key...");
+        
+        let weak_label = check_result_label_clone.downgrade();
 
-    let header_bar = HeaderBar::new();
-    header_bar.set_title_widget(Some(&Label::new(Some("GPG Setup"))));
-    header_bar.add_css_class("flat");
+        let output = std::process::Command::new("gpg")
+            .arg("--list-keys")
+            .arg("--with-colons")
+            .arg(&email)
+            .stderr(Stdio::piped())
+            .output();
 
-    let main_container = GtkBox::new(Orientation::Vertical, 0);
-    main_container.append(&header_bar);
+        let text = match output {
+            Ok(out) => {
+                if out.status.success() {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    if stdout.contains("\nuid:") || stdout.contains("\npub:") || stdout.contains(":uid:") {
+                        format!("GPG key found for {}.", email)
+                    } else {
+                        format!("No GPG key found for {}.", email)
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    format!("gpg returned an error: {}", stderr)
+                }
+            }
+            Err(e) => format!("Failed to run gpg: {}", e),
+        };
 
-    let clamp = Clamp::new();
-    clamp.set_maximum_size(500);
-    clamp.set_tightening_threshold(400);
-
-    let content_box = GtkBox::new(Orientation::Vertical, 24);
-    content_box.set_margin_top(24);
-    content_box.set_margin_bottom(24);
-    content_box.set_margin_start(24);
-    content_box.set_margin_end(24);
-
-    let title_container = GtkBox::new(Orientation::Horizontal, 12);
-    title_container.set_halign(gtk4::Align::Center);
-
-    let title_icon = Label::new(Some("🔑"));
-    title_icon.add_css_class("title-2");
-
-    let dialog_title = Label::new(Some("Setting up GPG"));
-    dialog_title.add_css_class("title-2");
-
-    title_container.append(&title_icon);
-    title_container.append(&dialog_title);
-    content_box.append(&title_container);
-
-    let instructions_box = GtkBox::new(Orientation::Vertical, 16);
-
-    let intro_text =
-        "You'll need to install GPG (GNU Privacy Guard) if it's not already on your system.";
-    let intro_label = Label::new(Some(intro_text));
-    intro_label.set_wrap(true);
-    intro_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    intro_label.set_justify(gtk4::Justification::Left);
-    intro_label.set_halign(gtk4::Align::Start);
-    intro_label.add_css_class("body");
-
-    let commands_title = Label::new(Some("Common GPG Commands:"));
-    commands_title.add_css_class("title-4");
-    commands_title.set_halign(gtk4::Align::Start);
-    commands_title.set_margin_top(8);
-
-    let commands_text = "• Generate a new key: `gpg --full-generate-key`\n• Use an existing key from your keyring\n• Import a key: `gpg --import your-key.asc`\n• List keys: `gpg --list-keys`";
-    let commands_label = Label::new(Some(commands_text));
-    commands_label.set_wrap(true);
-    commands_label.set_wrap_mode(gtk4::pango::WrapMode::Word);
-    commands_label.set_justify(gtk4::Justification::Left);
-    commands_label.set_halign(gtk4::Align::Start);
-    commands_label.add_css_class("body");
-    commands_label.add_css_class("monospace");
-
-    instructions_box.append(&intro_label);
-    instructions_box.append(&commands_title);
-    instructions_box.append(&commands_label);
-
-    let scrolled = ScrolledWindow::new();
-    scrolled.set_policy(PolicyType::Never, PolicyType::Automatic);
-    scrolled.set_child(Some(&instructions_box));
-    scrolled.set_size_request(-1, 200);
-    scrolled.add_css_class("card");
-    scrolled.set_margin_top(8);
-    scrolled.set_margin_bottom(16);
-
-    content_box.append(&scrolled);
-
-    let button_box = GtkBox::new(Orientation::Horizontal, 12);
-    button_box.set_halign(gtk4::Align::Center);
-
-    let close_button = Button::new();
-    close_button.set_label("Close");
-    close_button.add_css_class("suggested-action");
-
-    let window_clone = info_window.clone();
-    close_button.connect_clicked(move |_| {
-        window_clone.close();
+        // Move only the plain String into the main-loop task. Do NOT move the WeakRef into the std thread.
+        let text_for_main = text.clone();
+        let weak_label_for_main = weak_label.clone();
+        glib::MainContext::default().spawn_local(async move {
+            if let Some(label) = weak_label_for_main.upgrade() {
+                label.set_text(&text_for_main);
+            }
+        });
     });
 
-    button_box.append(&close_button);
-    content_box.append(&button_box);
+    terminal_button.connect_clicked(move |_| {
+        launch_terminal("gpg --full-generate-key");
+    });
 
-    clamp.set_child(Some(&content_box));
-    main_container.append(&clamp);
+    let welcome_window_clone = welcome_window.clone();
+    finish_button.connect_clicked(move |_| {
+        if let Err(err) = mark_first_run_complete() {
+            eprintln!("Failed to mark first run complete: {}", err);
+        }
+        welcome_window_clone.close();
+    });
+}
 
-    info_window.set_content(Some(&main_container));
-    info_window.present();
+fn launch_terminal(inner_command: &str) {
+    let full_command = format!("bash -c \"{}\"", inner_command);
+
+    // List of terminals and their preferred execution flags
+    // (Terminal Name, Execution Flag, Use Double-Dash?)
+    let terminal_configs = [
+        ("gnome-terminal", "--", true),       // GNOME standard
+        ("cosmic-term", "--", true),          // Cosmic
+        ("konsole", "-e", false),             // KDE
+        ("xfce4-terminal", "-x", false),      // XFCE
+        ("alacritty", "-e", false),           // 
+        ("kitty", "-e", false),               //
+        ("xterm", "-e", false),               // Universal fallback
+        ("x-terminal-emulator", "-e", false), // Generic system default
+
+    ];
+
+    for (name, flag, use_double_dash) in terminal_configs {
+        if which(name) {
+            let mut cmd = std::process::Command::new(name);
+            print!("{}", full_command);
+            if use_double_dash {
+                // terminal -- bash -c "..."
+                cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
+            } else {
+                // terminal -e "bash -c '...'"
+                cmd.arg(flag).arg(&full_command);
+            }
+
+            if cmd.spawn().is_ok() {
+                return; // Successful woohoo
+            }
+        }
+    }
+}
+
+fn which(name: &str) -> bool {
+    std::env::var_os("PATH").map_or(false, |path| {
+        std::env::split_paths(&path).any(|p| p.join(name).exists())
+    })
 }
 
 /// Shows a confirmation dialog for dangerous actions
@@ -1842,13 +1850,9 @@ pub fn show_delete_field_dialog(
     let title_box = GtkBox::new(Orientation::Horizontal, 12);
     title_box.set_halign(gtk4::Align::Center);
 
-    let warning_icon = Label::new(Some("⚠️"));
-    warning_icon.add_css_class("title-2");
-
     let title_label = Label::new(Some("Delete Field"));
     title_label.add_css_class("title-3");
 
-    title_box.append(&warning_icon);
     title_box.append(&title_label);
     content_box.append(&title_box);
 
@@ -1992,7 +1996,7 @@ where
 
         match verify_totp_code(&vault_name_clone, &code) {
             Ok(true) => {
-                status_label_clone.set_text("✅ Authentication successful!");
+                status_label_clone.set_text("Authentication successful!");
                 status_label_clone.add_css_class("success");
 
                 let dialog_clone2 = dialog_clone.clone();
@@ -2004,13 +2008,13 @@ where
                 });
             }
             Ok(false) => {
-                status_label_clone.set_text("❌ Invalid code. Please try again.");
+                status_label_clone.set_text("Invalid code. Please try again.");
                 status_label_clone.remove_css_class("success");
                 status_label_clone.add_css_class("error");
                 code_entry_clone.select_region(0, -1);
             }
             Err(e) => {
-                status_label_clone.set_text(&format!("❌ Error: {e}"));
+                status_label_clone.set_text(&format!("Error: {e}"));
                 status_label_clone.remove_css_class("success");
                 status_label_clone.add_css_class("error");
             }
@@ -2024,6 +2028,54 @@ where
 
     button_box.append(&cancel_button);
     button_box.append(&verify_button);
+    content_box.append(&button_box);
+
+    dialog.set_child(Some(&content_box));
+    dialog.present();
+}
+
+/// Shows the welcome dialog for first-time users
+pub fn show_update_dialog(parent: &adw::ApplicationWindow, latest: check_latest::Version) {
+    let dialog = Dialog::new();
+    
+    dialog.set_title(Some("Update Avaliable"));
+    dialog.set_modal(true);
+    dialog.set_transient_for(Some(parent));
+    dialog.set_default_size(300, 0);
+    dialog.set_resizable(true);
+
+    let content_box = GtkBox::new(Orientation::Vertical, 16);
+    content_box.set_margin_top(20);
+    content_box.set_margin_bottom(20);
+    content_box.set_margin_start(20);
+    content_box.set_margin_end(20);
+
+    let title = Label::new(Some(&format!("Update Available")));
+    title.add_css_class("title-2");
+    title.set_halign(gtk4::Align::Center);
+    content_box.append(&title);
+
+    let warning = Label::new(Some(
+        &format!("Version {} is available from Codeberg.org and Crates.io", latest),
+    ));
+    warning.add_css_class("error");
+    warning.set_wrap(true);
+    warning.set_halign(gtk4::Align::Center);
+    content_box.append(&warning);
+
+    let button_box = GtkBox::new(Orientation::Horizontal, 12);
+    button_box.set_halign(gtk4::Align::End);
+
+    let cancel_button = Button::new();
+    cancel_button.set_label("Close");
+    cancel_button.add_css_class("flat");
+
+    let dialog_clone = dialog.clone();
+    cancel_button.connect_clicked(move |_| {
+        dialog_clone.close();
+    });
+    
+    button_box.append(&cancel_button);
     content_box.append(&button_box);
 
     dialog.set_child(Some(&content_box));

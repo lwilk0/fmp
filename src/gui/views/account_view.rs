@@ -15,7 +15,7 @@ use crate::{
 use adw::{ButtonContent, PreferencesGroup, prelude::*};
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator, TextView,
-    ffi::GTK_WRAP_WORD_CHAR, pango::EllipsizeMode,
+    pango::EllipsizeMode,
 };
 use std::{cell::RefCell, rc::Rc};
 pub struct AccountView<'a> {

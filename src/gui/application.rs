@@ -1,7 +1,7 @@
 use adw::prelude::*;
 
 use crate::gui::{
-    dialogs::{is_first_run, show_welcome_dialog},
+    dialogs::{is_first_run, show_update_dialog, show_welcome_dialog},
     sidebar::create_paned_layout_with_callbacks,
     views::home_view::HomeView,
 };
@@ -43,7 +43,7 @@ fn run_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Forgot My Password")
-        .default_width(850)
+        .default_width(900)
         .default_height(600)
         .build();
 
@@ -51,8 +51,38 @@ fn run_ui(app: &Application) {
     window.present();
 
     if is_first_run() {
-        show_welcome_dialog();
+        show_welcome_dialog(&window);
     }
+
+    let (updateable, latest) = can_update();
+
+    if updateable {
+        show_update_dialog(&window, latest.unwrap());
+    }
+}
+
+fn can_update() -> (bool, Option<check_latest::Version>) {
+    let mut latest_version = None;
+
+    let mut updatable = false;
+
+    let target_crate = "forgot-my-password"; // The name on crates.io because I was too late to get the `fmp` crate :(
+
+    let result = check_latest::new_versions!(
+        crate_name = target_crate,
+        user_agent = check_latest::user_agent!()
+    );
+
+    if let Ok(versions) = result {
+        let current = env!("CARGO_PKG_VERSION");
+        if let Some(latest) = versions.max_version() {
+            if latest > current {
+                updatable = true;
+                latest_version = Some(latest.clone());
+            }
+        }
+    };
+    (updatable, latest_version)
 }
 
 fn load_css() {

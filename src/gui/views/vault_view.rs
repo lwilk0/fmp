@@ -53,18 +53,10 @@ impl<'a> VaultView<'a> {
             .build();
 
         main_box.append(&self.header_section());
-        main_box.append(&create_totp_management_section(
-            self.content_area,
-            &self.vault_name,
-        ));
-        main_box.append(&create_vault_management_section(
-            self.content_area,
-            &self.vault_name,
-        ));
 
         let content_area_clone = self.content_area.clone();
         let vault_name_clone = self.vault_name.clone();
-        let main_box_clone = main_box.clone();
+        //let main_box_clone = main_box.clone();
         let scrollable_clone = scrollable.clone();
         let loading_overlay_clone = loading_overlay.clone();
 
@@ -77,10 +69,20 @@ impl<'a> VaultView<'a> {
                 return glib::ControlFlow::Break;
             }
 
-            let accounts_section = create_accounts_grid(&content_area_clone, &vault_name_clone);
+            main_box.append(&create_accounts_grid(
+                &content_area_clone,
+                &vault_name_clone,
+            ));
+            main_box.append(&create_totp_management_section(
+                &content_area_clone,
+                &vault_name_clone,
+            ));
+            main_box.append(&create_vault_management_section(
+                &content_area_clone,
+                &vault_name_clone,
+            ));
 
-            main_box_clone.append(&accounts_section);
-            scrollable_clone.set_child(Some(&main_box_clone));
+            scrollable_clone.set_child(Some(&main_box));
             content_area_clone.append(&scrollable_clone);
 
             loading_overlay_clone.hide();
