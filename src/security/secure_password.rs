@@ -139,8 +139,15 @@ impl Drop for SecurePassword {
             let _ = exposed.expose_secret();
         }
 
-        // Add a small delay to make timing attacks harder
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        // FIXME: IDK if this even works
+        let operation_start_time = std::time::Instant::now();
+
+        // Ensure minimum execution time to prevent timing analysis
+        let minimum_duration = std::time::Duration::from_millis(2);
+        let elapsed_time = operation_start_time.elapsed();
+        if elapsed_time < minimum_duration {
+            std::thread::sleep(minimum_duration - elapsed_time);
+        }
     }
 }
 

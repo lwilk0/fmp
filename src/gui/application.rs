@@ -54,37 +54,45 @@ fn run_ui(app: &Application) {
         show_welcome_dialog(&window);
     }
 
-    let (updateable, latest) = can_update();
-
-    if updateable {
-        show_update_dialog(&window, latest.unwrap());
-    }
+    let window_clone = window.clone();
+    glib::MainContext::default().spawn_local(async move {
+        let (updateable, latest) = can_update().await;
+        if updateable {
+            // latest is Some(...) here
+            show_update_dialog(&window_clone, latest.unwrap());
+        }
+    });
 }
 
-fn can_update() -> (bool, Option<check_latest::Version>) {
-    let mut latest_version = None;
+async fn can_update() -> (bool, Option<check_latest::Version>) {
+    // run blocking check in background thread
+    let join_res = tokio::task::spawn_blocking(|| {
+        let target_crate = "forgot-my-password";
+        check_latest::new_versions!(
+            crate_name = target_crate,
+            user_agent = check_latest::user_agent!()
+        )
+    })
+    .await;
 
+    let mut latest_version = None;
     let mut updatable = false;
 
-    let target_crate = "forgot-my-password"; // The name on crates.io because I was too late to get the `fmp` crate :(
-
-    let result = check_latest::new_versions!(
-        crate_name = target_crate,
-        user_agent = check_latest::user_agent!()
-    );
-
-    if let Ok(versions) = result {
-        let current = env!("CARGO_PKG_VERSION");
-        if let Some(latest) = versions.max_version() {
-            if latest > current {
-                updatable = true;
-                latest_version = Some(latest.clone());
+    match join_res {
+        Ok(Ok(versions)) => {
+            let current = env!("CARGO_PKG_VERSION");
+            if let Some(latest) = versions.max_version() {
+                if latest > current {
+                    updatable = true;
+                    latest_version = Some(latest.clone());
+                }
             }
         }
-    };
+        _ => { /* treat as no update available */ }
+    }
+
     (updatable, latest_version)
 }
-
 fn load_css() {
     let provider = CssProvider::new();
     let css_data = include_str!("style.css");

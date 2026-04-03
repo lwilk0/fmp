@@ -127,7 +127,7 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
                 VaultView::new(&content_area_clone2, &vault_name_clone2).create();
             }
             Err(e) => {
-                eprintln!("Failed to create account: {e}");
+                log::error!("Failed to create account: {e}");
             }
         }
     });
@@ -300,7 +300,7 @@ impl<'a> AccountView<'a> {
                                 HomeView::new(&content_area_confirm).create();
                             }
                             Err(e) => {
-                                eprintln!("Failed to delete account '{account_name_confirm}': {e}");
+                                log::error!("Failed to delete account '{account_name_confirm}': {e}");
                             }
                         }
                     },
@@ -490,11 +490,9 @@ impl<'a> AccountView<'a> {
             let password_copy = account.password.expose_for_clipboard();
             clipboard.set_text(&password_copy);
 
-            // Schedule clipboard clearing after 30 seconds for security
-            let clipboard_clone = clipboard.clone();
             glib::timeout_add_seconds_local(30, move || {
-                clipboard_clone.set_text("");
-                println!("Clipboard cleared for security");
+                clipboard.set_text("");
+                log::info!("Clipboard cleared for security");
                 glib::ControlFlow::Break
             });
         });
@@ -752,7 +750,7 @@ impl<'a> AccountView<'a> {
                         .create();
                 }
                 Err(e) => {
-                    eprintln!("Failed to save account: {e}");
+                    log::error!("Failed to save account: {e}");
                 }
             }
         });

@@ -30,6 +30,7 @@ tempfile = "3.22.0"
 urlencoding = "2.1.3"
 check-latest = "1.0.2"
 zeroize = "1.8.1"
+tokio = "1.51.0"
 
 [dependencies.adw]
 package = "libadwaita"

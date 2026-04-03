@@ -434,7 +434,7 @@ fn create_password_display_preferences_group(
                 strength_progress_ref.add_css_class(get_strength_color_class(strength));
             }
             Err(error_message) => {
-                eprintln!("Failed to generate password: {error_message}");
+                log::error!("Failed to generate password: {error_message}");
                 let buffer = display_ref.buffer();
                 buffer.set_text("Error generating password");
 
@@ -475,6 +475,12 @@ fn create_password_display_preferences_group(
             glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
                 content_clone.set_label("Copy");
                 button_clone.remove_css_class("success");
+                glib::ControlFlow::Break
+            });
+
+            glib::timeout_add_seconds_local(30, move || {
+                clipboard.set_text("");
+                log::info!("Clipboard cleared for security");
                 glib::ControlFlow::Break
             });
         }
@@ -625,7 +631,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     let terminal_button = Button::with_label("Run `gpg --full-generate-key`");
     create_box.append(&terminal_button);
 
-    let create_label = Label::new(Some("It is recomended to use default settings.\nYou do not need to use a valid email, just remember it!"));
+    let create_label = Label::new(Some("It is recommended to use default settings.\nYou do not need to use a valid email, just remember it!"));
     create_label.set_wrap(true);
     create_label.add_css_class("body");
     create_box.append(&create_label);
@@ -708,7 +714,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     let welcome_window_clone = welcome_window.clone();
     finish_button.connect_clicked(move |_| {
         if let Err(err) = mark_first_run_complete() {
-            eprintln!("Failed to mark first run complete: {}", err);
+            log::error!("Failed to mark first run complete: {}", err);
         }
         welcome_window_clone.close();
     });
@@ -732,28 +738,19 @@ fn launch_terminal(inner_command: &str) {
     ];
 
     for (name, flag, use_double_dash) in terminal_configs {
-        if which(name) {
-            let mut cmd = std::process::Command::new(name);
-            print!("{}", full_command);
-            if use_double_dash {
-                // terminal -- bash -c "..."
-                cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
-            } else {
-                // terminal -e "bash -c '...'"
-                cmd.arg(flag).arg(&full_command);
-            }
+        let mut cmd = std::process::Command::new(name);
+        if use_double_dash {
+            // terminal -- bash -c "..."
+            cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
+        } else {
+            // terminal -e "bash -c '...'"
+            cmd.arg(flag).arg(&full_command);
+        }
 
-            if cmd.spawn().is_ok() {
-                return; // Successful woohoo
-            }
+        if cmd.spawn().is_ok() {
+            return; // Successful woohoo
         }
     }
-}
-
-fn which(name: &str) -> bool {
-    std::env::var_os("PATH").map_or(false, |path| {
-        std::env::split_paths(&path).any(|p| p.join(name).exists())
-    })
 }
 
 /// Shows a confirmation dialog for dangerous actions
@@ -894,7 +891,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
                     match verify_totp_code_with_secret(&secret_clone, &code) {
                         Ok(true) => {
                             if let Err(e) = confirm_totp_setup(&vault_name_clone, &secret_clone) {
-                                eprintln!("Failed to confirm TOTP setup: {e}");
+                                log::error!("Failed to confirm TOTP setup: {e}");
                             } else {
                                 VaultView::new(
                                     &content_area_clone,
@@ -913,7 +910,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
                             });
                         }
                         Err(e) => {
-                            eprintln!("TOTP verification error: {e}");
+                            log::error!("TOTP verification error: {e}");
                         }
                     }
                 }
@@ -1010,7 +1007,7 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                                     crate::gui::views::vault_view::VaultView::new(&content_area_clone2, &vault_name_clone2).create();
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to disable 2FA: {e}");
+                                    log::error!("Failed to disable 2FA: {e}");
                                 }
                             }
                         }
@@ -1124,7 +1121,7 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
         }
         Err(e) => {
-            eprintln!("Failed to create backup: {e}");
+            log::error!("Failed to create backup: {e}");
         }
     });
 
@@ -1190,7 +1187,7 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                 crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
             }
             Err(e) => {
-                eprintln!("Failed to restore backup: {e}");
+                log::error!("Failed to restore backup: {e}");
             }
         }
     });
@@ -1255,7 +1252,7 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
             crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone).create();
         }
         Err(e) => {
-            eprintln!("Failed to delete backup: {e}");
+            log::error!("Failed to delete backup: {e}");
         }
     });
 
@@ -1325,7 +1322,7 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                     crate::gui::views::vault_view::VaultView::new(&content_area_clone, &new_name).create();
                 }
                 Err(e) => {
-                    eprintln!("Failed to rename vault: {e}");
+                    log::error!("Failed to rename vault: {e}");
                 }
             }
         }
@@ -1417,7 +1414,7 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                     crate::gui::views::home_view::HomeView::new(&content_area_clone).create()
                 }
                 Err(e) => {
-                    eprintln!("Failed to delete vault: {e}");
+                    log::error!("Failed to delete vault: {e}");
                 }
             }
         }
@@ -1494,7 +1491,7 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                     ).create();
                 }
                 Err(e) => {
-                    eprintln!("Failed to rename account: {e}");
+                    log::error!("Failed to rename account: {e}");
                 }
             }
         }
@@ -1614,7 +1611,7 @@ pub fn show_add_field_dialog(
                 }
                 Err(e) => {
                     drop(account);
-                    eprintln!("Failed to save account: {e}");
+                    log::error!("Failed to save account: {e}");
                     show_error_dialog(
                         "Save Error",
                         "Failed to save the new field. Please try again.",
@@ -1799,7 +1796,7 @@ pub fn show_edit_field_dialog(
                 }
                 Err(e) => {
                     drop(account);
-                    eprintln!("Failed to save account: {e}");
+                    log::error!("Failed to save account: {e}");
                     show_error_dialog(
                         "Save Error",
                         "Failed to save the field changes. Please try again.",
@@ -1908,7 +1905,7 @@ pub fn show_delete_field_dialog(
             }
             Err(e) => {
                 drop(account);
-                eprintln!("Failed to save account: {e}");
+                log::error!("Failed to save account: {e}");
                 show_error_dialog(
                     "Save Error",
                     "Failed to delete the field. Please try again.",

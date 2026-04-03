@@ -197,7 +197,7 @@ fn show_error_message(content_area: &Box, title: &str, message: &str) {
 pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
     let account_dir = get_account_directory(vault_name);
     read_directory(&account_dir).unwrap_or_else(|_| {
-        eprintln!(
+        log::error!(
             "Failed to read account directory: {}",
             account_dir.display()
         );
@@ -265,14 +265,6 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
         self.activatable = a;
         self
     }
-    /*pub fn margin_start(mut self, m: i32) -> Self {
-        self.margin_start = m;
-        self
-    }
-    pub fn margin_end(mut self, m: i32) -> Self {
-        self.margin_end = m;
-        self
-    }*/
     pub fn callback(mut self, c: F) -> Self {
         self.callback = Some(c);
         self

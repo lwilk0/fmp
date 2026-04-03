@@ -162,18 +162,35 @@ impl Store {
         let username_bytes = &legacy_data[..separator_position];
         let password_bytes = &legacy_data[separator_position + 1..];
 
-        let parsed_username = String::from_utf8(username_bytes.to_vec())?;
+        let mut parsed_username = String::from_utf8(username_bytes.to_vec())?;
         let mut parsed_password = String::from_utf8(password_bytes.to_vec())?;
 
         let migrated_account = Account {
-            username: parsed_username,
+            username: parsed_username.clone(),
             password: SecurePassword::new(parsed_password.clone()),
             name: "Migrated Account".to_string(),
             ..Default::default()
         };
 
+        parsed_username.zeroize();
         parsed_password.zeroize();
 
         Ok(migrated_account)
     }
+}
+
+pub fn get_recipient_key(locations: &Locations) -> Result<(Context, gpgme::Key), Error> {
+    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+    let recipient = std::fs::read_to_string(&locations.recipient)?
+        .trim()
+        .to_string();
+    let recipient_key = ctx.get_key(&recipient).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to find recipient `{}` for encryption. Error: {}",
+            recipient,
+            e
+        )
+    })?;
+
+    Ok((ctx, recipient_key))
 }

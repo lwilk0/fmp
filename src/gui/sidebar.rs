@@ -20,7 +20,7 @@ pub fn get_available_vaults() -> Vec<String> {
     let vaults_dir = get_vaults_directory();
 
     read_directory(&vaults_dir).unwrap_or_else(|e| {
-        eprintln!(
+        log::error!(
             "Failed to read vaults directory: {} - Error: {}",
             vaults_dir.display(),
             e

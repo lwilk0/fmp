@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::crypto::lock_memory;
+use crate::storage::store::get_recipient_key;
 use crate::vault::Locations;
 use zeroize::Zeroize;
 
@@ -89,15 +90,9 @@ pub fn prepare_totp_setup(vault_name: &str) -> Result<(Vec<u8>, String, String),
     rng().fill(&mut secret);
 
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
+    let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
 
-    let issuer = "FMP";
-    let label = format!("{issuer}:{vault_name}");
-    let otpauth_uri = format!(
-        "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
-        urlencoding::encode(&label),
-        secret_b32,
-        urlencoding::encode(issuer)
-    );
+    lock_memory(&secret);
 
     Ok((secret.to_vec(), secret_b32, otpauth_uri))
 }
@@ -135,9 +130,15 @@ pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> 
 pub fn get_totp_qr_info(vault_name: &str) -> Result<(String, String), Error> {
     let secret_bytes = decrypt_secret(vault_name)?;
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret_bytes);
+    let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
 
+    Ok((secret_b32, otpauth_uri))
+}
+
+fn construct_otpath_uri(secret_b32: &String, vault_name: &str) -> String {
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
+
     let otpauth_uri = format!(
         "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
         urlencoding::encode(&label),
@@ -145,7 +146,7 @@ pub fn get_totp_qr_info(vault_name: &str) -> Result<(String, String), Error> {
         urlencoding::encode(issuer)
     );
 
-    Ok((secret_b32, otpauth_uri))
+    otpauth_uri
 }
 
 /// Turns off TOTP for a vault
@@ -167,51 +168,7 @@ pub fn disable_totp(vault_name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Verify a user-provided 6-digit TOTP code with a tolerance of ±1 time step(30s).
-///
-/// # Arguments:
-/// * `vault_name` - The name of the vault.
-/// * `code` - The user imputed 2FA code.
-///
-/// # Returns:
-/// * `Result<bool, Error>` - Returns a `bool` indicating if the code is valid on success, and an `Error` on failure.
-///
-/// # Errors:
-/// * Fails when unable to calculate the time since the Unix Epoch.
-pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
-    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
-    if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
-        return Ok(false);
-    }
-
-    let mut secret = decrypt_secret(vault_name)?;
-
-    #[allow(clippy::cast_possible_wrap)]
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| anyhow::anyhow!("System time error: {}", e))?
-        .as_secs() as i64;
-
-    let step = 30i64;
-    let digits = 6u32;
-
-    let mut valid = false;
-    for skew in [-1i64, 0, 1] {
-        #[allow(clippy::cast_sign_loss)]
-        let counter = ((now / step) + skew) as u64;
-        let hotp_val = hotp(&secret, counter, digits);
-        let candidate = format!("{:0width$}", hotp_val, width = digits as usize);
-        if candidate == code {
-            valid = true;
-            break;
-        }
-    }
-
-    secret.zeroize();
-    Ok(valid)
-}
-
-/// Verify a user-provided 6-digit TOTP code using a prepared secret (for setup verification).
+/// Verify a user-provided 6-digit TOTP code using a secret (for setup verification).
 ///
 /// # Arguments:
 /// * `secret` - The raw secret bytes.
@@ -222,7 +179,7 @@ pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
 ///
 /// # Errors:
 /// * Fails when unable to calculate the time since the Unix Epoch.
-pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
+fn verify_totp_from_secret_bytes(secret: &[u8], code: &str) -> Result<bool, anyhow::Error> {
     let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
     if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
         return Ok(false);
@@ -237,19 +194,28 @@ pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, E
     let step = 30i64;
     let digits = 6u32;
 
-    let mut valid = false;
     for skew in [-1i64, 0, 1] {
         #[allow(clippy::cast_sign_loss)]
         let counter = ((now / step) + skew) as u64;
         let hotp_val = hotp(secret, counter, digits);
         let candidate = format!("{:0width$}", hotp_val, width = digits as usize);
         if candidate == code {
-            valid = true;
-            break;
+            return Ok(true);
         }
     }
 
-    Ok(valid)
+    Ok(false)
+}
+
+pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
+    let mut secret = decrypt_secret(vault_name)?;
+    let res = verify_totp_from_secret_bytes(&secret, code)?;
+    secret.zeroize();
+    Ok(res)
+}
+
+pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
+    verify_totp_from_secret_bytes(secret, code).map_err(Into::into)
 }
 
 /// RFC 4226 HOTP calculation using HMAC-SHA1.
@@ -291,18 +257,8 @@ pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
 /// # Errors:
 /// * Fails when unable to get key for the specified recipient.
 fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), Error> {
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-
-    let recipient = std::fs::read_to_string(&locations.recipient)?
-        .trim()
-        .to_string();
-    let recipient_key = ctx.get_key(&recipient).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to find recipient `{}` for encryption. Error: {}",
-            recipient,
-            e
-        )
-    })?;
+    let (mut ctx, recipient_key) = get_recipient_key(locations)
+        .map_err(|e| anyhow::anyhow!("Failed to get recipient key. Error: {}", e))?;
 
     let mut output = Vec::new();
     ctx.encrypt([&recipient_key], secret, &mut output)
@@ -369,17 +325,8 @@ pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
         return Ok(());
     }
 
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-    let recipient = std::fs::read_to_string(&locations.recipient)?
-        .trim()
-        .to_string();
-    let recipient_key = ctx.get_key(&recipient).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to find recipient `{}` for encryption. Error: {}",
-            recipient,
-            e
-        )
-    })?;
+    let (mut ctx, recipient_key) = get_recipient_key(&locations)
+        .map_err(|e| anyhow::anyhow!("Failed to get recipient key. Error: {}", e))?;
 
     let data = b"gate";
     let mut output = Vec::new();
@@ -400,7 +347,7 @@ pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
 /// # Returns:
 /// * `PathBuf` - Path to the config-based ledger text file.
 fn ledger_path_config() -> PathBuf {
-    let base = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let base = dirs::config_dir().unwrap();
     base.join("fmp").join("totp_ledger")
 }
 
@@ -412,7 +359,7 @@ fn ledger_path_config() -> PathBuf {
 /// # Returns:
 /// * `PathBuf` - Path to the data-based ledger text file.
 fn ledger_path_data() -> PathBuf {
-    let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let base = dirs::data_dir().unwrap();
     base.join("fmp").join("totp_ledger")
 }
 

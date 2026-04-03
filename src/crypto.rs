@@ -50,6 +50,11 @@ pub fn lock_memory(data: &[u8]) {
         return;
     }
 
+    // TODO: Add similar to windows
+    unsafe {
+        libc::prctl(libc::PR_SET_DUMPABLE, 0);
+    }
+
     // Skip if previous attempts have failed
     if !MEMORY_LOCKING_AVAILABLE.load(Ordering::Relaxed) {
         return;
@@ -75,8 +80,8 @@ pub fn lock_memory(data: &[u8]) {
                 if mlock2_result != 0 {
                     // Both mlock and mlock2 failed, mark memory locking as unavailable
                     MEMORY_LOCKING_AVAILABLE.store(false, Ordering::Relaxed);
-                    eprintln!(
-                        "Warning: Failed to lock memory. Sensitive data may be swapped to disk."
+                    log::error!(
+                        "Warning: Failed to lock memory. Sensitive data may be swapped to disk.",
                     );
                 }
             }
@@ -85,7 +90,9 @@ pub fn lock_memory(data: &[u8]) {
             {
                 // On non-Linux Unix systems, if mlock fails, mark as unavailable
                 MEMORY_LOCKING_AVAILABLE.store(false, Ordering::Relaxed);
-                eprintln!("Warning: Failed to lock memory. Sensitive data may be swapped to disk.");
+                log::error!(
+                    "Warning: Failed to lock memory. Sensitive data may be swapped to disk."
+                );
             }
         }
     }
@@ -99,7 +106,7 @@ pub fn lock_memory(data: &[u8]) {
 
         if !lock_result.as_bool() {
             MEMORY_LOCKING_AVAILABLE.store(false, Ordering::Relaxed);
-            eprintln!("Warning: Failed to lock memory. Sensitive data may be swapped to disk.");
+            log::error!("Warning: Failed to lock memory. Sensitive data may be swapped to disk.");
         }
     }
 }
@@ -132,7 +139,7 @@ pub fn unlock_memory(data: &[u8]) {
         #[allow(clippy::ptr_as_ptr)]
         let result = libc::munlock(data.as_ptr() as *const _, data.len());
         if result != 0 {
-            eprintln!("Warning: Failed to unlock memory. This may cause memory leaks.");
+            log::error!("Warning: Failed to unlock memory. This may cause memory leaks.");
         }
     }
 
@@ -144,7 +151,7 @@ pub fn unlock_memory(data: &[u8]) {
         let unlock_result = VirtualUnlock(data.as_ptr() as *const c_void, data.len());
 
         if !unlock_result.as_bool() {
-            eprintln!("Warning: Failed to unlock memory. This may cause memory leaks.");
+            log::error!("Warning: Failed to unlock memory. This may cause memory leaks.");
         }
     }
 }

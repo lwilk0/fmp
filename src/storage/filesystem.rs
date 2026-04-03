@@ -352,7 +352,7 @@ pub fn increment_vault_usage(vault_name: &str) {
     }
 
     if let Err(e) = write(&stats_file, content) {
-        eprintln!("Failed to write vault stats: {e}");
+        log::error!("Failed to write vault stats: {e}");
     }
 }
 
@@ -390,7 +390,7 @@ pub fn record_recent_vault(vault_name: &str) {
     }
 
     if let Err(e) = write(&file, out) {
-        eprintln!("Failed to write recent vaults: {e}");
+        log::error!("Failed to write recent vaults: {e}");
     }
 }
 

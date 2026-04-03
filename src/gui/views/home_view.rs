@@ -269,7 +269,7 @@ pub fn show_create_vault_view(content_area: &Box) {
                         proceed_with_gate_warmup(&content_area_clone, &vault_name);
                     }
                     Err(e) => {
-                        eprintln!("Failed to create vault: {e}");
+                        log::error!("Failed to create vault: {e}");
                         set_button_loading_state(&button, false);
                     }
                 }
