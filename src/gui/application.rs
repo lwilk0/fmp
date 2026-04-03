@@ -1,7 +1,10 @@
 use adw::prelude::*;
 
 use crate::gui::{
-    dialogs::{is_first_run, show_update_dialog, show_welcome_dialog},
+    dialogs::{
+        common::show_update_dialog,
+        welcome::{is_first_run, show_welcome_dialog},
+    },
     sidebar::create_paned_layout_with_callbacks,
     views::home_view::HomeView,
 };

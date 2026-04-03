@@ -1,5 +1,5 @@
 use crate::{
-    gui::{dialogs::show_totp_authentication_dialog, views::vault_view::VaultView},
+    gui::{dialogs::totp::show_totp_authentication_dialog, views::vault_view::VaultView},
     storage::filesystem::read_directory,
     totp::is_totp_required,
     vault::{Account, Locations, warm_up_gpg},

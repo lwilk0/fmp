@@ -4,7 +4,7 @@ use crate::{
             CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
             get_available_accounts, proceed_with_gate_warmup,
         },
-        dialogs::show_standalone_password_generator_dialog,
+        dialogs::password_generator::show_standalone_password_generator_dialog,
         widgets::loading_spinner::{create_loading_button, set_button_loading_state},
     },
     storage::filesystem::{get_most_used_vault, get_recent_vaults},

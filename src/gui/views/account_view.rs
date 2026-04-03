@@ -5,8 +5,12 @@ use crate::{
             create_field_row,
         },
         dialogs::{
-            show_add_field_dialog, show_confirmation_dialog, show_delete_field_dialog,
-            show_edit_field_dialog, show_password_generator_dialog, show_rename_account_dialog,
+            account_management::{
+                show_add_field_dialog, show_delete_field_dialog, show_edit_field_dialog,
+                show_rename_account_dialog,
+            },
+            common::show_confirmation_dialog,
+            password_generator::show_password_generator_dialog,
         },
         views::{home_view::HomeView, vault_view::VaultView},
     },

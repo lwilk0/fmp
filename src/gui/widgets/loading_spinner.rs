@@ -127,12 +127,6 @@ pub fn create_loading_button(label: &str, loading_text: &str) -> (gtk4::Button, 
     let button = loading_button.button().clone();
     let is_loading = loading_button.is_loading.clone();
 
-    // Store the LoadingButton in the button's data for later access
-    let loading_button_rc = Rc::new(RefCell::new(loading_button));
-    unsafe {
-        button.set_data("loading_button", loading_button_rc);
-    }
-
     (button, is_loading)
 }
 

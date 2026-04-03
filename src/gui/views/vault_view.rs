@@ -5,9 +5,11 @@ use crate::{
             get_available_accounts,
         },
         dialogs::{
-            show_backup_vault_dialog, show_delete_backup_dialog, show_delete_vault_dialog,
-            show_rename_vault_dialog, show_restore_vault_dialog, show_totp_management_dialog,
-            show_totp_setup_dialog,
+            totp::{show_totp_management_dialog, show_totp_setup_dialog},
+            vault_management::{
+                show_backup_vault_dialog, show_delete_backup_dialog, show_delete_vault_dialog,
+                show_rename_vault_dialog, show_restore_vault_dialog,
+            },
         },
         views::{account_view::AccountView, account_view::show_new_account_view},
         widgets::loading_spinner::LoadingOverlay,
