@@ -16,7 +16,10 @@ use gtk4::{
 use std::{cell::RefCell, rc::Rc};
 
 /// Shows the password generator dialog and updates the provided entry field and account
-pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<RefCell<Account>>) {
+pub fn show_password_generator_dialog(
+    target_entry: Option<&Entry>,
+    account_ref: Option<&Rc<RefCell<Account>>>,
+) {
     let generator_window = PreferencesWindow::new();
     generator_window.set_title(Some("Password Generator"));
     generator_window.set_modal(true);
@@ -35,42 +38,8 @@ pub fn show_password_generator_dialog(target_entry: &Entry, account_ref: &Rc<Ref
     let custom_group = create_custom_characters_preferences_group(&password_config);
     let display_group = create_password_display_preferences_group(
         &password_config,
-        Some(target_entry),
-        Some(account_ref),
-        Some(&generator_window),
-    );
-
-    page.add(&length_group);
-    page.add(&character_group);
-    page.add(&custom_group);
-    page.add(&display_group);
-
-    generator_window.add(&page);
-    generator_window.present();
-}
-
-/// Shows the password generator dialog without the "Use Password" button (for standalone use)
-pub fn show_standalone_password_generator_dialog() {
-    let generator_window = PreferencesWindow::new();
-    generator_window.set_title(Some("Password Generator"));
-    generator_window.set_modal(true);
-    generator_window.set_default_size(560, 640);
-    generator_window.set_search_enabled(false);
-
-    // Password configuration - use single shared instance
-    let password_config = Rc::new(RefCell::new(PasswordConfig::default()));
-
-    let page = adw::PreferencesPage::new();
-    page.set_title("Password Generator");
-    page.set_icon_name(Some("dialog-password-symbolic"));
-
-    let length_group = create_password_length_preferences_group(&password_config);
-    let character_group = create_character_types_preferences_group(&password_config);
-    let custom_group = create_custom_characters_preferences_group(&password_config);
-    let display_group = create_password_display_preferences_group(
-        &password_config,
-        None,
-        None,
+        target_entry,
+        account_ref,
         Some(&generator_window),
     );
 
@@ -362,16 +331,7 @@ fn create_password_display_preferences_group(
     if !initial_password.is_empty()
         && initial_password != "Click 'Generate Password' to create a password"
     {
-        let strength = calculate_password_strength(&initial_password);
-        #[allow(clippy::cast_lossless)]
-        strength_progress.set_fraction(strength as f64 / 100.0);
-        strength_progress.set_text(Some(&format!("{strength}%")));
-        strength_description.set_text(get_strength_description(strength));
-        strength_progress.remove_css_class("strength-weak");
-        strength_progress.remove_css_class("strength-fair");
-        strength_progress.remove_css_class("strength-good");
-        strength_progress.remove_css_class("strength-strong");
-        strength_progress.add_css_class(get_strength_color_class(strength));
+        update_strength_indicator(&strength_progress, &strength_description, &initial_password);
     }
 
     let strength_box = GtkBox::new(Orientation::Vertical, 4);
@@ -407,17 +367,11 @@ fn create_password_display_preferences_group(
                 let buffer = display_ref.buffer();
                 buffer.set_text(&generated_password);
 
-                let strength = calculate_password_strength(&generated_password);
-                #[allow(clippy::cast_lossless)]
-                strength_progress_ref.set_fraction(strength as f64 / 100.0);
-                strength_progress_ref.set_text(Some(&format!("{strength}%")));
-                strength_desc_ref.set_text(get_strength_description(strength));
-
-                strength_progress_ref.remove_css_class("strength-weak");
-                strength_progress_ref.remove_css_class("strength-fair");
-                strength_progress_ref.remove_css_class("strength-good");
-                strength_progress_ref.remove_css_class("strength-strong");
-                strength_progress_ref.add_css_class(get_strength_color_class(strength));
+                update_strength_indicator(
+                    &strength_progress,
+                    &strength_description,
+                    &generated_password,
+                );
             }
             Err(error_message) => {
                 log::error!("Failed to generate password: {error_message}");
@@ -520,4 +474,20 @@ fn create_password_display_preferences_group(
     group.add(&actions_row);
 
     group
+}
+
+fn update_strength_indicator(progress: &ProgressBar, desc: &Label, password: &str) {
+    let strength = calculate_password_strength(password);
+    progress.set_fraction(strength as f64 / 100.0);
+    progress.set_text(Some(&format!("{strength}%")));
+    desc.set_text(get_strength_description(strength));
+    for cls in [
+        "strength-weak",
+        "strength-fair",
+        "strength-good",
+        "strength-strong",
+    ] {
+        progress.remove_css_class(cls);
+    }
+    progress.add_css_class(get_strength_color_class(strength));
 }

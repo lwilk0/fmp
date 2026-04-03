@@ -9,7 +9,9 @@ use crate::gui::{
     views::home_view::HomeView,
 };
 use adw::{Application, ApplicationWindow, HeaderBar};
-use gtk4::{Box, CssProvider, Label, Orientation, gdk, style_context_add_provider_for_display};
+use gtk4::{
+    Box, CssProvider, Label, Orientation, gdk, gio, glib, style_context_add_provider_for_display,
+};
 
 pub fn run_gui() {
     let application = adw::Application::builder()
@@ -57,45 +59,47 @@ fn run_ui(app: &Application) {
         show_welcome_dialog(&window);
     }
 
-    let window_clone = window.clone();
-    glib::MainContext::default().spawn_local(async move {
-        let (updateable, latest) = can_update().await;
-        if updateable {
-            // latest is Some(...) here
-            show_update_dialog(&window_clone, latest.unwrap());
-        }
-    });
-}
+    // I will not be happy if I get another *mut c_void` cannot be sent between threads safely, I hate async!!!! IT WORKS WOOOO
+    glib::spawn_future_local(glib::clone!(
+        #[weak]
+        window,
+        async move {
+            // Spawn the blocking task on GLib's thread pool
+            let result = gio::spawn_blocking(move || can_update_blocking()).await;
 
-async fn can_update() -> (bool, Option<check_latest::Version>) {
-    // run blocking check in background thread
-    let join_res = tokio::task::spawn_blocking(|| {
-        let target_crate = "forgot-my-password";
-        check_latest::new_versions!(
-            crate_name = target_crate,
-            user_agent = check_latest::user_agent!()
-        )
-    })
-    .await;
-
-    let mut latest_version = None;
-    let mut updatable = false;
-
-    match join_res {
-        Ok(Ok(versions)) => {
-            let current = env!("CARGO_PKG_VERSION");
-            if let Some(latest) = versions.max_version() {
-                if latest > current {
-                    updatable = true;
-                    latest_version = Some(latest.clone());
+            // Match on the result in case the thread panicked
+            if let Ok((updatable, latest_version)) = result {
+                if updatable {
+                    if let Some(version) = latest_version {
+                        show_update_dialog(&window, version);
+                    }
                 }
             }
         }
-        _ => { /* treat as no update available */ }
+    ));
+}
+
+fn can_update_blocking() -> (bool, Option<check_latest::Version>) {
+    let target_crate = "forgot-my-password";
+    let mut latest_version = None;
+    let mut updatable = false;
+
+    if let Ok(versions) = check_latest::new_versions!(
+        crate_name = target_crate,
+        user_agent = check_latest::user_agent!()
+    ) {
+        let current = env!("CARGO_PKG_VERSION");
+        if let Some(latest) = versions.max_version() {
+            if latest > current {
+                updatable = true;
+                latest_version = Some(latest.clone());
+            }
+        }
     }
 
     (updatable, latest_version)
 }
+
 fn load_css() {
     let provider = CssProvider::new();
     let css_data = include_str!("style.css");

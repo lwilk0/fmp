@@ -1,14 +1,13 @@
 use crate::{
     gui::{dialogs::totp::show_totp_authentication_dialog, views::vault_view::VaultView},
-    storage::filesystem::read_directory,
     totp::is_totp_required,
-    vault::{Account, Locations, warm_up_gpg},
+    vault::{Account, warm_up_gpg},
 };
-use adw::{ActionRow, ButtonContent, Clamp, prelude::*};
+use adw::{ActionRow, ButtonContent, prelude::*};
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, pango::EllipsizeMode,
 };
-use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::atomic::AtomicU64};
+use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicU64};
 
 // Global counter for tracking vault loading operations
 pub static VAULT_LOADING_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -100,7 +99,6 @@ pub fn create_editable_field_row(
     entry.set_text(initial_value);
     entry.set_hexpand(true);
     entry.set_size_request(250, -1);
-    //entry.add_css_class("password-field");
 
     let account_rc_clone = account_rc.clone();
     let field_name_owned = field_name.to_string();
@@ -192,25 +190,6 @@ fn show_error_message(content_area: &Box, title: &str, message: &str) {
     content_area.append(&main_box);
 }
 
-// TODO move to filesystem
-/// Reads available vaults from the vaults directory
-pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
-    let account_dir = get_account_directory(vault_name);
-    read_directory(&account_dir).unwrap_or_else(|_| {
-        log::error!(
-            "Failed to read account directory: {}",
-            account_dir.display()
-        );
-        Vec::new()
-    })
-}
-
-/// Gets the account directory path
-fn get_account_directory(vault_name: &str) -> PathBuf {
-    let locations = Locations::new(vault_name, "");
-    locations.account
-}
-
 pub struct CreateActionRow<F: Fn() + 'static> {
     title: Option<String>,
     subtitle: Option<String>,
@@ -280,7 +259,6 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
 
     pub fn build(self) -> ActionRow {
         let row = ActionRow::new();
-        let button = Button::new();
 
         if let Some(t) = self.title {
             row.set_title(&t);
@@ -297,6 +275,8 @@ impl<F: Fn() + 'static> CreateActionRow<F> {
         }
 
         if self.add_button {
+            let button = Button::new();
+
             if let Some(bl) = self.button_label {
                 button.set_label(&bl)
             }
@@ -419,11 +399,6 @@ impl CreateScrollableView {
         scrolled.set_vexpand(true);
         scrolled.set_hexpand(true);
 
-        let clamp = Clamp::new();
-        clamp.set_maximum_size(self.max_width);
-        clamp.set_tightening_threshold(self.tighten_threshold);
-
-        scrolled.set_child(Some(&clamp));
         scrolled
     }
 }

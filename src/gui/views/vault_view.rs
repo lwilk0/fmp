@@ -2,7 +2,6 @@ use crate::{
     gui::{
         content::{
             CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            get_available_accounts,
         },
         dialogs::{
             totp::{show_totp_management_dialog, show_totp_setup_dialog},
@@ -14,8 +13,9 @@ use crate::{
         views::{account_view::AccountView, account_view::show_new_account_view},
         widgets::loading_spinner::LoadingOverlay,
     },
-    storage::filesystem::backup_exists,
-    storage::filesystem::{increment_vault_usage, record_recent_vault},
+    storage::filesystem::{
+        backup_exists, get_available_accounts, increment_vault_usage, record_recent_vault,
+    },
     totp::is_totp_enabled,
 };
 use adw::{ActionRow, PreferencesGroup, prelude::*};
@@ -58,7 +58,6 @@ impl<'a> VaultView<'a> {
 
         let content_area_clone = self.content_area.clone();
         let vault_name_clone = self.vault_name.clone();
-        //let main_box_clone = main_box.clone();
         let scrollable_clone = scrollable.clone();
         let loading_overlay_clone = loading_overlay.clone();
 

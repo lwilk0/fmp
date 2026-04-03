@@ -441,3 +441,21 @@ pub fn get_most_used_vault() -> String {
         most_used
     }
 }
+
+/// Reads available vaults from the vaults directory
+pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
+    let account_dir = get_account_directory(vault_name);
+    read_directory(&account_dir).unwrap_or_else(|_| {
+        log::error!(
+            "Failed to read account directory: {}",
+            account_dir.display()
+        );
+        Vec::new()
+    })
+}
+
+/// Gets the account directory path
+fn get_account_directory(vault_name: &str) -> PathBuf {
+    let locations = Locations::new(vault_name, "");
+    locations.account
+}

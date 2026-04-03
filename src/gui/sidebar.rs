@@ -66,7 +66,6 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     scrolled_window.set_hexpand(true);
 
     let clamp = Clamp::new();
-    //clamp.set_maximum_size(320);
     clamp.set_tightening_threshold(240);
     clamp.set_margin_start(8);
     clamp.set_margin_end(8);

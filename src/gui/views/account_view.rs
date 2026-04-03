@@ -12,7 +12,7 @@ use crate::{
             common::show_confirmation_dialog,
             password_generator::show_password_generator_dialog,
         },
-        views::{home_view::HomeView, vault_view::VaultView},
+        views::vault_view::VaultView,
     },
     vault::{Account, create_account, delete_account, get_full_account_details, update_account},
 };
@@ -71,7 +71,7 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
         "Password Account",
         &new_account,
         "account_type",
-    ); // Account name
+    );
 
     form_box.append(&type_row);
 
@@ -301,7 +301,7 @@ impl<'a> AccountView<'a> {
                     move || {
                         match delete_account(&vault_name_confirm, &account_name_confirm) {
                             Ok(()) => {
-                                HomeView::new(&content_area_confirm).create();
+                                VaultView::new(&content_area_confirm, &vault_name_confirm).create();
                             }
                             Err(e) => {
                                 log::error!("Failed to delete account '{account_name_confirm}': {e}");
@@ -439,7 +439,7 @@ impl<'a> AccountView<'a> {
             let password_entry_gen = password_entry.clone();
             let account_rc_gen = account_rc.clone();
             generate_button.connect_clicked(move |_| {
-                show_password_generator_dialog(&password_entry_gen, &account_rc_gen);
+                show_password_generator_dialog(Some(&password_entry_gen), Some(&account_rc_gen));
             });
         }
 
@@ -550,7 +550,6 @@ impl<'a> AccountView<'a> {
 
         let account = account_rc.borrow();
         for (field_name, field_value) in &account.additional_fields {
-            // Create a vertical box for each field (field name + field controls)
             let field_container = Box::new(Orientation::Vertical, 4);
 
             let field_label = Label::new(Some(field_name));
@@ -559,13 +558,12 @@ impl<'a> AccountView<'a> {
             field_label.set_hexpand(true);
 
             let password_field_box = Box::new(Orientation::Horizontal, 8);
-            // password_field_box.set_halign(gtk4::Align::Center);
 
             let field_entry = Entry::new();
             field_entry.set_text(field_value);
             field_entry.set_editable(self.edit_mode);
             field_entry.set_hexpand(true);
-            field_entry.set_size_request(350, -1); // Make textbox longer
+            field_entry.set_size_request(350, -1);
             field_entry.add_css_class("password-field");
             field_entry.set_placeholder_text(Some(&format!("Enter {}", field_name.to_lowercase())));
 
@@ -839,7 +837,7 @@ fn create_password_field_row(
     let entry_gen = entry.clone();
     let account_rc_gen = account_rc.clone();
     generate_button.connect_clicked(move |_| {
-        show_password_generator_dialog(&entry_gen, &account_rc_gen);
+        show_password_generator_dialog(Some(&entry_gen), Some(&account_rc_gen));
     });
 
     let entry_clone = entry.clone();

@@ -2,12 +2,12 @@ use crate::{
     gui::{
         content::{
             CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-            get_available_accounts, proceed_with_gate_warmup,
+            proceed_with_gate_warmup,
         },
-        dialogs::password_generator::show_standalone_password_generator_dialog,
+        dialogs::password_generator::show_password_generator_dialog,
         widgets::loading_spinner::{create_loading_button, set_button_loading_state},
     },
-    storage::filesystem::{get_most_used_vault, get_recent_vaults},
+    storage::filesystem::{get_available_accounts, get_most_used_vault, get_recent_vaults},
     vault::create_vault,
 };
 use adw::{PreferencesGroup, prelude::*};
@@ -36,7 +36,6 @@ impl<'a> HomeView<'a> {
             .tighten_threshold(600)
             .build();
 
-        //main_box.append(&self.welcome_section());
         main_box.append(&self.statistics_section());
         main_box.append(&self.quick_actions_section());
         main_box.append(&self.recent_vaults_section());
@@ -133,7 +132,7 @@ impl<'a> HomeView<'a> {
                 .subtitle("Create a secure password with customisable options")
                 .button_label("Generate")
                 .css_class("suggested-action")
-                .callback(show_standalone_password_generator_dialog)
+                .callback(|| show_password_generator_dialog(None, None))
                 .build(),
         );
 

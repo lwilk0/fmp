@@ -217,11 +217,11 @@ fn launch_terminal(inner_command: &str) {
 
     for (name, flag, use_double_dash) in terminal_configs {
         let mut cmd = std::process::Command::new(name);
+
         if use_double_dash {
-            // terminal -- bash -c "..."
+            // This shouldnt work but it does so idk
             cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
         } else {
-            // terminal -e "bash -c '...'"
             cmd.arg(flag).arg(&full_command);
         }
 

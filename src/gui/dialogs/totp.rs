@@ -320,7 +320,7 @@ where
 
     let code_entry = Entry::new();
     code_entry.set_placeholder_text(Some("000000"));
-    code_entry.set_max_length(8);
+    code_entry.set_max_length(6);
     code_entry.set_width_chars(10);
     code_entry.set_halign(gtk4::Align::Center);
     code_entry.add_css_class("totp-code-entry");

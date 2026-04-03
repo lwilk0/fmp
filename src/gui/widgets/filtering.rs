@@ -1,5 +1,3 @@
-use std::cmp::Reverse;
-
 /// Sort vaults by name, case insensitive.
 pub fn sort_vaults<'a>(names: &'a [String], filter: &str) -> Vec<&'a str> {
     let mut view: Vec<&str> = if filter.is_empty() {
@@ -18,7 +16,7 @@ pub fn sort_vaults<'a>(names: &'a [String], filter: &str) -> Vec<&'a str> {
             .collect()
     };
 
-    view.sort_by_cached_key(|s| Reverse(s.to_ascii_lowercase()));
+    view.sort_by_cached_key(|s| s.to_ascii_lowercase());
 
     view
 }

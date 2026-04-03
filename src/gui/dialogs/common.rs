@@ -79,11 +79,11 @@ pub fn show_error_dialog(title: &str, message: &str) {
     dialog.present();
 }
 
-/// Shows the welcome dialog for first-time users
+/// Shows the update dialog when update is available
 pub fn show_update_dialog(parent: &adw::ApplicationWindow, latest: check_latest::Version) {
     let dialog = Dialog::new();
 
-    dialog.set_title(Some("Update Avaliable"));
+    dialog.set_title(Some("Update Available"));
     dialog.set_modal(true);
     dialog.set_transient_for(Some(parent));
     dialog.set_default_size(300, 0);
