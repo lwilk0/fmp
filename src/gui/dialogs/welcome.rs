@@ -187,7 +187,11 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     });
 
     terminal_button.connect_clicked(move |_| {
-        launch_terminal("gpg --full-generate-key");
+        #[cfg(unix)]
+        launch_terminal_unix("gpg --full-generate-key");
+
+        #[cfg(windows)]
+        launch_terminal_windows("gpg --full-generate-key");
     });
 
     let welcome_window_clone = welcome_window.clone();
@@ -199,13 +203,55 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     });
 }
 
-fn launch_terminal(inner_command: &str) {
+fn launch_terminal_unix(inner_command: &str) {
     let full_command = format!("bash -c \"{}\"", inner_command);
+
+    #[cfg(target_os = "macos")]
+    {
+        // Why on earth do MacOS terms require this stupid string???
+        // Try Terminal.app
+        let apple_script_term = format!(
+            "tell application \"Terminal\" to do script {}",
+            shell_escape_posix(&full_command)
+        );
+        if std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&apple_script_term)
+            .spawn()
+            .is_ok()
+        {
+            return;
+        }
+
+        // Try iTerm2 (fallback)
+        let apple_script_iterm = format!(
+            "tell application \"iTerm\" to create window with default profile; tell current session of current window to write text {}",
+            shell_escape_posix(&full_command)
+        );
+        if std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&apple_script_iterm)
+            .spawn()
+            .is_ok()
+        {
+            return;
+        }
+
+        // Try open -a Terminal as last resort
+        if std::process::Command::new("open")
+            .arg("-a")
+            .arg("Terminal")
+            .spawn()
+            .is_ok()
+        {
+            return;
+        }
+    }
 
     // List of terminals and their preferred execution flags
     // (Terminal Name, Execution Flag, Use Double-Dash?)
     let terminal_configs = [
-        ("gnome-terminal", "--", true),       // GNOME standard
+        ("gnome-terminal", "--", true),       // GNOME
         ("cosmic-term", "--", true),          // Cosmic
         ("konsole", "-e", false),             // KDE
         ("xfce4-terminal", "-x", false),      // XFCE
@@ -228,5 +274,57 @@ fn launch_terminal(inner_command: &str) {
         if cmd.spawn().is_ok() {
             return; // Successful woohoo
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn shell_escape_posix(s: &str) -> String {
+    if s.is_empty() {
+        "''".into()
+    } else if !s.contains('\'') {
+        format!("'{}'", s)
+    } else {
+        let replaced = s.replace('\'', r#"'"'"'"#);
+        format!("'{}'", replaced)
+    }
+}
+
+#[cfg(windows)]
+fn launch_terminal_windows(inner_command: &str) {
+    // Try Windows Terminal (wt)
+    if std::process::Command::new("wt")
+        .arg("--")
+        .arg("powershell")
+        .arg("-NoExit")
+        .arg("-Command")
+        .arg(inner_command)
+        .spawn()
+        .is_ok()
+    {
+        return;
+    }
+
+    // Try PowerShell directly
+    if std::process::Command::new("powershell")
+        .arg("-NoExit")
+        .arg("-Command")
+        .arg(inner_command)
+        .spawn()
+        .is_ok()
+    {
+        return;
+    }
+
+    // Fallback to cmd.exe (start a new window with /k to keep it open)
+    if std::process::Command::new("cmd")
+        .arg("/C")
+        .arg("start")
+        .arg("cmd")
+        .arg("/k")
+        .arg(inner_command)
+        .spawn()
+        .is_ok()
+    {
+        return;
     }
 }
