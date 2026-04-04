@@ -1,5 +1,6 @@
 /// All this code is awful, sorry future me. There must be a better way????
 use adw::{HeaderBar, Window as AdwWindow, prelude::*};
+use anyhow::Error;
 use gtk4::{Box as GtkBox, Button, Entry, Label, Orientation, glib};
 use std::{
     fs::{File, create_dir_all},
@@ -188,7 +189,8 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
 
     terminal_button.connect_clicked(move |_| {
         #[cfg(unix)]
-        launch_terminal_unix("gpg --full-generate-key");
+        let _ = launch_terminal_unix("gpg --full-generate-key")
+            .map_err(|e| anyhow::anyhow!("Failed to launch terminal. Error: {}", e));
 
         #[cfg(windows)]
         launch_terminal_windows("gpg --full-generate-key");
@@ -203,7 +205,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     });
 }
 
-fn launch_terminal_unix(inner_command: &str) {
+fn launch_terminal_unix(inner_command: &str) -> Result<(), Error> {
     let full_command = format!("bash -c \"{}\"", inner_command);
 
     #[cfg(target_os = "macos")]
@@ -262,19 +264,29 @@ fn launch_terminal_unix(inner_command: &str) {
     ];
 
     for (name, flag, use_double_dash) in terminal_configs {
-        let mut cmd = std::process::Command::new(name);
+        match which::which(name) {
+            Ok(_) => {
+                let mut cmd = std::process::Command::new(name);
 
-        if use_double_dash {
-            // This shouldnt work but it does so idk
-            cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
-        } else {
-            cmd.arg(flag).arg(&full_command);
-        }
+                if use_double_dash {
+                    // This shouldnt work but it does so idk
+                    cmd.arg("--").arg("bash").arg("-c").arg(&full_command);
+                } else {
+                    cmd.arg(flag).arg(&full_command);
+                }
 
-        if cmd.spawn().is_ok() {
-            return; // Successful woohoo
+                let mut child = cmd.spawn()?;
+                let status = child.wait()?;
+                if status.success() {
+                    return Ok(());
+                } else {
+                    return Err(anyhow::anyhow!("Child Failed!"));
+                }
+            }
+            Err(_) => {}
         }
     }
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
