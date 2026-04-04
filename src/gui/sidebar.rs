@@ -8,7 +8,7 @@ use gpgme::Context;
 use gtk4::{Box, Button, Label, Orientation, Paned, PolicyType, ScrolledWindow, SearchEntry};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
-const SIDEBAR_WIDTH: i32 = 270;
+const SIDEBAR_WIDTH: i32 = 250;
 
 /// Gets the vaults directory path
 fn get_vaults_directory() -> PathBuf {
@@ -75,11 +75,59 @@ pub fn create_sidebar_with_callbacks(content_area: &Box, ctx: Rc<RefCell<Context
     clamp.set_margin_start(8);
     clamp.set_margin_end(8);
 
-    let vault_group = create_vault_preferences_group(content_area, "", ctx.clone());
-    clamp.set_child(Some(&vault_group));
+    // --- Read filesystem ONCE, build all rows ONCE ---
+    let all_vaults = get_available_vaults();
+    let group = PreferencesGroup::new();
+
+    // Store (vault_name, row) pairs so we can show/hide later
+    let rows: Rc<Vec<(String, adw::ActionRow)>> = Rc::new(
+        all_vaults
+            .iter()
+            .map(|name| {
+                let row = create_vault_action_row(name, content_area, ctx.clone());
+                group.add(&row);
+                (name.clone(), row)
+            })
+            .collect(),
+    );
+
+    // Also keep an empty-state row, hidden by default
+    let empty_row = create_empty_state_action_row("");
+    empty_row.set_visible(false);
+    group.add(&empty_row);
+
+    clamp.set_child(Some(&group));
     scrolled_window.set_child(Some(&clamp));
 
-    connect_search_to_vault_group(&search_entry, &vault_group, content_area, ctx.clone());
+    // --- Connect search: just toggle visibility ---
+    let rows_clone = rows.clone();
+    search_entry.connect_search_changed(move |entry| {
+        let filter = entry.text().to_string();
+        let filter_lc = filter.to_ascii_lowercase();
+
+        let mut visible_count = 0;
+        for (name, row) in rows_clone.iter() {
+            let matches = filter_lc.is_empty() || name.to_ascii_lowercase().contains(&filter_lc);
+            row.set_visible(matches);
+            if matches {
+                visible_count += 1;
+            }
+        }
+
+        // Show/hide empty state
+        if visible_count == 0 {
+            if filter.is_empty() {
+                empty_row.set_title("No vaults found");
+                empty_row.set_subtitle("Create your first vault to get started");
+            } else {
+                empty_row.set_title("No vaults match your search");
+                empty_row.set_subtitle("Try a different search term");
+            }
+            empty_row.set_visible(true);
+        } else {
+            empty_row.set_visible(false);
+        }
+    });
 
     sidebar.append(&scrolled_window);
     sidebar
@@ -102,31 +150,6 @@ fn create_header_bar(content_area: &Box, ctx: Rc<RefCell<Context>>) -> HeaderBar
     home_button.connect_clicked(move |_| HomeView::new(&content_area_home).create(ctx.clone()));
 
     header_bar
-}
-
-/// Creates a vault preferences group with filtering capability
-fn create_vault_preferences_group(
-    content_area: &Box,
-    filter: &str,
-    ctx: Rc<RefCell<Context>>,
-) -> adw::PreferencesGroup {
-    let group = PreferencesGroup::new();
-
-    // Get available vaults and apply filtering
-    let all_vaults = get_available_vaults();
-    let filtered_vaults = crate::gui::widgets::filtering::sort_vaults(&all_vaults, filter);
-
-    if filtered_vaults.is_empty() {
-        let empty_row = create_empty_state_action_row(filter);
-        group.add(&empty_row);
-    } else {
-        for vault_name in filtered_vaults {
-            let vault_row = create_vault_action_row(vault_name, content_area, ctx.clone());
-            group.add(&vault_row);
-        }
-    }
-
-    group
 }
 
 /// Creates an empty state action row for when no vaults are found
@@ -178,51 +201,6 @@ fn create_vault_action_row(
     });
 
     row
-}
-
-/// Connects the search entry to update the vault preferences group when text changes
-fn connect_search_to_vault_group(
-    search_entry: &SearchEntry,
-    vault_group: &adw::PreferencesGroup,
-    content_area: &Box,
-    ctx: Rc<RefCell<Context>>,
-) {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    let content_area_clone = content_area.clone();
-    let current_group: Rc<RefCell<adw::PreferencesGroup>> =
-        Rc::new(RefCell::new(vault_group.clone()));
-
-    let cg = current_group.clone();
-    search_entry.connect_search_changed(move |entry| {
-        let filter_text = entry.text().to_string();
-
-        let new_group =
-            create_vault_preferences_group(&content_area_clone, &filter_text, ctx.clone());
-
-        if let Some(clamp) = cg
-            .borrow()
-            .parent()
-            .and_then(|p| p.downcast::<Clamp>().ok())
-        {
-            clamp.set_child(Some(&new_group));
-        } else if let Some(scrolled) = cg
-            .borrow()
-            .parent()
-            .and_then(|p| p.downcast::<ScrolledWindow>().ok())
-        {
-            scrolled.set_child(Some(&new_group));
-        } else {
-            if let Some(parent) = cg.borrow().parent() {
-                parent.downcast::<gtk4::Widget>().ok().map(|w| {
-                    w.hide();
-                });
-            }
-        }
-
-        *cg.borrow_mut() = new_group;
-    });
 }
 
 /// Creates a button with an icon
