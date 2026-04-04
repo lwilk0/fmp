@@ -193,6 +193,7 @@ fn create_vault_action_row(
     open_button.set_valign(gtk4::Align::Center);
     row.add_suffix(&open_button);
     row.set_activatable_widget(Some(&open_button));
+    row.set_activatable(false);
 
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();

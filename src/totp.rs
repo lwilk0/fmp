@@ -430,63 +430,9 @@ fn save_ledger_at(path: &PathBuf, set: &HashSet<String>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Returns the union set of all ledger entries from config and data directories.
-///
-/// # Returns:
-/// * `HashSet<String>` - Set of all vault names required in any ledger found.
-fn ledger_union() -> HashSet<String> {
-    let mut set = load_ledger_at(&ledger_path_config());
-    set.extend(load_ledger_at(&ledger_path_data()));
-    set
-}
-
-/// Checks if a given vault name is present in any TOTP ledger.
-///
-/// # Arguments:
-/// * `vault` - `&str`, vault name.
-///
-/// # Returns:
-/// * `bool` - True if found.
-fn ledger_contains(vault: &str) -> bool {
-    ledger_union().contains(vault)
-}
-
-/// Adds a vault name to the ledgers in both config and data directories.
-///
-/// # Arguments:
-/// * `vault` - `&str`, vault name to add.
-///
-/// # Returns:
-/// * `Result<(), Error>` - Ok on success, Err for IO errors.
-///
-/// # Errors:
-/// * Returns an error if a ledger file or directory cannot be written/created.
-fn ledger_add(vault: &str) -> Result<(), Error> {
-    for p in [ledger_path_config(), ledger_path_data()] {
-        let mut set = load_ledger_at(&p);
-        set.insert(vault.to_string());
-        save_ledger_at(&p, &set)?;
-    }
-    Ok(())
-}
-
-/// Removes a vault name from the ledgers in both config and data directories.
-///
-/// # Arguments:
-/// * `vault` - `&str`, vault name to remove.
-///
-/// # Returns:
-/// * `Result<(), Error>` - Ok on success, Err for IO errors.
-///
-/// # Errors:
-/// * Returns an error if a ledger file or directory cannot be written/created.
-fn ledger_remove(vault: &str) -> Result<(), Error> {
-    for p in [ledger_path_config(), ledger_path_data()] {
-        let mut set = load_ledger_at(&p);
-        set.remove(vault);
-        save_ledger_at(&p, &set)?;
-    }
-    Ok(())
+thread_local! {
+    /// Cached union of both TOTP ledger files. `None` means not yet loaded.
+    static LEDGER_CACHE: RefCell<Option<HashSet<String>>> = const { RefCell::new(None) };
 }
 
 /// Updates the TOTP ledgers when a vault is renamed
@@ -504,10 +450,63 @@ pub fn update_totp_ledgers_on_rename(old_name: &str, new_name: &str) -> Result<(
     for p in [ledger_path_config(), ledger_path_data()] {
         let mut set = load_ledger_at(&p);
         if set.remove(old_name) {
-            // Only add the new name if the old name was present
             set.insert(new_name.to_string());
             save_ledger_at(&p, &set)?;
         }
     }
+    // Update cache
+    LEDGER_CACHE.with(|cache| {
+        let mut borrow = cache.borrow_mut();
+        if let Some(ref mut set) = *borrow {
+            if set.remove(old_name) {
+                set.insert(new_name.to_string());
+            }
+        }
+    });
+    Ok(())
+}
+
+fn ledger_contains(vault: &str) -> bool {
+    LEDGER_CACHE.with(|cache| {
+        let mut borrow = cache.borrow_mut();
+        if borrow.is_none() {
+            let mut set = load_ledger_at(&ledger_path_config());
+            set.extend(load_ledger_at(&ledger_path_data()));
+            *borrow = Some(set);
+        }
+        borrow.as_ref().unwrap().contains(vault)
+    })
+}
+
+fn ledger_add(vault: &str) -> Result<(), Error> {
+    // Update both files on disk
+    for p in [ledger_path_config(), ledger_path_data()] {
+        let mut set = load_ledger_at(&p);
+        set.insert(vault.to_string());
+        save_ledger_at(&p, &set)?;
+    }
+    // Update the in-memory cache
+    LEDGER_CACHE.with(|cache| {
+        let mut borrow = cache.borrow_mut();
+        if let Some(ref mut set) = *borrow {
+            set.insert(vault.to_string());
+        }
+        // If cache wasn't loaded yet, no need to populate — next read will load from disk
+    });
+    Ok(())
+}
+
+fn ledger_remove(vault: &str) -> Result<(), Error> {
+    for p in [ledger_path_config(), ledger_path_data()] {
+        let mut set = load_ledger_at(&p);
+        set.remove(vault);
+        save_ledger_at(&p, &set)?;
+    }
+    LEDGER_CACHE.with(|cache| {
+        let mut borrow = cache.borrow_mut();
+        if let Some(ref mut set) = *borrow {
+            set.remove(vault);
+        }
+    });
     Ok(())
 }
