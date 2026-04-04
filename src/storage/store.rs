@@ -23,8 +23,10 @@ use crate::security::SecurePassword;
 use crate::storage::Locations;
 use anyhow::Error;
 use gpgme::{Context, Protocol};
+use std::cell::RefCell;
 use std::fs::{File, read_to_string};
 use std::io::{BufReader, Read, Write};
+use std::rc::Rc;
 use zeroize::Zeroize;
 
 /// Handles GPG encryption and decryption operations for account data
@@ -179,12 +181,14 @@ impl Store {
     }
 }
 
-pub fn get_recipient_key(locations: &Locations) -> Result<(Context, gpgme::Key), Error> {
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+pub fn get_recipient_key(
+    locations: &Locations,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<gpgme::Key, Error> {
     let recipient = std::fs::read_to_string(&locations.recipient)?
         .trim()
         .to_string();
-    let recipient_key = ctx.get_key(&recipient).map_err(|e| {
+    let recipient_key = ctx.borrow_mut().get_key(&recipient).map_err(|e| {
         anyhow::anyhow!(
             "Failed to find recipient `{}` for encryption. Error: {}",
             recipient,
@@ -192,5 +196,5 @@ pub fn get_recipient_key(locations: &Locations) -> Result<(Context, gpgme::Key),
         )
     })?;
 
-    Ok((ctx, recipient_key))
+    Ok(recipient_key)
 }

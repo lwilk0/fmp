@@ -20,9 +20,13 @@ Copyright (C) 2025  Luke Wilkinson
 use crate::models::Account;
 use crate::storage::{Locations, Store};
 use anyhow::Error;
-use gpgme::{Context, Protocol};
-use std::fs::{File, remove_dir_all};
-use std::io::{BufReader, Read, Write};
+use gpgme::Context;
+use std::{
+    cell::RefCell,
+    fs::{File, remove_dir_all},
+    io::{BufReader, Read, Write},
+    rc::Rc,
+};
 
 /// Retrieves the full account details for a specific account in a vault.
 ///
@@ -93,15 +97,18 @@ pub fn update_account(vault_name: &str, account: &Account) -> Result<(), Error> 
 ///
 /// # Errors
 /// * If the vault directory cannot be created or if the recipient file cannot be written.
-pub fn create_vault(vault_name: &str, recipient: &str) -> Result<(), Error> {
+pub fn create_vault(
+    vault_name: &str,
+    recipient: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     locations.initialize_vault()?;
 
     let mut recipient_file = File::create(&locations.recipient)?;
     recipient_file.write_all(recipient.as_bytes())?;
 
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-    let recipient_key = ctx.get_key(recipient).map_err(|e| {
+    let recipient_key = ctx.borrow_mut().get_key(recipient).map_err(|e| {
         anyhow::anyhow!(
             "Failed to find recipient `{}` for encryption. Error: {}",
             recipient,
@@ -111,7 +118,8 @@ pub fn create_vault(vault_name: &str, recipient: &str) -> Result<(), Error> {
 
     let gate_data = b"gate";
     let mut output = Vec::new();
-    ctx.encrypt([&recipient_key], &gate_data[..], &mut output)?;
+    ctx.borrow_mut()
+        .encrypt([&recipient_key], &gate_data[..], &mut output)?;
 
     let mut gate_file = File::create(&locations.gate)?;
 
@@ -136,8 +144,7 @@ pub fn create_vault(vault_name: &str, recipient: &str) -> Result<(), Error> {
 ///
 /// # Errors
 /// * If the gate file cannot be read or decrypted.
-pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+pub fn warm_up_gpg(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     let mut encrypted = Vec::new();
     let mut out = Vec::new();
@@ -146,7 +153,8 @@ pub fn warm_up_gpg(vault_name: &str) -> Result<(), Error> {
     let mut reader = BufReader::new(file);
     reader.read_to_end(&mut encrypted)?;
 
-    ctx.decrypt(&encrypted, &mut out)
+    ctx.borrow_mut()
+        .decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
     Ok(())
 }

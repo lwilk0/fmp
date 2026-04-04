@@ -4,6 +4,7 @@ use crate::{
     vault::{Account, warm_up_gpg},
 };
 use adw::{ActionRow, ButtonContent, prelude::*};
+use gpgme::Context;
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, pango::EllipsizeMode,
 };
@@ -131,26 +132,32 @@ pub fn clear_content(content_area: &Box) {
 }
 
 /// Proceeds with gate warm-up and then shows the vault view
-pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str) {
+pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str, ctx: Rc<RefCell<Context>>) {
     // Check if TOTP is required for this vault
     if is_totp_required(vault_name) {
         let content_area_clone = content_area.clone();
         let vault_name_clone = vault_name.to_string();
 
-        show_totp_authentication_dialog(&vault_name_clone.clone(), move || {
-            proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone);
-        });
+        let ctx_clone = ctx.clone();
+
+        show_totp_authentication_dialog(
+            &vault_name_clone.clone(),
+            move || {
+                proceed_with_gpg_warmup(&content_area_clone, &vault_name_clone, ctx.clone());
+            },
+            ctx_clone.clone(),
+        );
     } else {
-        proceed_with_gpg_warmup(content_area, vault_name);
+        proceed_with_gpg_warmup(content_area, vault_name, ctx.clone());
     }
 }
 
 /// Proceeds with GPG warm-up after TOTP verification (if required)
-fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str) {
+fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str, ctx: Rc<RefCell<Context>>) {
     // Attempt to warm up GPG by decrypting the gate file
-    match warm_up_gpg(vault_name) {
+    match warm_up_gpg(vault_name, ctx.clone()) {
         Ok(()) => {
-            VaultView::new(content_area, vault_name).create();
+            VaultView::new(content_area, vault_name).create(ctx.clone());
         }
         Err(e) => {
             show_error_message(

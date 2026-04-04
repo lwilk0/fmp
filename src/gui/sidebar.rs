@@ -4,8 +4,9 @@ use crate::{
     vault::Locations,
 };
 use adw::{ButtonContent, Clamp, HeaderBar, PreferencesGroup, prelude::*};
+use gpgme::Context;
 use gtk4::{Box, Button, Label, Orientation, Paned, PolicyType, ScrolledWindow, SearchEntry};
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 const SIDEBAR_WIDTH: i32 = 270;
 
@@ -30,8 +31,12 @@ pub fn get_available_vaults() -> Vec<String> {
 }
 
 /// Creates a responsive paned layout with sidebar that can update the main content
-pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box) -> Paned {
-    let sidebar = create_sidebar_with_callbacks(content_area);
+pub fn create_paned_layout_with_callbacks(
+    main_content: &Box,
+    content_area: &Box,
+    ctx: Rc<RefCell<Context>>,
+) -> Paned {
+    let sidebar = create_sidebar_with_callbacks(content_area, ctx);
 
     let paned = Paned::new(Orientation::Horizontal);
     paned.set_start_child(Some(&sidebar));
@@ -45,11 +50,11 @@ pub fn create_paned_layout_with_callbacks(main_content: &Box, content_area: &Box
 }
 
 /// Creates a sidebar with navigation items that can update content
-pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
+pub fn create_sidebar_with_callbacks(content_area: &Box, ctx: Rc<RefCell<Context>>) -> Box {
     let sidebar = Box::new(Orientation::Vertical, 0);
     sidebar.add_css_class("sidebar");
 
-    let header_bar = create_header_bar(content_area);
+    let header_bar = create_header_bar(content_area, ctx.clone());
     sidebar.append(&header_bar);
 
     let search_entry = SearchEntry::new();
@@ -70,18 +75,18 @@ pub fn create_sidebar_with_callbacks(content_area: &Box) -> Box {
     clamp.set_margin_start(8);
     clamp.set_margin_end(8);
 
-    let vault_group = create_vault_preferences_group(content_area, "");
+    let vault_group = create_vault_preferences_group(content_area, "", ctx.clone());
     clamp.set_child(Some(&vault_group));
     scrolled_window.set_child(Some(&clamp));
 
-    connect_search_to_vault_group(&search_entry, &vault_group, content_area);
+    connect_search_to_vault_group(&search_entry, &vault_group, content_area, ctx.clone());
 
     sidebar.append(&scrolled_window);
     sidebar
 }
 
 /// Creates the header bar with navigation buttons
-fn create_header_bar(content_area: &Box) -> HeaderBar {
+fn create_header_bar(content_area: &Box, ctx: Rc<RefCell<Context>>) -> HeaderBar {
     let header_bar = HeaderBar::new();
     let title_label = Label::new(None);
     title_label.add_css_class("heading");
@@ -94,13 +99,17 @@ fn create_header_bar(content_area: &Box) -> HeaderBar {
     header_bar.pack_start(&home_button);
 
     let content_area_home = content_area.clone();
-    home_button.connect_clicked(move |_| HomeView::new(&content_area_home).create());
+    home_button.connect_clicked(move |_| HomeView::new(&content_area_home).create(ctx.clone()));
 
     header_bar
 }
 
 /// Creates a vault preferences group with filtering capability
-fn create_vault_preferences_group(content_area: &Box, filter: &str) -> adw::PreferencesGroup {
+fn create_vault_preferences_group(
+    content_area: &Box,
+    filter: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> adw::PreferencesGroup {
     let group = PreferencesGroup::new();
 
     // Get available vaults and apply filtering
@@ -112,7 +121,7 @@ fn create_vault_preferences_group(content_area: &Box, filter: &str) -> adw::Pref
         group.add(&empty_row);
     } else {
         for vault_name in filtered_vaults {
-            let vault_row = create_vault_action_row(vault_name, content_area);
+            let vault_row = create_vault_action_row(vault_name, content_area, ctx.clone());
             group.add(&vault_row);
         }
     }
@@ -141,7 +150,11 @@ fn create_empty_state_action_row(filter: &str) -> adw::ActionRow {
 }
 
 /// Creates an action row for a specific vault
-fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionRow {
+fn create_vault_action_row(
+    vault_name: &str,
+    content_area: &Box,
+    ctx: Rc<RefCell<Context>>,
+) -> adw::ActionRow {
     use adw::ActionRow;
 
     let row = ActionRow::new();
@@ -161,7 +174,7 @@ fn create_vault_action_row(vault_name: &str, content_area: &Box) -> adw::ActionR
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();
     open_button.connect_clicked(move |_| {
-        proceed_with_gate_warmup(&content_area_clone, &vault_name_clone);
+        proceed_with_gate_warmup(&content_area_clone, &vault_name_clone, ctx.clone());
     });
 
     row
@@ -172,6 +185,7 @@ fn connect_search_to_vault_group(
     search_entry: &SearchEntry,
     vault_group: &adw::PreferencesGroup,
     content_area: &Box,
+    ctx: Rc<RefCell<Context>>,
 ) {
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -184,7 +198,8 @@ fn connect_search_to_vault_group(
     search_entry.connect_search_changed(move |entry| {
         let filter_text = entry.text().to_string();
 
-        let new_group = create_vault_preferences_group(&content_area_clone, &filter_text);
+        let new_group =
+            create_vault_preferences_group(&content_area_clone, &filter_text, ctx.clone());
 
         if let Some(clamp) = cg
             .borrow()
@@ -225,13 +240,13 @@ pub fn create_icon_button(icon_name: &str) -> Button {
 }
 
 /// Refreshes the sidebar from the content area (convenience function)
-pub fn refresh_sidebar_from_content_area(content_area: &Box) {
+pub fn refresh_sidebar_from_content_area(content_area: &Box, ctx: Rc<RefCell<Context>>) {
     if let Some(main_content) = content_area.parent().and_then(|p| p.downcast::<Box>().ok())
         && let Some(paned) = main_content
             .parent()
             .and_then(|p| p.downcast::<Paned>().ok())
     {
-        let new_sidebar = create_sidebar_with_callbacks(content_area);
+        let new_sidebar = create_sidebar_with_callbacks(content_area, ctx);
         paned.set_start_child(Some(&new_sidebar));
     }
 }

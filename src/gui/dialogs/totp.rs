@@ -6,6 +6,8 @@ use crate::{
         verify_totp_code_with_secret,
     },
 };
+use gpgme::Context;
+use std::{cell::RefCell, rc::Rc};
 
 use adw::{ActionRow, PreferencesGroup, PreferencesWindow, prelude::*};
 use gtk4::{
@@ -17,7 +19,7 @@ use image::{DynamicImage, Luma};
 use qrcode::QrCode;
 
 /// Shows the TOTP setup dialog for enabling 2FA on a vault
-pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox, ctx: Rc<RefCell<Context>>) {
     let totp_window = PreferencesWindow::new();
     totp_window.set_title(Some("Enable Two-Factor Authentication"));
     totp_window.set_modal(true);
@@ -63,7 +65,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
     totp_window.present();
 
     // Prepare TOTP secret and QR code after showing dialog (without enabling yet)
-    match prepare_totp_setup(vault_name) {
+    match prepare_totp_setup(vault_name, ctx.clone()) {
         Ok((secret, secret_b32, otpauth_uri)) => {
             // Remove loading message
             qr_group.remove(&loading_row);
@@ -112,10 +114,13 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
                 if code.len() == 6 {
                     match verify_totp_code_with_secret(&secret_clone, &code) {
                         Ok(true) => {
-                            if let Err(e) = confirm_totp_setup(&vault_name_clone, &secret_clone) {
+                            if let Err(e) =
+                                confirm_totp_setup(&vault_name_clone, &secret_clone, ctx.clone())
+                            {
                                 log::error!("Failed to confirm TOTP setup: {e}");
                             } else {
-                                VaultView::new(&content_area_clone, &vault_name_clone).create();
+                                VaultView::new(&content_area_clone, &vault_name_clone)
+                                    .create(ctx.clone());
                                 window_clone.close();
                             }
                         }
@@ -150,7 +155,11 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox) {
 }
 
 /// Shows the TOTP management dialog for an already enabled vault
-pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_totp_management_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let totp_window = PreferencesWindow::new();
     totp_window.set_title(Some("Manage Two-Factor Authentication"));
     totp_window.set_modal(true);
@@ -174,7 +183,7 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
     status_row.add_prefix(&status_icon);
     status_group.add(&status_row);
 
-    match get_totp_qr_info(vault_name) {
+    match get_totp_qr_info(vault_name, ctx.clone()) {
         Ok((secret, otpauth_uri)) => {
             let qr_group: PreferencesGroup = PreferencesGroup::new();
             qr_group.set_title("Backup QR Code");
@@ -218,12 +227,13 @@ pub fn show_totp_management_dialog(vault_name: &str, content_area: &GtkBox) {
                         let vault_name_clone2 = vault_name_clone.clone();
                         let content_area_clone2 = content_area_clone.clone();
                         let window_clone2 = window_clone.clone();
+                        let ctx_clone = ctx.clone();
                         move || {
                             match disable_totp(&vault_name_clone2) {
                                 Ok(()) => {
                                     window_clone2.close();
-                                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2);
-                                    crate::gui::views::vault_view::VaultView::new(&content_area_clone2, &vault_name_clone2).create();
+                                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone2, ctx_clone.clone());
+                                    crate::gui::views::vault_view::VaultView::new(&content_area_clone2, &vault_name_clone2).create(ctx_clone.clone());
                                 }
                                 Err(e) => {
                                     log::error!("Failed to disable 2FA: {e}");
@@ -289,8 +299,11 @@ fn generate_qr_code_image(otpauth_uri: &str) -> Result<Pixbuf, Box<dyn std::erro
 }
 
 /// Shows the TOTP authentication dialog for vault access
-pub fn show_totp_authentication_dialog<F>(vault_name: &str, on_success: F)
-where
+pub fn show_totp_authentication_dialog<F>(
+    vault_name: &str,
+    on_success: F,
+    ctx: Rc<RefCell<Context>>,
+) where
     F: Fn() + 'static + Clone,
 {
     let dialog = Dialog::new();
@@ -357,7 +370,7 @@ where
     verify_button.connect_clicked(move |_| {
         let code = code_entry_clone.text();
 
-        match verify_totp_code(&vault_name_clone, &code) {
+        match verify_totp_code(&vault_name_clone, &code, ctx.clone()) {
             Ok(true) => {
                 status_label_clone.set_text("Authentication successful!");
                 status_label_clone.add_css_class("success");

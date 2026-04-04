@@ -2,12 +2,18 @@
 use crate::storage::filesystem::{
     create_backup, delete_backup, delete_vault, install_backup, rename_vault,
 };
+use gpgme::Context;
+use std::{cell::RefCell, rc::Rc};
 
 use adw::prelude::*;
 use gtk4::{Box as GtkBox, Button, Dialog, Entry, Label, Orientation};
 
 /// Shows the backup vault dialog
-pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_backup_vault_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Create Vault Backup"));
     dialog.set_modal(true);
@@ -56,7 +62,7 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
         Ok(()) => {
             dialog_clone.close();
             crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone)
-                .create();
+                .create(ctx.clone());
         }
         Err(e) => {
             log::error!("Failed to create backup: {e}");
@@ -72,7 +78,11 @@ pub fn show_backup_vault_dialog(vault_name: &str, content_area: &GtkBox) {
 }
 
 /// Shows the restore vault dialog
-pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_restore_vault_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Restore Vault Backup"));
     dialog.set_modal(true);
@@ -126,7 +136,7 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
                     &content_area_clone,
                     &vault_name_clone,
                 )
-                .create();
+                .create(ctx.clone());
             }
             Err(e) => {
                 log::error!("Failed to restore backup: {e}");
@@ -143,7 +153,11 @@ pub fn show_restore_vault_dialog(vault_name: &str, content_area: &GtkBox) {
 }
 
 /// Shows the delete backup dialog
-pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_delete_backup_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Delete Vault Backup"));
     dialog.set_modal(true);
@@ -192,7 +206,7 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
         Ok(()) => {
             dialog_clone.close();
             crate::gui::views::vault_view::VaultView::new(&content_area_clone, &vault_name_clone)
-                .create();
+                .create(ctx.clone());
         }
         Err(e) => {
             log::error!("Failed to delete backup: {e}");
@@ -208,7 +222,11 @@ pub fn show_delete_backup_dialog(vault_name: &str, content_area: &GtkBox) {
 }
 
 /// Shows the rename vault dialog
-pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_rename_vault_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Rename Vault"));
     dialog.set_modal(true);
@@ -261,9 +279,12 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match rename_vault(&vault_name_clone, &new_name) {
                 Ok(()) => {
                     dialog_clone.close();
-                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
+                    crate::gui::sidebar::refresh_sidebar_from_content_area(
+                        &content_area_clone,
+                        ctx.clone(),
+                    );
                     crate::gui::views::vault_view::VaultView::new(&content_area_clone, &new_name)
-                        .create();
+                        .create(ctx.clone());
                 }
                 Err(e) => {
                     log::error!("Failed to rename vault: {e}");
@@ -286,7 +307,11 @@ pub fn show_rename_vault_dialog(vault_name: &str, content_area: &GtkBox) {
 }
 
 /// Shows the delete vault dialog
-pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
+pub fn show_delete_vault_dialog(
+    vault_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Delete Vault"));
     dialog.set_modal(true);
@@ -354,8 +379,12 @@ pub fn show_delete_vault_dialog(vault_name: &str, content_area: &GtkBox) {
             match delete_vault(&vault_name_clone) {
                 Ok(()) => {
                     dialog_clone.close();
-                    crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                    crate::gui::views::home_view::HomeView::new(&content_area_clone).create()
+                    crate::gui::sidebar::refresh_sidebar_from_content_area(
+                        &content_area_clone,
+                        ctx.clone(),
+                    );
+                    crate::gui::views::home_view::HomeView::new(&content_area_clone)
+                        .create(ctx.clone())
                 }
                 Err(e) => {
                     log::error!("Failed to delete vault: {e}");

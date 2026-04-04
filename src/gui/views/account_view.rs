@@ -17,11 +17,13 @@ use crate::{
     vault::{Account, create_account, delete_account, get_full_account_details, update_account},
 };
 use adw::{ButtonContent, PreferencesGroup, prelude::*};
+use gpgme::Context;
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, Separator, TextView,
     pango::EllipsizeMode,
 };
 use std::{cell::RefCell, rc::Rc};
+
 pub struct AccountView<'a> {
     content_area: &'a Box,
     vault_name: String,
@@ -30,7 +32,7 @@ pub struct AccountView<'a> {
 }
 
 /// Shows the new account creation view
-pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
+pub fn show_new_account_view(content_area: &Box, vault_name: &str, ctx: Rc<RefCell<Context>>) {
     clear_content(content_area);
 
     let main_box = CreateBox::new()
@@ -104,9 +106,10 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
 
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
+    let ctx_clone = ctx.clone();
 
     cancel_button.connect_clicked(move |_| {
-        VaultView::new(&content_area_clone, &vault_name_clone).create();
+        VaultView::new(&content_area_clone, &vault_name_clone).create(ctx.clone());
     });
 
     let create_button = Button::new();
@@ -128,7 +131,7 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str) {
 
         match create_account(&vault_name_clone2, &account) {
             Ok(()) => {
-                VaultView::new(&content_area_clone2, &vault_name_clone2).create();
+                VaultView::new(&content_area_clone2, &vault_name_clone2).create(ctx_clone.clone());
             }
             Err(e) => {
                 log::error!("Failed to create account: {e}");
@@ -159,7 +162,7 @@ impl<'a> AccountView<'a> {
         }
     }
 
-    pub fn create(&self) {
+    pub fn create(&self, ctx: Rc<RefCell<Context>>) {
         clear_content(self.content_area);
 
         let account_data = match get_full_account_details(&self.vault_name, &self.account_name) {
@@ -182,21 +185,21 @@ impl<'a> AccountView<'a> {
         scrolled_window.set_vexpand(true);
         scrolled_window.set_hexpand(true);
 
-        main_box.append(&self.header_section(&account_rc));
+        main_box.append(&self.header_section(&account_rc, ctx.clone()));
         main_box.append(&self.details_section(&account_rc));
         main_box.append(&self.password_section(&account_rc));
-        main_box.append(&self.additional_fields_section(&account_rc));
+        main_box.append(&self.additional_fields_section(&account_rc, ctx.clone()));
         main_box.append(&self.notes_section(&account_rc));
 
         if self.edit_mode {
-            main_box.append(&self.actions_section(&account_rc));
+            main_box.append(&self.actions_section(&account_rc, ctx));
         }
 
         scrolled_window.set_child(Some(&main_box));
         self.content_area.append(&scrolled_window);
     }
 
-    fn header_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
+    fn header_section(&self, account_rc: &Rc<RefCell<Account>>, ctx: Rc<RefCell<Context>>) -> Box {
         let header_box = Box::new(Orientation::Horizontal, 16);
         header_box.set_halign(gtk4::Align::Fill);
 
@@ -261,6 +264,8 @@ impl<'a> AccountView<'a> {
             let content_area_clone = self.content_area.clone();
             let vault_name_clone = self.vault_name.to_string();
             let account_name_clone = self.account_name.to_string();
+            let ctx_clone = ctx.clone();
+
             edit_button.connect_clicked(move |_| {
                 AccountView::new(
                     &content_area_clone,
@@ -268,7 +273,7 @@ impl<'a> AccountView<'a> {
                     &account_name_clone,
                     true,
                 )
-                .create();
+                .create(ctx.clone());
             });
 
             let rename_button = Button::new();
@@ -285,6 +290,9 @@ impl<'a> AccountView<'a> {
             let content_area_delete = self.content_area.clone();
             let vault_name_delete = self.vault_name.to_string();
             let account_name_delete = self.account_name.to_string();
+
+            let ctx_clone2 = ctx_clone.clone();
+
             delete_button.connect_clicked(move |_| {
                 let message = format!(
                     "Are you sure you want to delete the account '{account_name_delete}'?\n\nThis action cannot be undone and will permanently remove all data associated with this account.");
@@ -292,6 +300,7 @@ impl<'a> AccountView<'a> {
                 let content_area_confirm = content_area_delete.clone();
                 let vault_name_confirm = vault_name_delete.clone();
                 let account_name_confirm = account_name_delete.clone();
+                let ctx_clone3 = ctx_clone.clone();
 
                 show_confirmation_dialog(
                     "Delete Account",
@@ -301,7 +310,7 @@ impl<'a> AccountView<'a> {
                     move || {
                         match delete_account(&vault_name_confirm, &account_name_confirm) {
                             Ok(()) => {
-                                VaultView::new(&content_area_confirm, &vault_name_confirm).create();
+                                VaultView::new(&content_area_confirm, &vault_name_confirm).create(ctx_clone3.clone());
                             }
                             Err(e) => {
                                 log::error!("Failed to delete account '{account_name_confirm}': {e}");
@@ -314,18 +323,20 @@ impl<'a> AccountView<'a> {
             let content_area_rename = self.content_area.clone();
             let vault_name_rename = self.vault_name.to_string();
             let account_name_rename = self.account_name.to_string();
+            let ctx_clone3 = ctx_clone2.clone();
             rename_button.connect_clicked(move |_| {
                 show_rename_account_dialog(
                     &vault_name_rename,
                     &account_name_rename,
                     &content_area_rename,
+                    ctx_clone3.clone(),
                 );
             });
 
             let content_area_back = self.content_area.clone();
             let vault_name_back = self.vault_name.to_string();
             back_button.connect_clicked(move |_| {
-                VaultView::new(&content_area_back, &vault_name_back).create();
+                VaultView::new(&content_area_back, &vault_name_back).create(ctx_clone2.clone());
             });
 
             buttons_box.append(&back_button);
@@ -515,7 +526,11 @@ impl<'a> AccountView<'a> {
         section
     }
 
-    fn additional_fields_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
+    fn additional_fields_section(
+        &self,
+        account_rc: &Rc<RefCell<Account>>,
+        ctx: Rc<RefCell<Context>>,
+    ) -> Box {
         let section = Box::new(Orientation::Vertical, 16);
         section.add_css_class("account-section");
 
@@ -533,8 +548,15 @@ impl<'a> AccountView<'a> {
             let account_rc_clone = account_rc.clone();
             let content_area_clone = self.content_area.clone();
             let vault_name_clone = self.vault_name.to_string();
+            let ctx_clone = ctx.clone();
+
             add_button.connect_clicked(move |_| {
-                show_add_field_dialog(&account_rc_clone, &content_area_clone, &vault_name_clone);
+                show_add_field_dialog(
+                    &account_rc_clone,
+                    &content_area_clone,
+                    &vault_name_clone,
+                    ctx_clone.clone(),
+                );
             });
         }
 
@@ -629,12 +651,16 @@ impl<'a> AccountView<'a> {
                 let content_area_edit = self.content_area.clone();
                 let vault_name_edit = self.vault_name.to_string();
                 let field_name_edit = field_name.clone();
+                let ctx_clone = ctx.clone();
+                let ctx_clone2 = ctx_clone.clone();
+
                 edit_button.connect_clicked(move |_| {
                     show_edit_field_dialog(
                         &account_rc_edit,
                         &content_area_edit,
                         &vault_name_edit,
                         &field_name_edit,
+                        ctx_clone.clone(),
                     );
                 });
 
@@ -648,6 +674,7 @@ impl<'a> AccountView<'a> {
                         &content_area_delete,
                         &vault_name_delete,
                         &field_name_delete,
+                        ctx_clone2.clone(),
                     );
                 });
 
@@ -722,7 +749,7 @@ impl<'a> AccountView<'a> {
         section
     }
 
-    fn actions_section(&self, account_rc: &Rc<RefCell<Account>>) -> Box {
+    fn actions_section(&self, account_rc: &Rc<RefCell<Account>>, ctx: Rc<RefCell<Context>>) -> Box {
         let section = Box::new(Orientation::Vertical, 16);
 
         let separator = Separator::new(Orientation::Horizontal);
@@ -739,6 +766,8 @@ impl<'a> AccountView<'a> {
         let account_rc_clone = account_rc.clone();
         let vault_name_clone = self.vault_name.clone();
         let content_area_clone = self.content_area.clone();
+        let ctx_clone = ctx.clone();
+
         save_button.connect_clicked(move |_| {
             let mut account = account_rc_clone.borrow_mut();
             account.update_modified_time();
@@ -749,7 +778,7 @@ impl<'a> AccountView<'a> {
                     drop(account);
                     // Exit edit mode and show the updated account
                     AccountView::new(&content_area_clone, &vault_name_clone, &account_name, false)
-                        .create();
+                        .create(ctx_clone.clone());
                 }
                 Err(e) => {
                     log::error!("Failed to save account: {e}");
@@ -772,7 +801,7 @@ impl<'a> AccountView<'a> {
                 &account.name,
                 false,
             )
-            .create();
+            .create(ctx.clone());
         });
 
         actions_box.append(&cancel_button);

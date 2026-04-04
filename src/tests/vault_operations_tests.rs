@@ -2,6 +2,8 @@ use crate::models::Account;
 use crate::security::SecurePassword;
 use crate::storage::filesystem::delete_vault;
 use crate::vault::operations::*;
+use gpgme::{Context, Protocol};
+use std::{cell::RefCell, rc::Rc};
 
 #[allow(dead_code)]
 fn cleanup_test_vault(vault_name: &str) {
@@ -11,8 +13,12 @@ fn cleanup_test_vault(vault_name: &str) {
 
 #[test]
 fn test_create_vault_successfully() {
+    let ctx = Rc::new(RefCell::new(
+        Context::from_protocol(Protocol::OpenPgp).unwrap(),
+    ));
+
     // This test will likely fail in test environment without proper GPG setup
-    let result = create_vault("test_vault", "test@example.com");
+    let result = create_vault("test_vault", "test@example.com", ctx);
 
     match result {
         Ok(_) => {
@@ -131,7 +137,11 @@ fn test_delete_account_successfully() {
 
 #[test]
 fn test_create_vault_invalid_recipient() {
-    let result = create_vault("test_vault", "invalid_recipient_id");
+    let ctx = Rc::new(RefCell::new(
+        Context::from_protocol(Protocol::OpenPgp).unwrap(),
+    ));
+
+    let result = create_vault("test_vault", "invalid_recipient_id", ctx);
 
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
@@ -177,7 +187,11 @@ fn test_delete_non_existent_account() {
 
 #[test]
 fn test_warm_up_gpg() {
-    let result = warm_up_gpg("test_vault");
+    let ctx = Rc::new(RefCell::new(
+        Context::from_protocol(Protocol::OpenPgp).unwrap(),
+    ));
+
+    let result = warm_up_gpg("test_vault", ctx);
 
     // This will fail without proper vault setup
     assert!(result.is_err());

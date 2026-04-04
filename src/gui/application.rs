@@ -9,9 +9,12 @@ use crate::gui::{
     views::home_view::HomeView,
 };
 use adw::{Application, ApplicationWindow, HeaderBar};
+use gpgme::{Context, Protocol};
 use gtk4::{
     Box, CssProvider, Label, Orientation, gdk, gio, glib, style_context_add_provider_for_display,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub fn run_gui() {
     let application = adw::Application::builder()
@@ -27,6 +30,11 @@ pub fn run_gui() {
 fn run_ui(app: &Application) {
     load_css();
 
+    // FIXME dont unwrap
+    let ctx = Rc::new(RefCell::new(
+        Context::from_protocol(Protocol::OpenPgp).unwrap(),
+    ));
+
     let main_content = Box::new(Orientation::Vertical, 0);
 
     let title_label = Label::new(None);
@@ -39,11 +47,12 @@ fn run_ui(app: &Application) {
     let content_area = Box::new(Orientation::Vertical, 12);
     content_area.add_css_class("main-content");
 
-    HomeView::new(&content_area).create();
+    HomeView::new(&content_area).create(ctx.clone());
 
     main_content.append(&content_area);
 
-    let paned_layout = create_paned_layout_with_callbacks(&main_content, &content_area);
+    let paned_layout =
+        create_paned_layout_with_callbacks(&main_content, &content_area, ctx.clone());
 
     let window = ApplicationWindow::builder()
         .application(app)

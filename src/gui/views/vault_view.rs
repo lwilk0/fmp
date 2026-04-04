@@ -19,8 +19,9 @@ use crate::{
     totp::is_totp_enabled,
 };
 use adw::{ActionRow, PreferencesGroup, prelude::*};
+use gpgme::Context;
 use gtk4::{Box, Label, Orientation};
-use std::{rc::Rc, sync::atomic::Ordering};
+use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
 pub struct VaultView<'a> {
     content_area: &'a Box,
@@ -35,7 +36,7 @@ impl<'a> VaultView<'a> {
         }
     }
 
-    pub fn create(&self) {
+    pub fn create(&self, ctx: Rc<RefCell<Context>>) {
         self.clear();
 
         increment_vault_usage(&self.vault_name);
@@ -63,6 +64,9 @@ impl<'a> VaultView<'a> {
 
         let current_id = VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
 
+        let ctx_clone = ctx.clone();
+        let ctx_clone2 = ctx_clone.clone();
+
         glib::idle_add_local(move || {
             let counter = VAULT_LOADING_COUNTER.load(Ordering::SeqCst);
             if counter != current_id {
@@ -73,14 +77,17 @@ impl<'a> VaultView<'a> {
             main_box.append(&create_accounts_grid(
                 &content_area_clone,
                 &vault_name_clone,
+                ctx_clone.clone(),
             ));
             main_box.append(&create_totp_management_section(
                 &content_area_clone,
                 &vault_name_clone,
+                ctx_clone2.clone(),
             ));
             main_box.append(&create_vault_management_section(
                 &content_area_clone,
                 &vault_name_clone,
+                ctx.clone(),
             ));
 
             scrollable_clone.set_child(Some(&main_box));
@@ -134,13 +141,19 @@ impl<'a> VaultView<'a> {
 }
 
 /// Creates the vault management section with backup and vault operations
-pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+pub fn create_vault_management_section(
+    content_area: &Box,
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> PreferencesGroup {
     let group = PreferencesGroup::new();
     group.set_title("Vault Management");
     group.set_description(Some("Backup, restore, rename, and delete vault operations"));
 
     let vault_name_clone = vault_name.to_string();
     let content_area_clone = content_area.clone();
+
+    let ctx_clone = ctx.clone();
 
     group.add(
         &CreateActionRow::new()
@@ -151,12 +164,17 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
             .callback({
                 let vault_name = vault_name_clone.clone();
                 let content_area = content_area_clone.clone();
-                move || show_backup_vault_dialog(&vault_name, &content_area)
+                move || show_backup_vault_dialog(&vault_name, &content_area, ctx_clone.clone())
             })
             .build(),
     );
 
     let has_backup = backup_exists(vault_name);
+
+    let ctx_clone = ctx.clone();
+    let ctx_clone2 = ctx_clone.clone();
+    let ctx_clone3 = ctx_clone2.clone();
+    let ctx_clone4 = ctx_clone3.clone();
 
     group.add(
         &CreateActionRow::new()
@@ -168,7 +186,7 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
             .callback({
                 let vault_name = vault_name_clone.clone();
                 let content_area = content_area_clone.clone();
-                move || show_restore_vault_dialog(&vault_name, &content_area)
+                move || show_restore_vault_dialog(&vault_name, &content_area, ctx_clone.clone())
             })
             .build(),
     );
@@ -182,7 +200,7 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
             .callback({
                 let vault_name = vault_name_clone.clone();
                 let content_area = content_area_clone.clone();
-                move || show_rename_vault_dialog(&vault_name, &content_area)
+                move || show_rename_vault_dialog(&vault_name, &content_area, ctx_clone2.clone())
             })
             .build(),
     );
@@ -197,7 +215,7 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
             .callback({
                 let vault_name = vault_name_clone.clone();
                 let content_area = content_area_clone.clone();
-                move || show_delete_backup_dialog(&vault_name, &content_area)
+                move || show_delete_backup_dialog(&vault_name, &content_area, ctx_clone3.clone())
             })
             .build(),
     );
@@ -211,7 +229,7 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
             .callback({
                 let vault_name = vault_name_clone;
                 let content_area = content_area_clone;
-                move || show_delete_vault_dialog(&vault_name, &content_area)
+                move || show_delete_vault_dialog(&vault_name, &content_area, ctx_clone4.clone())
             })
             .build(),
     );
@@ -220,7 +238,11 @@ pub fn create_vault_management_section(content_area: &Box, vault_name: &str) -> 
 }
 
 /// Creates a modern list layout for accounts using `PreferencesGroup`
-pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+pub fn create_accounts_grid(
+    content_area: &Box,
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> PreferencesGroup {
     let group = PreferencesGroup::new();
     group.set_title("Accounts");
     group.set_description(Some("Manage your account credentials"));
@@ -229,6 +251,10 @@ pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> Preferences
 
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
+
+    let ctx_clone = ctx.clone();
+    let ctx_clone2 = ctx_clone.clone();
+    let ctx_clone3 = ctx_clone2.clone();
 
     if all_accounts.is_empty() {
         group.add(
@@ -240,7 +266,7 @@ pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> Preferences
                 .callback({
                     let content_area = content_area_clone.clone();
                     let vault_name = vault_name_clone.clone();
-                    move || show_new_account_view(&content_area, &vault_name)
+                    move || show_new_account_view(&content_area, &vault_name, ctx_clone.clone())
                 })
                 .build(),
         );
@@ -254,13 +280,18 @@ pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> Preferences
                 .callback({
                     let content_area = content_area_clone.clone();
                     let vault_name = vault_name_clone.clone();
-                    move || show_new_account_view(&content_area, &vault_name)
+                    move || show_new_account_view(&content_area, &vault_name, ctx_clone2.clone())
                 })
                 .build(),
         );
 
         for account_name in all_accounts {
-            let account_row = create_account_row(account_name.as_str(), content_area, vault_name);
+            let account_row = create_account_row(
+                account_name.as_str(),
+                content_area,
+                vault_name,
+                ctx_clone3.clone(),
+            );
             group.add(&account_row);
         }
     }
@@ -269,7 +300,12 @@ pub fn create_accounts_grid(content_area: &Box, vault_name: &str) -> Preferences
 }
 
 /// Creates an account row for the preferences group
-fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) -> ActionRow {
+fn create_account_row(
+    account_name: &str,
+    content_area: &Box,
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> ActionRow {
     CreateActionRow::new()
         .title(account_name)
         .subtitle("Password Account")
@@ -286,23 +322,28 @@ fn create_account_row(account_name: &str, content_area: &Box, vault_name: &str) 
                     &account_name_clone,
                     false,
                 )
-                .create()
+                .create(ctx.clone())
             }
         })
         .build()
 }
 
 /// Creates the TOTP (2FA) management section for the vault view
-pub fn create_totp_management_section(content_area: &Box, vault_name: &str) -> PreferencesGroup {
+pub fn create_totp_management_section(
+    content_area: &Box,
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> PreferencesGroup {
     let group = PreferencesGroup::new();
     group.set_title("Two-Factor Authentication");
     group.set_description(Some("Secure your vault with TOTP authentication"));
 
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
+    let ctx_clone = ctx.clone();
+    let ctx_clone2 = ctx_clone.clone();
 
     let is_enabled = is_totp_enabled(vault_name);
-
     if is_enabled {
         group.add(
             &CreateActionRow::new()
@@ -313,7 +354,9 @@ pub fn create_totp_management_section(content_area: &Box, vault_name: &str) -> P
                 .callback({
                     let content_area = content_area_clone.clone();
                     let vault_name = vault_name_clone.clone();
-                    move || show_totp_management_dialog(&vault_name, &content_area)
+                    move || {
+                        show_totp_management_dialog(&vault_name, &content_area, ctx_clone.clone())
+                    }
                 })
                 .build(),
         );
@@ -326,7 +369,9 @@ pub fn create_totp_management_section(content_area: &Box, vault_name: &str) -> P
                 .css_class("suggested-action")
                 .callback({
                     let vault_name = vault_name_clone.clone();
-                    move || show_totp_setup_dialog(&vault_name, &content_area_clone)
+                    move || {
+                        show_totp_setup_dialog(&vault_name, &content_area_clone, ctx_clone2.clone())
+                    }
                 })
                 .build(),
         );

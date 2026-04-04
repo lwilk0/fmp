@@ -13,10 +13,10 @@ use std::{
     cell::RefCell,
     rc::Rc,
 };
-
+use gpgme::Context;
 
 /// Shows the rename account dialog
-pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_area: &GtkBox) {
+pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_area: &GtkBox, ctx: Rc<RefCell<Context>>) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Rename Account"));
     dialog.set_modal(true);
@@ -75,7 +75,7 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                         &vault_name_clone,
                         &new_name,
                         false,
-                    ).create();
+                    ).create(ctx.clone());
                 }
                 Err(e) => {
                     log::error!("Failed to rename account: {e}");
@@ -102,6 +102,7 @@ pub fn show_add_field_dialog(
     account_rc: &Rc<RefCell<Account>>,
     content_area: &GtkBox,
     vault_name: &str,
+    ctx: Rc<RefCell<Context>>
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Add Additional Field"));
@@ -194,7 +195,7 @@ pub fn show_add_field_dialog(
                         &vault_name_clone,
                         &account_name,
                         true,
-                    ).create();
+                    ).create(ctx.clone());
                 }
                 Err(e) => {
                     drop(account);
@@ -230,6 +231,7 @@ pub fn show_edit_field_dialog(
     content_area: &GtkBox,
     vault_name: &str,
     field_name: &str,
+    ctx: Rc<RefCell<Context>>
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Edit Field"));
@@ -346,7 +348,7 @@ pub fn show_edit_field_dialog(
                         &vault_name_clone,
                         &account_name,
                         true, // Keep in edit mode
-                    ).create();
+                    ).create(ctx.clone());
                 }
                 Err(e) => {
                     drop(account);
@@ -386,6 +388,7 @@ pub fn show_delete_field_dialog(
     content_area: &GtkBox,
     vault_name: &str,
     field_name: &str,
+    ctx: Rc<RefCell<Context>>
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Delete Field"));
@@ -456,7 +459,7 @@ pub fn show_delete_field_dialog(
                     &account_name,
                     true, // Keep in edit mode
                 )
-                .create();
+                .create(ctx.clone());
             }
             Err(e) => {
                 drop(account);

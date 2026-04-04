@@ -11,8 +11,9 @@ use crate::{
     vault::create_vault,
 };
 use adw::{PreferencesGroup, prelude::*};
+use gpgme::Context;
 use gtk4::{Align, Box, Button, Entry, Label, Orientation};
-use std::sync::atomic::Ordering;
+use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
 pub struct HomeView<'a> {
     content_area: &'a Box,
@@ -24,7 +25,7 @@ impl<'a> HomeView<'a> {
     }
 
     /// Creates the home view for the content area
-    pub fn create(&self) {
+    pub fn create(&self, ctx: Rc<RefCell<Context>>) {
         self.clear();
 
         let main_box = CreateBox::new()
@@ -37,8 +38,8 @@ impl<'a> HomeView<'a> {
             .build();
 
         main_box.append(&self.statistics_section());
-        main_box.append(&self.quick_actions_section());
-        main_box.append(&self.recent_vaults_section());
+        main_box.append(&self.quick_actions_section(ctx.clone()));
+        main_box.append(&self.recent_vaults_section(ctx.clone()));
 
         scrollable.set_child(Some(&main_box));
         self.content_area.append(&scrollable);
@@ -106,7 +107,7 @@ impl<'a> HomeView<'a> {
     }
 
     /// Creates the quick actions section
-    fn quick_actions_section(&self) -> PreferencesGroup {
+    fn quick_actions_section(&self, ctx: Rc<RefCell<Context>>) -> PreferencesGroup {
         let group = PreferencesGroup::new();
         group.set_title("Quick Actions");
         group.set_description(Some("Get started with common tasks"));
@@ -121,7 +122,7 @@ impl<'a> HomeView<'a> {
                 .css_class("suggested-action")
                 .callback({
                     let content_area = content_area.clone();
-                    move || show_create_vault_view(&content_area)
+                    move || show_create_vault_view(&content_area, ctx.clone())
                 })
                 .build(),
         );
@@ -140,7 +141,7 @@ impl<'a> HomeView<'a> {
     }
 
     /// Creates the recent vaults section for the home view (bottom panel)
-    fn recent_vaults_section(&self) -> PreferencesGroup {
+    fn recent_vaults_section(&self, ctx: Rc<RefCell<Context>>) -> PreferencesGroup {
         let group = PreferencesGroup::new();
 
         let content_area = &self.content_area.clone();
@@ -165,6 +166,7 @@ impl<'a> HomeView<'a> {
         for name in recent {
             let name_clone = name.clone();
 
+            let ctx_clone = ctx.clone();
             group.add(
                 &CreateActionRow::new()
                     .title(&name)
@@ -174,7 +176,7 @@ impl<'a> HomeView<'a> {
                     .callback({
                         let content_area = content_area.clone();
                         let name = name_clone.clone();
-                        move || proceed_with_gate_warmup(&content_area, &name)
+                        move || proceed_with_gate_warmup(&content_area, &name, ctx_clone.clone())
                     })
                     .build(),
             );
@@ -185,7 +187,7 @@ impl<'a> HomeView<'a> {
 }
 
 /// Shows the create vault view
-pub fn show_create_vault_view(content_area: &Box) {
+pub fn show_create_vault_view(content_area: &Box, ctx: Rc<RefCell<Context>>) {
     clear_content(content_area);
 
     let main_box = CreateBox::new()
@@ -236,13 +238,16 @@ pub fn show_create_vault_view(content_area: &Box) {
     cancel_button.set_size_request(120, -1);
 
     let content_area_clone2 = content_area.clone();
-    cancel_button.connect_clicked(move |_| HomeView::new(&content_area_clone2).create());
+    let ctx_clone = ctx.clone();
+
+    cancel_button.connect_clicked(move |_| HomeView::new(&content_area_clone2).create(ctx.clone()));
 
     let (create_button, _) = create_loading_button("Create Vault", "Creating vault...");
     create_button.add_css_class("suggested-action");
     create_button.set_size_request(120, -1);
 
     let content_area_clone = content_area.clone();
+
     create_button.connect_clicked(move |button| {
         let vault_name = name_entry.text().to_string();
         let recipient = recipient_entry.text().to_string();
@@ -260,12 +265,21 @@ pub fn show_create_vault_view(content_area: &Box) {
             let recipient = recipient.clone();
             let button = button.clone();
 
+            let ctx_clone2 = ctx_clone.clone();
+            let ctx_clone3 = ctx_clone2.clone();
             move || {
-                match create_vault(&vault_name, &recipient) {
+                match create_vault(&vault_name, &recipient, ctx_clone2.clone()) {
                     Ok(()) => {
                         // Refresh sidebar to show new vault
-                        crate::gui::sidebar::refresh_sidebar_from_content_area(&content_area_clone);
-                        proceed_with_gate_warmup(&content_area_clone, &vault_name);
+                        crate::gui::sidebar::refresh_sidebar_from_content_area(
+                            &content_area_clone,
+                            ctx_clone2.clone(),
+                        );
+                        proceed_with_gate_warmup(
+                            &content_area_clone,
+                            &vault_name,
+                            ctx_clone3.clone(),
+                        );
                     }
                     Err(e) => {
                         log::error!("Failed to create vault: {e}");

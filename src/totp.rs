@@ -20,14 +20,16 @@ Copyright (C) 2025  Luke Wilkinson
 
 use anyhow::Error;
 use base32::Alphabet;
-use gpgme::{Context, Protocol};
+use gpgme::Context;
 use hmac::{Hmac, Mac};
 use rand::{Rng, rng};
 use sha1::Sha1;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::{File, create_dir_all, remove_file};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::crypto::lock_memory;
@@ -83,8 +85,11 @@ pub fn is_totp_required(vault_name: &str) -> bool {
 ///
 /// # Errors:
 /// * Fails when unable to check if a gate exists.
-pub fn prepare_totp_setup(vault_name: &str) -> Result<(Vec<u8>, String, String), Error> {
-    ensure_gate_exists(vault_name)?;
+pub fn prepare_totp_setup(
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(Vec<u8>, String, String), Error> {
+    ensure_gate_exists(vault_name, ctx.clone())?;
 
     let mut secret = [0u8; 20];
     rng().fill(&mut secret);
@@ -108,10 +113,14 @@ pub fn prepare_totp_setup(vault_name: &str) -> Result<(Vec<u8>, String, String),
 ///
 /// # Errors:
 /// * Fails when unable to: encrypt and store secret, mark a vault as requiring TOTP, or add a vault to the ledger.
-pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> {
+pub fn confirm_totp_setup(
+    vault_name: &str,
+    secret: &[u8],
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
 
-    encrypt_and_store_secret(&locations, secret)?;
+    encrypt_and_store_secret(&locations, secret, ctx.clone())?;
     ledger_add(vault_name)?;
 
     Ok(())
@@ -127,8 +136,11 @@ pub fn confirm_totp_setup(vault_name: &str, secret: &[u8]) -> Result<(), Error> 
 ///
 /// # Errors:
 /// * Fails when unable to decrypt the existing TOTP secret or if 2FA is not enabled for the vault.
-pub fn get_totp_qr_info(vault_name: &str) -> Result<(String, String), Error> {
-    let secret_bytes = decrypt_secret(vault_name)?;
+pub fn get_totp_qr_info(
+    vault_name: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(String, String), Error> {
+    let secret_bytes = decrypt_secret(vault_name, ctx.clone())?;
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret_bytes);
     let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
 
@@ -207,8 +219,12 @@ fn verify_totp_from_secret_bytes(secret: &[u8], code: &str) -> Result<bool, anyh
     Ok(false)
 }
 
-pub fn verify_totp_code(vault_name: &str, code: &str) -> Result<bool, Error> {
-    let mut secret = decrypt_secret(vault_name)?;
+pub fn verify_totp_code(
+    vault_name: &str,
+    code: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<bool, Error> {
+    let mut secret = decrypt_secret(vault_name, ctx.clone())?;
     let res = verify_totp_from_secret_bytes(&secret, code)?;
     secret.zeroize();
     Ok(res)
@@ -256,12 +272,17 @@ pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
 ///
 /// # Errors:
 /// * Fails when unable to get key for the specified recipient.
-fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), Error> {
-    let (mut ctx, recipient_key) = get_recipient_key(locations)
+fn encrypt_and_store_secret(
+    locations: &Locations,
+    secret: &[u8],
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(), Error> {
+    let recipient_key = get_recipient_key(locations, ctx.clone())
         .map_err(|e| anyhow::anyhow!("Failed to get recipient key. Error: {}", e))?;
 
     let mut output = Vec::new();
-    ctx.encrypt([&recipient_key], secret, &mut output)
+    ctx.borrow_mut()
+        .encrypt([&recipient_key], secret, &mut output)
         .map_err(|e| anyhow::anyhow!("Failed to encrypt TOTP secret. Error: {}", e))?;
 
     let mut file = File::create(&locations.totp)?;
@@ -285,7 +306,7 @@ fn encrypt_and_store_secret(locations: &Locations, secret: &[u8]) -> Result<(), 
 ///
 /// # Errors:
 /// * Fails when unable to: find the `totp.gpg` file for the specified vault, open the `totp.gpg` file or get the gpgme `Context`.
-fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
+fn decrypt_secret(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<Vec<u8>, Error> {
     let locations = Locations::new(vault_name, "");
     if !locations.totp.exists() {
         return Err(anyhow::anyhow!(
@@ -298,9 +319,9 @@ fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
     let mut file = File::open(&locations.totp)?;
     file.read_to_end(&mut encrypted)?;
 
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
     let mut out = Vec::new();
-    ctx.decrypt(&encrypted, &mut out)
+    ctx.borrow_mut()
+        .decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt TOTP secret. Error: {}", e))?;
 
     lock_memory(&out);
@@ -319,18 +340,19 @@ fn decrypt_secret(vault_name: &str) -> Result<Vec<u8>, Error> {
 ///
 /// # Errors:
 /// * Fails when unable to: get gpgme `Context`, read the `recipient.txt` file, get the key for the recipient, encrypt the `gate.gpg` file, open the `gate.gpg` file, change the `gate.gpg` files permissions or write data to `gate.gpg`.
-pub fn ensure_gate_exists(vault_name: &str) -> Result<(), Error> {
+pub fn ensure_gate_exists(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     if locations.gate.exists() {
         return Ok(());
     }
 
-    let (mut ctx, recipient_key) = get_recipient_key(&locations)
+    let recipient_key = get_recipient_key(&locations, ctx.clone())
         .map_err(|e| anyhow::anyhow!("Failed to get recipient key. Error: {}", e))?;
 
     let data = b"gate";
     let mut output = Vec::new();
-    ctx.encrypt([&recipient_key], &data[..], &mut output)
+    ctx.borrow_mut()
+        .encrypt([&recipient_key], &data[..], &mut output)
         .map_err(|e| anyhow::anyhow!("Failed to encrypt gate file. Error: {}", e))?;
 
     let mut file = File::create(&locations.gate)?;
