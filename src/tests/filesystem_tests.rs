@@ -57,7 +57,7 @@ fn test_read_directory_with_subdirectories() {
 #[test]
 fn test_create_backup_successfully() {
     // Since create_backup uses Locations which uses system paths,
-    // we test with a non-existent vault to verify error handling
+    // test with a non-existent vault to verify error handling
     let result = create_backup("definitely_non_existent_test_vault");
 
     // This should fail since the vault doesn't exist
@@ -73,7 +73,7 @@ fn test_create_backup_successfully() {
 #[test]
 fn test_install_backup_successfully() {
     // This test would require a more complex setup with actual backup directories
-    // For now, we'll test the error case when backup doesn't exist
+    // For now, test the error case when backup doesn't exist
     let result = install_backup("non_existent_vault");
 
     assert!(result.is_err());

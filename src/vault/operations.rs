@@ -159,6 +159,26 @@ pub fn warm_up_gpg(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<(), Er
     Ok(())
 }
 
+// blocking part: only uses Send data (reads file into Vec<u8>)
+pub fn warm_up_gpg_blocking(vault_name: &str) -> Result<Vec<u8>, Error> {
+    let locations = Locations::new(vault_name, "");
+    let mut encrypted = Vec::new();
+
+    let file = File::open(&locations.gate)?;
+    let mut reader = BufReader::new(file);
+    reader.read_to_end(&mut encrypted)?;
+    Ok(encrypted)
+}
+
+// finalize on main thread: uses `ctx` (Rc<RefCell<Context>>) to decrypt
+pub fn warm_up_gpg_finalize(encrypted: Vec<u8>, ctx: Rc<RefCell<Context>>) -> Result<(), Error> {
+    let mut out = Vec::new();
+    ctx.borrow_mut()
+        .decrypt(&encrypted, &mut out)
+        .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
+    Ok(())
+}
+
 /// Deletes an account from the specified vault.
 ///
 /// # Arguments

@@ -1,7 +1,7 @@
 use crate::{
     gui::{dialogs::totp::show_totp_authentication_dialog, views::vault_view::VaultView},
     totp::is_totp_required,
-    vault::{Account, warm_up_gpg},
+    vault::{Account, warm_up_gpg_blocking, warm_up_gpg_finalize},
 };
 use adw::{ActionRow, ButtonContent, prelude::*};
 use gpgme::Context;
@@ -152,21 +152,46 @@ pub fn proceed_with_gate_warmup(content_area: &Box, vault_name: &str, ctx: Rc<Re
     }
 }
 
-/// Proceeds with GPG warm-up after TOTP verification (if required)
 fn proceed_with_gpg_warmup(content_area: &Box, vault_name: &str, ctx: Rc<RefCell<Context>>) {
-    // Attempt to warm up GPG by decrypting the gate file
-    match warm_up_gpg(vault_name, ctx.clone()) {
-        Ok(()) => {
-            VaultView::new(content_area, vault_name).create(ctx.clone());
+    let content_area = content_area.clone();
+    let vault_name = vault_name.to_string();
+    let ctx_main = ctx.clone();
+
+    clear_content(&content_area);
+    let loading = crate::gui::widgets::loading_spinner::LoadingOverlay::new();
+    content_area.append(loading.widget());
+    loading.show("Unlocking vault...");
+
+    glib::spawn_future_local(async move {
+        // run file I/O off the main thread
+        let vault_bg = vault_name.clone();
+        let blocking_res = gtk4::gio::spawn_blocking(move || warm_up_gpg_blocking(&vault_bg))
+            .await
+            .expect("GPG warmup task panicked");
+
+        loading.hide();
+
+        match blocking_res {
+            Ok(encrypted) => {
+                // finalize on main thread using Rc<RefCell<Context>>
+                match warm_up_gpg_finalize(encrypted, ctx_main.clone()) {
+                    Ok(()) => VaultView::new(&content_area, &vault_name).create(ctx_main),
+                    Err(e) => show_error_message(
+                        &content_area,
+                        "Failed to Access Vault",
+                        &format!("Could not finalize GPG warmup: {e}"),
+                    ),
+                }
+            }
+            Err(e) => {
+                show_error_message(
+                    &content_area,
+                    "Failed to Access Vault",
+                    &format!("Could not decrypt vault gate file: {e}"),
+                );
+            }
         }
-        Err(e) => {
-            show_error_message(
-                content_area,
-                "Failed to Access Vault",
-                &format!("Could not decrypt vault gate file: {e}"),
-            );
-        }
-    }
+    });
 }
 
 /// Shows an error message in the content area

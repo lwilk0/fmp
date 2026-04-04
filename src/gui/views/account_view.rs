@@ -24,8 +24,8 @@ use gtk4::{
 };
 use std::{cell::RefCell, rc::Rc};
 
-pub struct AccountView<'a> {
-    content_area: &'a Box,
+pub struct AccountView {
+    content_area: Box,
     vault_name: String,
     account_name: String,
     edit_mode: bool,
@@ -123,20 +123,33 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str, ctx: Rc<RefCe
     let vault_name_clone2 = vault_name.to_string();
 
     create_button.connect_clicked(move |_| {
-        let account = account_rc_clone.borrow();
-
+        let account = account_rc_clone.borrow().clone();
         if account.name.is_empty() {
             return;
         }
 
-        match create_account(&vault_name_clone2, &account) {
-            Ok(()) => {
-                VaultView::new(&content_area_clone2, &vault_name_clone2).create(ctx_clone.clone());
+        let vault_name_clone3 = vault_name_clone2.clone();
+        let content_area3 = content_area_clone2.clone();
+        let ctx_clone2 = ctx_clone.clone();
+
+        glib::spawn_future_local(async move {
+            let vault_name_clone4 = vault_name_clone3.clone();
+            let account_clone = account.clone();
+            let result = gtk4::gio::spawn_blocking(move || {
+                create_account(&vault_name_clone4, &account_clone)
+            })
+            .await
+            .expect("create account task panicked");
+
+            match result {
+                Ok(()) => {
+                    VaultView::new(&content_area3, &vault_name_clone3).create(ctx_clone2.clone());
+                }
+                Err(e) => {
+                    eprintln!("Failed to create account: {e}");
+                }
             }
-            Err(e) => {
-                log::error!("Failed to create account: {e}");
-            }
-        }
+        });
     });
 
     actions_box.append(&cancel_button);
@@ -147,56 +160,83 @@ pub fn show_new_account_view(content_area: &Box, vault_name: &str, ctx: Rc<RefCe
     content_area.append(&scrollable);
 }
 
-impl<'a> AccountView<'a> {
+impl AccountView {
     pub fn new(
-        content_area: &'a Box,
+        content_area: &Box,
         vault_name: &str,
         account_name: &str,
         edit_mode: bool,
-    ) -> Self {
-        Self {
-            content_area,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            content_area: content_area.clone(),
             vault_name: vault_name.to_string(),
             account_name: account_name.to_string(),
             edit_mode,
-        }
+        })
     }
 
-    pub fn create(&self, ctx: Rc<RefCell<Context>>) {
-        clear_content(self.content_area);
+    pub fn create(self: Rc<Self>, ctx: Rc<RefCell<Context>>) {
+        clear_content(&self.content_area);
 
-        let account_data = match get_full_account_details(&self.vault_name, &self.account_name) {
-            Ok(account) => account,
-            Err(_) => Account {
-                name: self.account_name.clone(),
-                ..Default::default()
-            },
-        };
+        let content_area = self.content_area.clone();
+        let vault_name = self.vault_name.clone();
+        let account_name = self.account_name.clone();
+        let edit_mode = self.edit_mode;
+        let this = self.clone();
 
-        let account_rc = Rc::new(RefCell::new(account_data));
+        // loading spinner...
+        let loading = crate::gui::widgets::loading_spinner::LoadingOverlay::new();
+        content_area.append(loading.widget());
+        loading.show("Loading account...");
 
-        let main_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Vertical, 24))
-            .margins(24, 24, 24, 24)
-            .build();
+        let ctx_clone = ctx.clone();
 
-        let scrolled_window = ScrolledWindow::new();
-        scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
-        scrolled_window.set_vexpand(true);
-        scrolled_window.set_hexpand(true);
+        glib::spawn_future_local(async move {
+            let vault_name_clone = vault_name.clone();
+            let account_name_clone = account_name.clone();
+            let account_name_clone2 = account_name_clone.clone();
 
-        main_box.append(&self.header_section(&account_rc, ctx.clone()));
-        main_box.append(&self.details_section(&account_rc));
-        main_box.append(&self.password_section(&account_rc));
-        main_box.append(&self.additional_fields_section(&account_rc, ctx.clone()));
-        main_box.append(&self.notes_section(&account_rc));
+            let result = gtk4::gio::spawn_blocking(move || {
+                get_full_account_details(&vault_name_clone, &account_name_clone)
+            })
+            .await
+            .expect("decrypt task panicked");
 
-        if self.edit_mode {
-            main_box.append(&self.actions_section(&account_rc, ctx));
-        }
+            loading.hide();
 
-        scrolled_window.set_child(Some(&main_box));
-        self.content_area.append(&scrolled_window);
+            let account_data = match result {
+                Ok(account) => account,
+                Err(_) => Account {
+                    name: account_name_clone2.clone(),
+                    ..Default::default()
+                },
+            };
+
+            let account_rc = Rc::new(RefCell::new(account_data));
+
+            let main_box = CreateBox::new()
+                .new_box(Box::new(Orientation::Vertical, 24))
+                .margins(24, 24, 24, 24)
+                .build();
+
+            let scrolled_window = ScrolledWindow::new();
+            scrolled_window.set_policy(PolicyType::Never, PolicyType::Automatic);
+            scrolled_window.set_vexpand(true);
+            scrolled_window.set_hexpand(true);
+
+            main_box.append(&this.header_section(&account_rc, ctx_clone.clone()));
+            main_box.append(&this.details_section(&account_rc));
+            main_box.append(&this.password_section(&account_rc));
+            main_box.append(&this.additional_fields_section(&account_rc, ctx_clone.clone()));
+            main_box.append(&this.notes_section(&account_rc));
+
+            if edit_mode {
+                main_box.append(&this.actions_section(&account_rc, ctx_clone));
+            }
+
+            scrolled_window.set_child(Some(&main_box));
+            content_area.append(&scrolled_window);
+        });
     }
 
     fn header_section(&self, account_rc: &Rc<RefCell<Account>>, ctx: Rc<RefCell<Context>>) -> Box {
@@ -260,7 +300,6 @@ impl<'a> AccountView<'a> {
             edit_button.set_tooltip_text(Some("Edit account"));
             edit_button.add_css_class("suggested-action");
 
-            // Connect edit functionality
             let content_area_clone = self.content_area.clone();
             let vault_name_clone = self.vault_name.to_string();
             let account_name_clone = self.account_name.to_string();
@@ -286,7 +325,6 @@ impl<'a> AccountView<'a> {
             delete_button.set_tooltip_text(Some("Delete account"));
             delete_button.add_css_class("destructive-action");
 
-            // Connect delete functionality with confirmation dialog
             let content_area_delete = self.content_area.clone();
             let vault_name_delete = self.vault_name.to_string();
             let account_name_delete = self.account_name.to_string();
@@ -855,7 +893,6 @@ fn create_password_field_row(
     reveal_button.add_css_class("flat");
     reveal_button.set_tooltip_text(Some("Show/Hide Password"));
 
-    // Connect entry changes to account data
     let account_rc_clone = account_rc.clone();
     entry.connect_changed(move |entry| {
         let text = entry.text().to_string();
