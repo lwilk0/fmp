@@ -5,8 +5,6 @@
 
 A password manager written in memory-safe Rust.
 
-Forgot My Password (FMP) lets you generate, store, and manage passwords in encrypted vaults. It uses GPG to protect your sensitive data and provides a fast, intuitive GUI.
-
 ## Table of Contents
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)

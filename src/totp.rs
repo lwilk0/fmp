@@ -479,19 +479,16 @@ fn ledger_contains(vault: &str) -> bool {
 }
 
 fn ledger_add(vault: &str) -> Result<(), Error> {
-    // Update both files on disk
     for p in [ledger_path_config(), ledger_path_data()] {
         let mut set = load_ledger_at(&p);
         set.insert(vault.to_string());
         save_ledger_at(&p, &set)?;
     }
-    // Update the in-memory cache
     LEDGER_CACHE.with(|cache| {
         let mut borrow = cache.borrow_mut();
         if let Some(ref mut set) = *borrow {
             set.insert(vault.to_string());
         }
-        // If cache wasn't loaded yet, no need to populate — next read will load from disk
     });
     Ok(())
 }
