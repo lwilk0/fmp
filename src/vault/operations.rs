@@ -144,22 +144,6 @@ pub fn create_vault(
 ///
 /// # Errors
 /// * If the gate file cannot be read or decrypted.
-pub fn warm_up_gpg(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<(), Error> {
-    let locations = Locations::new(vault_name, "");
-    let mut encrypted = Vec::new();
-    let mut out = Vec::new();
-
-    let file = File::open(&locations.gate)?;
-    let mut reader = BufReader::new(file);
-    reader.read_to_end(&mut encrypted)?;
-
-    ctx.borrow_mut()
-        .decrypt(&encrypted, &mut out)
-        .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
-    Ok(())
-}
-
-// blocking part: only uses Send data (reads file into Vec<u8>)
 pub fn warm_up_gpg_blocking(vault_name: &str) -> Result<Vec<u8>, Error> {
     let locations = Locations::new(vault_name, "");
     let mut encrypted = Vec::new();

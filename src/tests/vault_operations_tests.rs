@@ -186,29 +186,6 @@ fn test_delete_non_existent_account() {
 }
 
 #[test]
-fn test_warm_up_gpg() {
-    let ctx = Rc::new(RefCell::new(
-        Context::from_protocol(Protocol::OpenPgp).unwrap(),
-    ));
-
-    let result = warm_up_gpg("test_vault", ctx);
-
-    // This will fail without proper vault setup
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("No such file")
-            || error_msg.contains("permission")
-            || error_msg.contains("decrypt")
-            || error_msg.contains("gpg")
-            || error_msg.contains("OpenPgp")
-    );
-
-    // Clean up in case the test vault exists
-    cleanup_test_vault("test_vault");
-}
-
-#[test]
 fn test_create_account_with_empty_name() {
     let account = Account {
         name: "".to_string(),

@@ -8,8 +8,6 @@ A password manager written in memory-safe Rust.
 Forgot My Password (FMP) lets you generate, store, and manage passwords in encrypted vaults. It uses GPG to protect your sensitive data and provides a fast, intuitive GUI.
 
 ## Table of Contents
-- [Features](#features)
-- [Security](#security)
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)
 - [Usage](#usage)
@@ -17,26 +15,6 @@ Forgot My Password (FMP) lets you generate, store, and manage passwords in encry
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
-
-## Features
-- **GUI:** Intuitive and fast GUI.
-- **Create Vaults:** Create encrypted vaults to store your passwords.
-- **Modify Accounts:** Add, delete, and rename accounts within a vault.
-- **Passwords:** Generate strong passwords and estimate their entropy.
-- **Backups:** Backup and restore vaults securely.
-- **Modify Account Info:** Update account usernames and passwords.
-- **Cross-platform compatibility:** FMP is available on Unix and Windows.
-
-## Security
-- **Encryption with GPG:** All data is encrypted using GPG. Only users with the correct GPG key can decrypt vault contents.
-- **No plaintext passwords on disk:** Sensitive information is always encrypted.
-- **Sensitive variables cannot be written to disk:** Secrets are never written while unencrypted.
-- **Sensitive variables are obfuscated in memory:** Secure memory handling (Rust’s `secrecy` crate, memory locking) helps prevent secrets from being scraped from RAM.
-- **Sensitive variables are cleared from memory:** Memory holding secrets is zeroized when no longer needed.
-- **Memory locking:** System calls (like `mlock`) prevent sensitive memory from being swapped to disk.
-- **File permissions:** Strict file permissions on sensitive files.
-- **Recipient verification:** Encryption is tied to a specific GPG recipient.
-- **Cross-platform secure handling:** Secure memory and file handling for both Unix and Windows.
 
 ## Requirements
 - **Rust toolchain and Cargo**
