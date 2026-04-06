@@ -58,14 +58,12 @@ impl SecureClipboardString {
 
 impl Drop for SecureClipboardString {
     fn drop(&mut self) {
-        // Unlock memory before zeroization
-        unlock_memory(self.inner_content.as_bytes());
-
-        // Add extra security measures for secure overwriting
         unsafe {
             let content_bytes = self.inner_content.as_mut_vec();
             secure_overwrite(content_bytes);
         }
+
+        unlock_memory(self.inner_content.as_bytes());
 
         // FIXME: IDK if this even works
         let operation_start_time = std::time::Instant::now();

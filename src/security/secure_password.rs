@@ -18,7 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::{
-    crypto::{lock_memory, secure_overwrite},
+    crypto::{lock_memory, secure_overwrite, unlock_memory},
     security::SecureClipboardString,
 };
 use rand::{RngCore, rng};
@@ -27,11 +27,19 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
 
 /// A secure password wrapper that handles memory locking and zeroization
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SecurePassword {
     inner_secret: SecretString,
     // Add a dummy field to make memory layout less predictable
     obfuscation_data: [u8; 32],
+}
+
+// Fancy schmancy clone that (fingers crossed) does not leak memory
+impl Clone for SecurePassword {
+    fn clone(&self) -> Self {
+        let password_str = self.inner_secret.expose_secret().to_string();
+        Self::new(password_str)
+    }
 }
 
 impl SecurePassword {
@@ -42,12 +50,14 @@ impl SecurePassword {
         let mut obfuscation_buffer = [0u8; 32];
         rng().fill_bytes(&mut obfuscation_buffer);
 
+        let boxed = password_input.clone().into_boxed_str();
         let secure_password_instance = Self {
-            inner_secret: SecretString::new(password_input.clone().into_boxed_str()),
+            inner_secret: SecretString::new(boxed),
             obfuscation_data: obfuscation_buffer,
         };
 
         password_input.zeroize();
+        unlock_memory(password_input.as_bytes());
 
         secure_password_instance
     }
@@ -80,6 +90,7 @@ impl SecurePassword {
 
         // Securely wipe the original password string
         new_password_input.zeroize();
+        unlock_memory(new_password_input.as_bytes());
     }
 
     /// Creates a masked version of the password for display
@@ -93,7 +104,6 @@ impl SecurePassword {
     pub fn expose_for_clipboard(&self) -> SecureClipboardString {
         let password_copy = self.inner_secret.expose_secret().to_string();
 
-        lock_memory(password_copy.as_bytes());
         SecureClipboardString::new(password_copy)
     }
 
@@ -104,8 +114,6 @@ impl SecurePassword {
         F: FnOnce(&str) -> R,
     {
         let exposed_password = self.inner_secret.expose_secret();
-
-        lock_memory(exposed_password.as_bytes());
 
         // Add some timing obfuscation to prevent timing attacks
         let operation_start_time = std::time::Instant::now();
@@ -136,7 +144,17 @@ impl Drop for SecurePassword {
             // This is unsafe but necessary to access the inner data for secure cleanup
             std::ptr::addr_of_mut!(self.inner_secret).as_mut()
         } {
-            let _ = exposed.expose_secret();
+            let secret_ref = exposed.expose_secret();
+
+            unsafe {
+                let ptr = secret_ref.as_ptr() as *mut u8;
+                let len = secret_ref.len();
+                if len > 0 {
+                    let slice = std::slice::from_raw_parts_mut(ptr, len);
+                    secure_overwrite(slice);
+                    unlock_memory(std::slice::from_raw_parts(ptr, len));
+                }
+            }
         }
 
         // FIXME: IDK if this even works

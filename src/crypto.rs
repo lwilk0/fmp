@@ -180,3 +180,110 @@ pub fn secure_overwrite(data: &mut [u8]) {
     // Zeroize uses volatile writes to ensure the compiler does not remove the wipe
     data.zeroize();
 }
+
+/// RAII guard that locks memory on creation and securely overwrites + unlocks on drop.  
+///  
+/// This eliminates manual lock/unlock pairing errors that cause mlock leaks.  
+/// The buffer is locked immediately on construction and guaranteed to be  
+/// zeroized-then-unlocked on drop, even during panics or early returns.  
+///  
+/// # Security Notes  
+/// * Data is zeroized while still locked (preventing swap exposure during cleanup)  
+/// * Drop order is always: secure_overwrite → unlock_memory  
+/// * The guard prevents the compiler from optimizing away the zeroization  
+/// * Clone is intentionally NOT implemented to prevent untracked copies  
+pub struct LockedBuffer {
+    data: Vec<u8>,
+}
+
+#[allow(dead_code)]
+impl LockedBuffer {
+    /// Creates a new `LockedBuffer`, immediately locking the data in memory.  
+    ///  
+    /// # Arguments  
+    /// * `data` - The sensitive data to protect. Ownership is transferred to the guard.  
+    pub fn new(data: Vec<u8>) -> Self {
+        lock_memory(&data);
+        Self { data }
+    }
+
+    /// Creates a `LockedBuffer` from a `String`, consuming it.  
+    ///  
+    /// This avoids the need to manually convert strings to bytes and prevents  
+    /// the original String from lingering unzeroized.  
+    pub fn from_string(s: String) -> Self {
+        let bytes = s.into_bytes();
+        lock_memory(&bytes);
+        Self { data: bytes }
+    }
+
+    /// Returns a read-only slice of the locked data.  
+    pub fn as_slice(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Returns a mutable slice of the locked data.  
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
+
+    /// Returns the length of the locked data.  
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns true if the locked data is empty.  
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Attempts to interpret the locked data as a UTF-8 string slice.  
+    ///  
+    /// # Returns  
+    /// * `Ok(&str)` if the data is valid UTF-8  
+    /// * `Err` if the data is not valid UTF-8  
+    pub fn as_str(&self) -> Result<&str, std::str::Utf8Error> {
+        std::str::from_utf8(&self.data)
+    }
+
+    /// Provides scoped read access to the data via a closure.  
+    ///  
+    /// This pattern ensures the caller cannot hold a reference beyond the  
+    /// closure's lifetime, reducing the risk of accidental exposure.  
+    pub fn with_data<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[u8]) -> R,
+    {
+        f(&self.data)
+    }
+
+    /// Consumes the guard, zeroizes and unlocks the data, returning nothing.  
+    ///  
+    /// Use this for explicit early cleanup when you want to release the  
+    /// locked memory before the guard would naturally go out of scope.  
+    pub fn destroy(mut self) {
+        secure_overwrite(&mut self.data);
+        unlock_memory(&self.data);
+        // Prevent Drop from running again on empty data
+        self.data = Vec::new();
+    }
+}
+
+impl Drop for LockedBuffer {
+    fn drop(&mut self) {
+        if !self.data.is_empty() {
+            // Critical: zeroize WHILE STILL LOCKED, then unlock
+            secure_overwrite(&mut self.data);
+            unlock_memory(&self.data);
+        }
+    }
+}
+
+impl std::fmt::Debug for LockedBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LockedBuffer")
+            .field("len", &self.data.len())
+            .field("data", &"[REDACTED]")
+            .finish()
+    }
+}

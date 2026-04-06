@@ -27,6 +27,7 @@ use std::{
     io::{BufReader, Read, Write},
     rc::Rc,
 };
+use zeroize::Zeroize;
 
 /// Retrieves the full account details for a specific account in a vault.
 ///
@@ -160,6 +161,9 @@ pub fn warm_up_gpg_finalize(encrypted: Vec<u8>, ctx: Rc<RefCell<Context>>) -> Re
     ctx.borrow_mut()
         .decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt warm-up file. Error: {}", e))?;
+
+    out.zeroize();
+
     Ok(())
 }
 

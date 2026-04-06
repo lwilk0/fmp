@@ -18,6 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 
 */
 
+use crate::crypto::LockedBuffer;
 use anyhow::Error;
 use base32::Alphabet;
 use gpgme::Context;
@@ -97,9 +98,12 @@ pub fn prepare_totp_setup(
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
     let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
 
+    let result_vec = secret.to_vec();
+
+    secret.zeroize();
     lock_memory(&secret);
 
-    Ok((secret.to_vec(), secret_b32, otpauth_uri))
+    Ok((result_vec, secret_b32, otpauth_uri))
 }
 
 /// Confirm and finalize 2FA setup for a vault using a prepared secret.
@@ -140,10 +144,21 @@ pub fn get_totp_qr_info(
     vault_name: &str,
     ctx: Rc<RefCell<Context>>,
 ) -> Result<(String, String), Error> {
-    let secret_bytes = decrypt_secret(vault_name, ctx.clone())?;
-    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret_bytes);
-    let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
+    let secret_buf = decrypt_secret(vault_name, ctx.clone())?;
+    // secret_buf is a LockedBuffer
+    let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, secret_buf.as_slice());
+    // secret_buf automatically cleaned up when dropped
 
+    let issuer = "FMP";
+    let label = format!("{issuer}:{vault_name}");
+    let otpauth_uri = format!(
+        "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
+        urlencoding::encode(&label),
+        secret_b32,
+        urlencoding::encode(issuer)
+    );
+
+    // Note: secret_b32 is returned — caller responsible for its lifetime
     Ok((secret_b32, otpauth_uri))
 }
 
@@ -224,10 +239,40 @@ pub fn verify_totp_code(
     code: &str,
     ctx: Rc<RefCell<Context>>,
 ) -> Result<bool, Error> {
-    let mut secret = decrypt_secret(vault_name, ctx.clone())?;
-    let res = verify_totp_from_secret_bytes(&secret, code)?;
-    secret.zeroize();
-    Ok(res)
+    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
+    if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
+        return Ok(false);
+    }
+
+    let secret = decrypt_secret(vault_name, ctx.clone())?;
+
+    #[allow(clippy::cast_possible_wrap)]
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow::anyhow!("System time error: {}", e))?
+        .as_secs() as i64;
+
+    let step = 30i64;
+    let digits = 6u32;
+
+    let mut valid = false;
+    for skew in [-1i64, 0, 1] {
+        #[allow(clippy::cast_sign_loss)]
+        let counter = ((now / step) + skew) as u64;
+        let hotp_val = hotp(secret.as_slice(), counter, digits);
+        let mut candidate = format!("{:0width$}", hotp_val, width = digits as usize);
+
+        if candidate == code {
+            valid = true;
+            candidate.zeroize();
+            break;
+        }
+
+        candidate.zeroize();
+    }
+
+    // secret automatically zeroized+unlocked when dropped
+    Ok(valid)
 }
 
 pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
@@ -249,7 +294,7 @@ pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
 
     let mut mac = HmacSha1::new_from_slice(secret).expect("HMAC can take key of any size");
     mac.update(&counter_bytes);
-    let result = mac.finalize().into_bytes();
+    let mut result = mac.finalize().into_bytes();
 
     let offset = (result[19] & 0x0f) as usize;
     let bin_code = ((u32::from(result[offset]) & 0x7f) << 24)
@@ -258,6 +303,10 @@ pub fn hotp(secret: &[u8], counter: u64, digits: u32) -> u32 {
         | (u32::from(result[offset + 3]) & 0xff);
 
     let modulo = 10u32.pow(digits);
+
+    counter_bytes.zeroize();
+    result.as_mut_slice().zeroize();
+
     bin_code % modulo
 }
 
@@ -306,7 +355,8 @@ fn encrypt_and_store_secret(
 ///
 /// # Errors:
 /// * Fails when unable to: find the `totp.gpg` file for the specified vault, open the `totp.gpg` file or get the gpgme `Context`.
-fn decrypt_secret(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<Vec<u8>, Error> {
+/// **Callers MUST call `zeroize()` then `unlock_memory()` on the returned buffer when done.**  
+fn decrypt_secret(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<LockedBuffer, Error> {
     let locations = Locations::new(vault_name, "");
     if !locations.totp.exists() {
         return Err(anyhow::anyhow!(
@@ -324,10 +374,9 @@ fn decrypt_secret(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<Vec<u8>
         .decrypt(&encrypted, &mut out)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt TOTP secret. Error: {}", e))?;
 
-    lock_memory(&out);
     encrypted.zeroize();
 
-    Ok(out)
+    Ok(LockedBuffer::new(out))
 }
 
 /// Create a tiny encrypted gate file to trigger GPG passphrase prompt early.

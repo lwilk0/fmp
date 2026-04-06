@@ -17,7 +17,7 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::crypto::lock_memory;
+use crate::crypto::LockedBuffer;
 use crate::models::Account;
 use crate::security::SecurePassword;
 use crate::storage::Locations;
@@ -70,9 +70,7 @@ impl Store {
     pub fn encrypt_account_to_file(&mut self, account_data: &Account) -> Result<(), Error> {
         // Serialize the account to JSON
         let serialized_json = serde_json::to_string(account_data)?;
-        let mut account_bytes = serialized_json.into_bytes();
-
-        lock_memory(account_bytes.as_slice());
+        let account_buf = LockedBuffer::from_string(serialized_json);
 
         let recipient_id = read_to_string(&self.storage_locations.recipient)?
             .trim()
@@ -95,7 +93,11 @@ impl Store {
 
         let mut encrypted_output = Vec::new();
         self.gpg_context
-            .encrypt([&recipient_key], &account_bytes, &mut encrypted_output)
+            .encrypt(
+                [&recipient_key],
+                account_buf.as_slice(),
+                &mut encrypted_output,
+            )
             .map_err(|encryption_error| {
                 anyhow::anyhow!(
                     "Failed to encrypt data for recipient `{}`. Error: {}",
@@ -105,8 +107,6 @@ impl Store {
             })?;
 
         output_file.write_all(&encrypted_output)?;
-
-        account_bytes.zeroize();
 
         Ok(())
     }
@@ -132,24 +132,19 @@ impl Store {
                 anyhow::anyhow!("Failed to decrypt data. Error: {}", decryption_error)
             })?;
 
-        // Lock the decrypted buffer to reduce swap risk
-        lock_memory(&decrypted_output);
+        let decrypted_buf = LockedBuffer::new(decrypted_output);
 
-        // Try to parse as JSON first
-        let account_data = if let Ok(json_string) = String::from_utf8(decrypted_output.clone()) {
-            if let Ok(parsed_account) = serde_json::from_str::<Account>(&json_string) {
+        let account_data = if let Ok(json_str) = decrypted_buf.as_str() {
+            if let Ok(parsed_account) = serde_json::from_str::<Account>(json_str) {
                 parsed_account
             } else {
-                // Fallback to old format parsing
-                Self::parse_legacy_format(&decrypted_output)?
+                Self::parse_legacy_format(decrypted_buf.as_slice())?
             }
         } else {
             return Err(anyhow::anyhow!(
                 "Failed to convert decrypted data to string"
             ));
         };
-
-        decrypted_output.zeroize();
 
         Ok(account_data)
     }
