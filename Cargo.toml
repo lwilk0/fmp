@@ -60,9 +60,7 @@ panic = "abort"
 debug = 0
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 incremental = true
-debug = 1
-
-[profile.test]
-opt-level = 1
+debug = true
+split-debuginfo = "unpacked"

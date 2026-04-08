@@ -66,8 +66,9 @@ pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
 pub fn create_backup(vault_name: &str) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
 
-    if locations.backup.exists() {
-        remove_dir_all(&locations.backup)?;
+    let backup_path = locations.backup.join(vault_name);
+    if backup_path.exists() {
+        remove_dir_all(&backup_path)?;
     }
 
     create_dir_all(&locations.backup)?;

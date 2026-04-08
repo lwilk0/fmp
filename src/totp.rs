@@ -355,7 +355,7 @@ fn encrypt_and_store_secret(
 ///
 /// # Errors:
 /// * Fails when unable to: find the `totp.gpg` file for the specified vault, open the `totp.gpg` file or get the gpgme `Context`.
-/// **Callers MUST call `zeroize()` then `unlock_memory()` on the returned buffer when done.**  
+/// **Callers MUST call `zeroize()` then `unlock_memory()` on the returned buffer when done.**
 fn decrypt_secret(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result<LockedBuffer, Error> {
     let locations = Locations::new(vault_name, "");
     if !locations.totp.exists() {

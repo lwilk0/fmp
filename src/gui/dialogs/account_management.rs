@@ -1,22 +1,19 @@
 /// All this code is awful, sorry future me. There must be a better way????
 use crate::{
-    vault::Account,
-    storage::filesystem::rename_account,
-    gui::dialogs::common::show_error_dialog,
+    gui::dialogs::common::show_error_dialog, storage::filesystem::rename_account, vault::Account,
 };
 use adw::prelude::*;
-use gtk4::{
-    Box as GtkBox, Button, Dialog, Entry, Label,
-    Orientation,
-};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
 use gpgme::Context;
+use gtk4::{Box as GtkBox, Button, Dialog, Entry, Label, Orientation};
+use std::{cell::RefCell, rc::Rc};
 
 /// Shows the rename account dialog
-pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_area: &GtkBox, ctx: Rc<RefCell<Context>>) {
+pub fn show_rename_account_dialog(
+    vault_name: &str,
+    account_name: &str,
+    content_area: &GtkBox,
+    ctx: Rc<RefCell<Context>>,
+) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Rename Account"));
     dialog.set_modal(true);
@@ -75,7 +72,8 @@ pub fn show_rename_account_dialog(vault_name: &str, account_name: &str, content_
                         &vault_name_clone,
                         &new_name,
                         false,
-                    ).create(ctx.clone());
+                    )
+                    .create(ctx.clone());
                 }
                 Err(e) => {
                     log::error!("Failed to rename account: {e}");
@@ -102,7 +100,7 @@ pub fn show_add_field_dialog(
     account_rc: &Rc<RefCell<Account>>,
     content_area: &GtkBox,
     vault_name: &str,
-    ctx: Rc<RefCell<Context>>
+    ctx: Rc<RefCell<Context>>,
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Add Additional Field"));
@@ -175,7 +173,7 @@ pub fn show_add_field_dialog(
                     "Field Already Exists",
                     &format!(
                         "A field named \"{field_name}\" already exists. Please choose a different name."
-                        
+
                     ),
                 );
                 return;
@@ -231,7 +229,7 @@ pub fn show_edit_field_dialog(
     content_area: &GtkBox,
     vault_name: &str,
     field_name: &str,
-    ctx: Rc<RefCell<Context>>
+    ctx: Rc<RefCell<Context>>,
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Edit Field"));
@@ -388,7 +386,7 @@ pub fn show_delete_field_dialog(
     content_area: &GtkBox,
     vault_name: &str,
     field_name: &str,
-    ctx: Rc<RefCell<Context>>
+    ctx: Rc<RefCell<Context>>,
 ) {
     let dialog = Dialog::new();
     dialog.set_title(Some("Delete Field"));
@@ -479,4 +477,3 @@ pub fn show_delete_field_dialog(
     dialog.set_child(Some(&content_box));
     dialog.present();
 }
-
