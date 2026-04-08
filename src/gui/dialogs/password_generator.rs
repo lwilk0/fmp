@@ -458,7 +458,7 @@ fn create_password_display_preferences_group(
             {
                 entry_ref.set_text(&generated_password);
                 let mut account = account_use_ref.borrow_mut();
-                account.password.update(generated_password.to_string());
+                account.password.update(&generated_password);
                 window_ref.close();
             }
         });

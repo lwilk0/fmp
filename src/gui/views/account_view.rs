@@ -206,10 +206,21 @@ impl AccountView {
 
             let account_data = match result {
                 Ok(account) => account,
-                Err(_) => Account {
-                    name: account_name_clone2.clone(),
-                    ..Default::default()
-                },
+                Err(e) => {
+                    log::error!("Failed to decrypt account '{}': {e}", account_name_clone2);
+                    clear_content(&content_area);
+                    let err_label = Label::new(Some(&format!(
+                        "Failed to load account '{}': {e}\n\nThe account data could not be decrypted. Check that your GPG key is available.",
+                        account_name_clone2
+                    )));
+                    err_label.set_wrap(true);
+                    err_label.set_halign(gtk4::Align::Center);
+                    err_label.set_valign(gtk4::Align::Center);
+                    err_label.set_margin_top(48);
+                    err_label.add_css_class("dim-label");
+                    content_area.append(&err_label);
+                    return;
+                }
             };
 
             let account_rc = Rc::new(RefCell::new(account_data));
@@ -477,9 +488,11 @@ impl AccountView {
         if self.edit_mode {
             let account_rc_edit = account_rc.clone();
             password_entry.connect_changed(move |entry| {
-                let text = entry.text().to_string();
+                let mut text = entry.text().to_string();
                 let mut account = account_rc_edit.borrow_mut();
-                account.password.update(text);
+                account.password.update(&text);
+                use zeroize::Zeroize;
+                text.zeroize();
             });
         }
 
@@ -895,9 +908,11 @@ fn create_password_field_row(
 
     let account_rc_clone = account_rc.clone();
     entry.connect_changed(move |entry| {
-        let text = entry.text().to_string();
+        let mut text = entry.text().to_string();
         let mut account = account_rc_clone.borrow_mut();
-        account.password.update(text);
+        account.password.update(&text);
+        use zeroize::Zeroize;
+        text.zeroize();
     });
 
     let entry_gen = entry.clone();

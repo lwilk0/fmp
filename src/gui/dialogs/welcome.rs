@@ -180,7 +180,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
         // Move only the plain String into the main-loop task. Do NOT move the WeakRef into the std thread.
         let text_for_main = text.clone();
         let weak_label_for_main = weak_label.clone();
-        glib::MainContext::default().spawn_local(async move {
+        glib::spawn_future_local(async move {
             if let Some(label) = weak_label_for_main.upgrade() {
                 label.set_text(&text_for_main);
             }

@@ -1,4 +1,5 @@
 /// All this code is awful, sorry future me. There must be a better way????
+use crate::gui::dialogs::common::show_error_dialog;
 use crate::storage::filesystem::{
     create_backup, delete_backup, delete_vault, install_backup, rename_vault,
 };
@@ -66,6 +67,7 @@ pub fn show_backup_vault_dialog(
         }
         Err(e) => {
             log::error!("Failed to create backup: {e}");
+            show_error_dialog("Backup Failed", &format!("Could not create backup: {e}"));
         }
     });
 
@@ -140,6 +142,7 @@ pub fn show_restore_vault_dialog(
             }
             Err(e) => {
                 log::error!("Failed to restore backup: {e}");
+                show_error_dialog("Restore Failed", &format!("Could not restore backup: {e}"));
             }
         }
     });
@@ -210,6 +213,7 @@ pub fn show_delete_backup_dialog(
         }
         Err(e) => {
             log::error!("Failed to delete backup: {e}");
+            show_error_dialog("Delete Failed", &format!("Could not delete backup: {e}"));
         }
     });
 
@@ -288,6 +292,7 @@ pub fn show_rename_vault_dialog(
                 }
                 Err(e) => {
                     log::error!("Failed to rename vault: {e}");
+                    show_error_dialog("Rename Failed", &format!("Could not rename vault: {e}"));
                 }
             }
         }
@@ -388,6 +393,7 @@ pub fn show_delete_vault_dialog(
                 }
                 Err(e) => {
                     log::error!("Failed to delete vault: {e}");
+                    show_error_dialog("Delete Failed", &format!("Could not delete vault: {e}"));
                 }
             }
         }

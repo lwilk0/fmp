@@ -8,10 +8,8 @@ use gpgme::Context;
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, pango::EllipsizeMode,
 };
-use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicU64};
-
-// Global counter for tracking vault loading operations
-pub static VAULT_LOADING_COUNTER: AtomicU64 = AtomicU64::new(0);
+use std::{cell::RefCell, rc::Rc};
+use zeroize::Zeroize;
 
 /// Creates a field row with label and value
 pub fn create_field_row(label_text: &str, value_text: &str, copyable: bool) -> Box {
@@ -104,7 +102,7 @@ pub fn create_editable_field_row(
     let account_rc_clone = account_rc.clone();
     let field_name_owned = field_name.to_string();
     entry.connect_changed(move |entry| {
-        let text = entry.text().to_string();
+        let mut text = entry.text().to_string();
         let mut account = account_rc_clone.borrow_mut();
 
         match field_name_owned.as_str() {
@@ -112,7 +110,10 @@ pub fn create_editable_field_row(
             "account_type" => account.account_type = text,
             "website" => account.website = text,
             "username" => account.username = text,
-            "password" => account.password.update(text),
+            "password" => {
+                account.password.update(&text);
+                text.zeroize();
+            }
             "notes" => account.notes = text,
             _ => {}
         }

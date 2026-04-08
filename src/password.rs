@@ -104,46 +104,46 @@ pub fn generate_password(password_config: &PasswordConfig) -> Result<String, Str
     Ok(password)
 }
 
-/// Calculates password strength score (0-100)
+/// Calculates password strength score (0-100) based on estimated bit entropy.
+///
+/// Entropy = log2(pool_size) * length, capped at 128 bits = 100.
 pub fn calculate_password_strength(password: &str) -> u8 {
     if password.is_empty() {
         return 0;
     }
 
-    let mut score = 0u8;
     let length = password.len();
 
-    // Length scoring (0-40 points)
-    score += match length {
-        0..=4 => 0,
-        5..=7 => 10,
-        8..=11 => 20,
-        12..=15 => 30,
-        _ => 40,
-    };
-
-    // Character variety scoring (0-40 points)
+    // Detect which character classes are present to estimate pool size
     let has_lower = password.chars().any(|c| c.is_ascii_lowercase());
     let has_upper = password.chars().any(|c| c.is_ascii_uppercase());
     let has_digit = password.chars().any(|c| c.is_ascii_digit());
-    let has_special = password.chars().any(|c| !c.is_alphanumeric());
-
-    let variety_count = [has_lower, has_upper, has_digit, has_special]
-        .iter()
-        .filter(|&&x| x)
-        .count();
-
-    score += u8::try_from(variety_count).expect("Failed to convert variety count") * 10;
-
-    // Entropy bonus (0-20 points)
-    let unique_chars = password
+    let has_special = password
         .chars()
-        .collect::<std::collections::HashSet<_>>()
-        .len();
-    let entropy_bonus = ((unique_chars as f32 / length as f32) * 20.0) as u8;
-    score += entropy_bonus.min(20);
+        .any(|c| !c.is_alphanumeric() && c.is_ascii());
+    let has_extended = password.chars().any(|c| !c.is_ascii());
 
-    score.min(100)
+    let pool_size: f32 = [
+        (has_lower, 26.0f32),
+        (has_upper, 26.0),
+        (has_digit, 10.0),
+        (has_special, 32.0),
+        (has_extended, 64.0),
+    ]
+    .iter()
+    .filter(|(present, _)| *present)
+    .map(|(_, size)| size)
+    .sum();
+
+    if pool_size == 0.0 {
+        return 0;
+    }
+
+    // bits of entropy = log2(pool_size) * length
+    // cap at 128 bits → 100 score
+    let bits = pool_size.log2() * length as f32;
+    let score = ((bits / 128.0) * 100.0).min(100.0) as u8;
+    score
 }
 
 /// Returns a color class based on password strength

@@ -40,19 +40,7 @@ impl SecureClipboardString {
     where
         F: FnOnce(&str) -> R,
     {
-        // Add some timing obfuscation to prevent timing attacks
-        let operation_start_time = std::time::Instant::now();
-
-        let result = operation_function(&self.inner_content);
-
-        // Ensure minimum execution time to prevent timing analysis
-        let minimum_duration = std::time::Duration::from_millis(5);
-        let elapsed_time = operation_start_time.elapsed();
-        if elapsed_time < minimum_duration {
-            std::thread::sleep(minimum_duration - elapsed_time);
-        }
-
-        result
+        operation_function(&self.inner_content)
     }
 }
 
@@ -60,19 +48,12 @@ impl Drop for SecureClipboardString {
     fn drop(&mut self) {
         unsafe {
             let content_bytes = self.inner_content.as_mut_vec();
+            // Save ptr+len before zeroing
+            let ptr = content_bytes.as_ptr();
+            let len = content_bytes.len();
             secure_overwrite(content_bytes);
-        }
-
-        unlock_memory(self.inner_content.as_bytes());
-
-        // FIXME: IDK if this even works
-        let operation_start_time = std::time::Instant::now();
-
-        // Ensure minimum execution time to prevent timing analysis
-        let minimum_duration = std::time::Duration::from_millis(2);
-        let elapsed_time = operation_start_time.elapsed();
-        if elapsed_time < minimum_duration {
-            std::thread::sleep(minimum_duration - elapsed_time);
+            // Unlock using the original address range, not the now-zeroed bytes
+            unlock_memory(std::slice::from_raw_parts(ptr, len));
         }
     }
 }

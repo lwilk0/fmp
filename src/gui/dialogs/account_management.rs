@@ -77,6 +77,7 @@ pub fn show_rename_account_dialog(
                 }
                 Err(e) => {
                     log::error!("Failed to rename account: {e}");
+                    show_error_dialog("Rename Failed", &format!("Could not rename account: {e}"));
                 }
             }
         }

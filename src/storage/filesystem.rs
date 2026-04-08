@@ -36,7 +36,7 @@ use std::{
 ///
 /// # Errors
 /// * If reading the directory fails, or if the file type cannot be determined, an error is returned.
-pub fn read_directory(directory: &PathBuf) -> Result<Vec<String>, Error> {
+pub fn read_directory(directory: &std::path::Path) -> Result<Vec<String>, Error> {
     let mut directories = Vec::new();
 
     for entry in read_dir(directory)? {
@@ -285,9 +285,12 @@ fn remove_mentions_from_file(file: PathBuf, filter_string: &str) -> Result<(), E
     let content = read_to_string(&file)?;
     let updated_content: String = content
         .lines()
-        .filter(|line| !line.contains(filter_string))
-        .collect::<Vec<_>>()
-        .join("\n");
+        .filter(|line| line.trim() != filter_string)
+        .fold(String::new(), |mut acc, line| {
+            acc.push_str(line);
+            acc.push('\n');
+            acc
+        });
 
     write(&file, updated_content)?;
 
@@ -320,8 +323,11 @@ fn update_vault_stats_on_rename(old_name: &str, new_name: &str) -> Result<(), Er
                 line.to_string()
             }
         })
-        .collect::<Vec<_>>()
-        .join("\n");
+        .fold(String::new(), |mut acc, line| {
+            acc.push_str(&line);
+            acc.push('\n');
+            acc
+        });
 
     write(&stats_file, updated_content)?;
 
@@ -346,8 +352,10 @@ pub fn increment_vault_usage(vault_name: &str) {
     let current_count = usage_counts.get(vault_name).unwrap_or(&0);
     usage_counts.insert(vault_name.to_string(), current_count + 1);
 
+    let mut entries: Vec<(String, u32)> = usage_counts.into_iter().collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
     let mut content = String::new();
-    for (name, count) in usage_counts {
+    for (name, count) in entries {
         use std::fmt::Write;
         writeln!(content, "{name}:{count}").unwrap();
     }

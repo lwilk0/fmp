@@ -1,8 +1,6 @@
 use crate::{
     gui::{
-        content::{
-            CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
-        },
+        content::{CreateActionRow, CreateBox, CreateScrollableView, clear_content},
         dialogs::{
             totp::{show_totp_management_dialog, show_totp_setup_dialog},
             vault_management::{
@@ -21,7 +19,13 @@ use crate::{
 use adw::{ActionRow, PreferencesGroup, prelude::*};
 use gpgme::Context;
 use gtk4::{Box, Label, Orientation};
-use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+static VAULT_LOADING_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub struct VaultView<'a> {
     content_area: &'a Box,

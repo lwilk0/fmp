@@ -18,7 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::{
-    crypto::{lock_memory, secure_overwrite, unlock_memory},
+    crypto::{lock_memory, secure_overwrite},
     security::SecureClipboardString,
 };
 use rand::{RngCore, rng};
@@ -44,20 +44,16 @@ impl Clone for SecurePassword {
 
 impl SecurePassword {
     /// Creates a new secure password from a string
-    pub fn new(mut password_input: String) -> Self {
+    pub fn new(password_input: String) -> Self {
         lock_memory(password_input.as_bytes());
 
         let mut obfuscation_buffer = [0u8; 32];
         rng().fill_bytes(&mut obfuscation_buffer);
 
-        let boxed = password_input.clone().into_boxed_str();
         let secure_password_instance = Self {
-            inner_secret: SecretString::new(boxed),
+            inner_secret: SecretString::new(password_input.into_boxed_str()),
             obfuscation_data: obfuscation_buffer,
         };
-
-        password_input.zeroize();
-        unlock_memory(password_input.as_bytes());
 
         secure_password_instance
     }
@@ -79,18 +75,11 @@ impl SecurePassword {
     }
 
     /// Updates the password with a new value
-    pub fn update(&mut self, mut new_password_input: String) {
-        // Lock the new password in memory
-        lock_memory(new_password_input.as_bytes());
-
+    pub fn update(&mut self, new_password_input: &str) {
         // Regenerate obfuscation data on update
         rng().fill_bytes(&mut self.obfuscation_data);
 
-        self.inner_secret = SecretString::new(new_password_input.clone().into_boxed_str());
-
-        // Securely wipe the original password string
-        new_password_input.zeroize();
-        unlock_memory(new_password_input.as_bytes());
+        self.inner_secret = SecretString::new(new_password_input.to_string().into_boxed_str());
     }
 
     /// Creates a masked version of the password for display
@@ -114,19 +103,7 @@ impl SecurePassword {
         F: FnOnce(&str) -> R,
     {
         let exposed_password = self.inner_secret.expose_secret();
-
-        // Add some timing obfuscation to prevent timing attacks
-        let operation_start_time = std::time::Instant::now();
-        let operation_result = operation_function(exposed_password);
-
-        // Ensure minimum execution time to prevent timing analysis
-        let minimum_duration = std::time::Duration::from_millis(10);
-        let elapsed_time = operation_start_time.elapsed();
-        if elapsed_time < minimum_duration {
-            std::thread::sleep(minimum_duration - elapsed_time);
-        }
-
-        operation_result
+        operation_function(exposed_password)
     }
 }
 
@@ -144,27 +121,7 @@ impl Drop for SecurePassword {
             // This is unsafe but necessary to access the inner data for secure cleanup
             std::ptr::addr_of_mut!(self.inner_secret).as_mut()
         } {
-            let secret_ref = exposed.expose_secret();
-
-            unsafe {
-                let ptr = secret_ref.as_ptr() as *mut u8;
-                let len = secret_ref.len();
-                if len > 0 {
-                    let slice = std::slice::from_raw_parts_mut(ptr, len);
-                    secure_overwrite(slice);
-                    unlock_memory(std::slice::from_raw_parts(ptr, len));
-                }
-            }
-        }
-
-        // FIXME: IDK if this even works
-        let operation_start_time = std::time::Instant::now();
-
-        // Ensure minimum execution time to prevent timing analysis
-        let minimum_duration = std::time::Duration::from_millis(2);
-        let elapsed_time = operation_start_time.elapsed();
-        if elapsed_time < minimum_duration {
-            std::thread::sleep(minimum_duration - elapsed_time);
+            exposed.zeroize();
         }
     }
 }
@@ -186,11 +143,7 @@ impl<'de> Deserialize<'de> for SecurePassword {
     where
         D: Deserializer<'de>,
     {
-        let mut password_data = String::deserialize(deserializer)?;
-        let secure_password_instance = SecurePassword::new(password_data.clone());
-
-        password_data.zeroize();
-
-        Ok(secure_password_instance)
+        let password_data = String::deserialize(deserializer)?;
+        Ok(SecurePassword::new(password_data))
     }
 }

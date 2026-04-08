@@ -5,6 +5,9 @@
 
 A password manager written in memory-safe Rust.
 
+## Note on usage of AI:
+AI was not used for any sensitive backend components. It was somewhat used for GUI stuff but no issues are found. Some documentation was written by AI, but was rewording my writing - I have dyslexia and my writing is sometimes odd. All AI items have been check and edited to the same extent as my own. All AI code is being reworked in the GUI now I have a better understanding of the GTK library.
+
 ## Table of Contents
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)

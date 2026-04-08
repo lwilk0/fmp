@@ -11,14 +11,17 @@ use crate::gui::{
 use adw::{Application, ApplicationWindow, HeaderBar};
 use gpgme::{Context, Protocol};
 use gtk4::{
-    Box, CssProvider, Label, Orientation, gdk, gio, glib, style_context_add_provider_for_display,
+    Box, ButtonsType, CssProvider, DialogFlags, Label, MessageDialog, MessageType, Orientation,
+    gdk, gio, glib, style_context_add_provider_for_display,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn run_gui() {
+    crate::crypto::disable_core_dumps();
+
     let application = adw::Application::builder()
-        .application_id("com.fmp")
+        .application_id("org.codeberg.fmp")
         .build();
     application.connect_activate(|app| {
         run_ui(app);
@@ -30,10 +33,26 @@ pub fn run_gui() {
 fn run_ui(app: &Application) {
     load_css();
 
-    // FIXME dont unwrap
-    let ctx = Rc::new(RefCell::new(
-        Context::from_protocol(Protocol::OpenPgp).unwrap(),
-    ));
+    let ctx = match Context::from_protocol(Protocol::OpenPgp) {
+        Ok(ctx) => Rc::new(RefCell::new(ctx)),
+        Err(e) => {
+            let dialog = MessageDialog::new(
+                None::<&gtk4::Window>,
+                DialogFlags::MODAL,
+                MessageType::Error,
+                ButtonsType::Close,
+                &format!(
+                    "FMP requires GPG (GnuPG) to be installed and the OpenPGP backend to be available.\n\nError: {e}\n\nPlease install GnuPG and restart the application."
+                ),
+            );
+            dialog.set_title(Some("GPG Not Available"));
+            dialog.connect_response(move |_, _| {
+                std::process::exit(1);
+            });
+            dialog.present();
+            return;
+        }
+    };
 
     let main_content = Box::new(Orientation::Vertical, 0);
 

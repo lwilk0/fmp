@@ -66,7 +66,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox, ctx: Rc<R
 
     // Prepare TOTP secret and QR code after showing dialog (without enabling yet)
     match prepare_totp_setup(vault_name, ctx.clone()) {
-        Ok((secret, secret_b32, otpauth_uri)) => {
+        Ok((secret_buf, secret_b32, otpauth_uri)) => {
             // Remove loading message
             qr_group.remove(&loading_row);
 
@@ -105,7 +105,7 @@ pub fn show_totp_setup_dialog(vault_name: &str, content_area: &GtkBox, ctx: Rc<R
             verification_row.add_suffix(&button_box);
 
             let vault_name_clone = vault_name.to_string();
-            let secret_clone = secret.clone();
+            let secret_clone = secret_buf.as_slice().to_vec();
             let window_clone = totp_window.clone();
             let content_area_clone = content_area.clone();
 
@@ -274,7 +274,7 @@ fn generate_qr_code_image(otpauth_uri: &str) -> Result<Pixbuf, Box<dyn std::erro
     // Use the QR code renderer's built-in scaling for much better performance
     let image = qr_code
         .render::<Luma<u8>>()
-        .min_dimensions(300, 300)
+        .min_dimensions(200, 200)
         .module_dimensions(15, 15)
         .build();
 

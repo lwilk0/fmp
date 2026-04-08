@@ -33,7 +33,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::crypto::lock_memory;
 use crate::storage::store::get_recipient_key;
 use crate::vault::Locations;
 use zeroize::Zeroize;
@@ -68,7 +67,12 @@ pub fn is_totp_required(vault_name: &str) -> bool {
 
     let locations = Locations::new(vault_name, "");
     if locations.totp.exists() {
-        let _ = ledger_add(vault_name);
+        if let Err(e) = ledger_add(vault_name) {
+            log::warn!(
+                "Failed to persist TOTP ledger entry for '{}': {e}",
+                vault_name
+            );
+        }
         return true;
     }
 
@@ -82,28 +86,25 @@ pub fn is_totp_required(vault_name: &str) -> bool {
 /// * `vault_name` - The name of the vault.
 ///
 /// # Returns:
-/// * `Result<(Vec<u8>, String, String), Error>` - Returns the raw secret, Base32-encoded secret and an otp URI on success, and an `Error` of failure.
+/// * `Result<(LockedBuffer, String, String), Error>` - Returns the raw secret, Base32-encoded secret and an otp URI on success, and an `Error` of failure.
 ///
 /// # Errors:
 /// * Fails when unable to check if a gate exists.
 pub fn prepare_totp_setup(
     vault_name: &str,
     ctx: Rc<RefCell<Context>>,
-) -> Result<(Vec<u8>, String, String), Error> {
+) -> Result<(LockedBuffer, String, String), Error> {
     ensure_gate_exists(vault_name, ctx.clone())?;
 
     let mut secret = [0u8; 20];
     rng().fill(&mut secret);
 
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, &secret);
-    let otpauth_uri = construct_otpath_uri(&secret_b32, vault_name);
+    let otpauth_uri = construct_otpauth_uri(&secret_b32, vault_name);
 
-    let result_vec = secret.to_vec();
-
+    let result_buf = LockedBuffer::new(secret.to_vec());
     secret.zeroize();
-    lock_memory(&secret);
-
-    Ok((result_vec, secret_b32, otpauth_uri))
+    Ok((result_buf, secret_b32, otpauth_uri))
 }
 
 /// Confirm and finalize 2FA setup for a vault using a prepared secret.
@@ -145,9 +146,7 @@ pub fn get_totp_qr_info(
     ctx: Rc<RefCell<Context>>,
 ) -> Result<(String, String), Error> {
     let secret_buf = decrypt_secret(vault_name, ctx.clone())?;
-    // secret_buf is a LockedBuffer
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, secret_buf.as_slice());
-    // secret_buf automatically cleaned up when dropped
 
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
@@ -158,11 +157,10 @@ pub fn get_totp_qr_info(
         urlencoding::encode(issuer)
     );
 
-    // Note: secret_b32 is returned — caller responsible for its lifetime
     Ok((secret_b32, otpauth_uri))
 }
 
-fn construct_otpath_uri(secret_b32: &String, vault_name: &str) -> String {
+fn construct_otpauth_uri(secret_b32: &str, vault_name: &str) -> String {
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
 
@@ -239,40 +237,8 @@ pub fn verify_totp_code(
     code: &str,
     ctx: Rc<RefCell<Context>>,
 ) -> Result<bool, Error> {
-    let code: String = code.trim().chars().filter(|c| !c.is_whitespace()).collect();
-    if code.len() < 6 || code.len() > 8 || !code.chars().all(|c| c.is_ascii_digit()) {
-        return Ok(false);
-    }
-
-    let secret = decrypt_secret(vault_name, ctx.clone())?;
-
-    #[allow(clippy::cast_possible_wrap)]
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| anyhow::anyhow!("System time error: {}", e))?
-        .as_secs() as i64;
-
-    let step = 30i64;
-    let digits = 6u32;
-
-    let mut valid = false;
-    for skew in [-1i64, 0, 1] {
-        #[allow(clippy::cast_sign_loss)]
-        let counter = ((now / step) + skew) as u64;
-        let hotp_val = hotp(secret.as_slice(), counter, digits);
-        let mut candidate = format!("{:0width$}", hotp_val, width = digits as usize);
-
-        if candidate == code {
-            valid = true;
-            candidate.zeroize();
-            break;
-        }
-
-        candidate.zeroize();
-    }
-
-    // secret automatically zeroized+unlocked when dropped
-    Ok(valid)
+    let secret = decrypt_secret(vault_name, ctx)?;
+    verify_totp_from_secret_bytes(secret.as_slice(), code).map_err(Into::into)
 }
 
 pub fn verify_totp_code_with_secret(secret: &[u8], code: &str) -> Result<bool, Error> {
@@ -418,8 +384,10 @@ pub fn ensure_gate_exists(vault_name: &str, ctx: Rc<RefCell<Context>>) -> Result
 /// # Returns:
 /// * `PathBuf` - Path to the config-based ledger text file.
 fn ledger_path_config() -> PathBuf {
-    let base = dirs::config_dir().unwrap();
-    base.join("fmp").join("totp_ledger")
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("fmp")
+        .join("totp_ledger")
 }
 
 /// Returns the path to the TOTP ledger in the user data directory.
@@ -430,21 +398,23 @@ fn ledger_path_config() -> PathBuf {
 /// # Returns:
 /// * `PathBuf` - Path to the data-based ledger text file.
 fn ledger_path_data() -> PathBuf {
-    let base = dirs::data_dir().unwrap();
-    base.join("fmp").join("totp_ledger")
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("fmp")
+        .join("totp_ledger")
 }
 
 /// Loads a ledger file containing vault names (one per line).
 ///
 /// # Arguments:
-/// * `path` - `&PathBuf`, filesystem path to read from.
+/// * `path` - `PathBuf`, filesystem path to read from.
 ///
 /// # Returns:
 /// * `HashSet<String>` - Set of vault names read from the file (if present).
 ///
 /// # Errors:
 /// * Returns empty set if the file or its contents are invalid, but does NOT propagate IO errors.
-fn load_ledger_at(path: &PathBuf) -> HashSet<String> {
+fn load_ledger_at(path: &std::path::Path) -> HashSet<String> {
     if let Ok(bytes) = std::fs::read(path)
         && let Ok(text) = String::from_utf8(bytes)
     {
@@ -468,7 +438,7 @@ fn load_ledger_at(path: &PathBuf) -> HashSet<String> {
 ///
 /// # Errors:
 /// * Returns an error if the file cannot be written or its parent cannot be created.
-fn save_ledger_at(path: &PathBuf, set: &HashSet<String>) -> Result<(), Error> {
+fn save_ledger_at(path: &std::path::Path, set: &HashSet<String>) -> Result<(), Error> {
     if let Some(dir) = path.parent() {
         create_dir_all(dir)?;
     }

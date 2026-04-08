@@ -1,7 +1,7 @@
 use crate::{
     gui::{
         content::{
-            CreateActionRow, CreateBox, CreateScrollableView, VAULT_LOADING_COUNTER, clear_content,
+            CreateActionRow, CreateBox, CreateScrollableView, clear_content,
             proceed_with_gate_warmup,
         },
         dialogs::password_generator::show_password_generator_dialog,
@@ -13,7 +13,7 @@ use crate::{
 use adw::{PreferencesGroup, prelude::*};
 use gpgme::Context;
 use gtk4::{Align, Box, Button, Entry, Label, Orientation};
-use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
+use std::{cell::RefCell, rc::Rc};
 
 pub struct HomeView<'a> {
     content_area: &'a Box,
@@ -47,7 +47,6 @@ impl<'a> HomeView<'a> {
 
     pub fn clear(&self) {
         clear_content(self.content_area);
-        VAULT_LOADING_COUNTER.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Creates the statistics section showing vault and account counts

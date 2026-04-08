@@ -180,16 +180,20 @@ pub fn get_recipient_key(
     locations: &Locations,
     ctx: Rc<RefCell<Context>>,
 ) -> Result<gpgme::Key, Error> {
-    let recipient = std::fs::read_to_string(&locations.recipient)?
-        .trim()
-        .to_string();
-    let recipient_key = ctx.borrow_mut().get_key(&recipient).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to find recipient `{}` for encryption. Error: {}",
-            recipient,
-            e
-        )
-    })?;
+    if locations.recipient.metadata()?.len() >= 256 {
+        return Err(anyhow::anyhow!("Recipient file is too large"));
+    } else {
+        let recipient = std::fs::read_to_string(&locations.recipient)?
+            .trim()
+            .to_string();
+        let recipient_key = ctx.borrow_mut().get_key(&recipient).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to find recipient `{}` for encryption. Error: {}",
+                recipient,
+                e
+            )
+        })?;
 
-    Ok(recipient_key)
+        Ok(recipient_key)
+    }
 }
