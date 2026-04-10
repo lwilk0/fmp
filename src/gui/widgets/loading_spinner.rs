@@ -3,7 +3,6 @@ use gtk4::{Box, Label, Orientation, Spinner};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// A loading overlay widget that can be shown/hidden over content
 pub struct LoadingOverlay {
     overlay_box: Box,
     spinner: Spinner,
@@ -11,7 +10,6 @@ pub struct LoadingOverlay {
 }
 
 impl LoadingOverlay {
-    /// Create a new loading overlay
     pub fn new() -> Self {
         let overlay_box = Box::new(Orientation::Vertical, 16);
         overlay_box.set_halign(gtk4::Align::Center);
@@ -41,19 +39,16 @@ impl LoadingOverlay {
         }
     }
 
-    /// Get the widget to add to the UI
     pub fn widget(&self) -> &Box {
         &self.overlay_box
     }
 
-    /// Show the loading overlay with a custom message
     pub fn show(&self, message: &str) {
         self.message_label.set_text(message);
         self.spinner.start();
         self.overlay_box.set_visible(true);
     }
 
-    /// Hide the loading overlay
     pub fn hide(&self) {
         self.spinner.stop();
         self.overlay_box.set_visible(false);
@@ -71,12 +66,10 @@ pub struct LoadingButton {
 }
 
 impl LoadingButton {
-    /// Create a new loading button
     pub fn new(label: &str, loading_text: &str) -> Self {
         let button = gtk4::Button::new();
         let is_loading = Rc::new(RefCell::new(false));
 
-        // Create button content with label and spinner
         let button_box = Box::new(Orientation::Horizontal, 8);
         button_box.set_halign(gtk4::Align::Center);
 
@@ -99,44 +92,56 @@ impl LoadingButton {
         }
     }
 
-    /// Get the button widget
     pub fn button(&self) -> &gtk4::Button {
         &self.button
     }
-
-    /// Set the loading state
-    pub fn set_loading(&self, loading: bool) {
-        *self.is_loading.borrow_mut() = loading;
-        if loading {
-            self.spinner.set_visible(true);
-            self.spinner.start();
-            self.label.set_text(&self.loading_text);
-            self.button.set_sensitive(false);
-        } else {
-            self.spinner.stop();
-            self.spinner.set_visible(false);
-            self.label.set_text(&self.original_text);
-            self.button.set_sensitive(true);
-        }
-    }
 }
 
-/// Create a loading button that shows a spinner when clicked
+const LOADING_BUTTON_DATA_KEY: &str = "fmp_loading_button_data";
+
+struct LoadingButtonData {
+    spinner: Spinner,
+    label: Label,
+    original_text: String,
+    loading_text: String,
+}
+
 pub fn create_loading_button(label: &str, loading_text: &str) -> (gtk4::Button, Rc<RefCell<bool>>) {
     let loading_button = LoadingButton::new(label, loading_text);
     let button = loading_button.button().clone();
     let is_loading = loading_button.is_loading.clone();
 
+    let data = LoadingButtonData {
+        spinner: loading_button.spinner.clone(),
+        label: loading_button.label.clone(),
+        original_text: loading_button.original_text.clone(),
+        loading_text: loading_button.loading_text.clone(),
+    };
+
+    unsafe {
+        button.set_data(LOADING_BUTTON_DATA_KEY, data);
+    }
+
     (button, is_loading)
 }
 
-/// Set the loading state of a loading button
 pub fn set_button_loading_state(button: &gtk4::Button, loading: bool) {
     unsafe {
-        if let Some(loading_button_rc) = button.data::<Rc<RefCell<LoadingButton>>>("loading_button")
-        {
-            let loading_button_ref = loading_button_rc.as_ref().as_ref().borrow_mut();
-            loading_button_ref.set_loading(loading);
+        let Some(data) = button.data::<LoadingButtonData>(LOADING_BUTTON_DATA_KEY) else {
+            return;
+        };
+        let data = data.as_ref();
+
+        if loading {
+            data.spinner.set_visible(true);
+            data.spinner.start();
+            data.label.set_text(&data.loading_text);
+            button.set_sensitive(false);
+        } else {
+            data.spinner.stop();
+            data.spinner.set_visible(false);
+            data.label.set_text(&data.original_text);
+            button.set_sensitive(true);
         }
     }
 }
