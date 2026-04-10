@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use adw::{HeaderBar, Window as AdwWindow, prelude::*};
 use anyhow::Error;
 use gtk4::{Box as GtkBox, Button, Entry, Label, Orientation, glib};
@@ -222,7 +221,7 @@ fn launch_terminal_unix(inner_command: &str) -> Result<(), Error> {
             .spawn()
             .is_ok()
         {
-            return;
+            return Ok(());
         }
 
         // Try iTerm2 (fallback)
@@ -236,7 +235,7 @@ fn launch_terminal_unix(inner_command: &str) -> Result<(), Error> {
             .spawn()
             .is_ok()
         {
-            return;
+            return Ok(());
         }
 
         // Try open -a Terminal as last resort
@@ -246,7 +245,7 @@ fn launch_terminal_unix(inner_command: &str) -> Result<(), Error> {
             .spawn()
             .is_ok()
         {
-            return;
+            return Ok(());
         }
     }
 

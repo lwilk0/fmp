@@ -116,13 +116,7 @@ impl Default for SecurePassword {
 impl Drop for SecurePassword {
     fn drop(&mut self) {
         secure_overwrite(&mut self.obfuscation_data);
-
-        if let Some(exposed) = unsafe {
-            // This is unsafe but necessary to access the inner data for secure cleanup
-            std::ptr::addr_of_mut!(self.inner_secret).as_mut()
-        } {
-            exposed.zeroize();
-        }
+        self.inner_secret.zeroize();
     }
 }
 

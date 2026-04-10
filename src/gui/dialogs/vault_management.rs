@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use crate::gui::dialogs::common::show_error_dialog;
 use crate::storage::filesystem::{
     create_backup, delete_backup, delete_vault, install_backup, rename_vault,

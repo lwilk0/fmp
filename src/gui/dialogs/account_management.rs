@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use crate::{
     gui::dialogs::common::show_error_dialog, storage::filesystem::rename_account, vault::Account,
 };
@@ -307,8 +306,8 @@ pub fn show_edit_field_dialog(
     let old_field_name = field_name.to_string();
 
     save_button.connect_clicked(move |_| {
-        let new_field_name = name_entry_clone.text().to_string().trim().to_string();
-        let new_field_value = value_entry_clone.text().to_string().trim().to_string();
+        let new_field_name = name_entry_clone.text().trim().to_string();
+        let new_field_value = value_entry_clone.text().trim().to_string();
 
         if !new_field_name.is_empty() && !new_field_value.is_empty() {
             let mut account = account_rc_clone.borrow_mut();

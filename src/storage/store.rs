@@ -182,18 +182,18 @@ pub fn get_recipient_key(
 ) -> Result<gpgme::Key, Error> {
     if locations.recipient.metadata()?.len() >= 256 {
         return Err(anyhow::anyhow!("Recipient file is too large"));
-    } else {
-        let recipient = std::fs::read_to_string(&locations.recipient)?
-            .trim()
-            .to_string();
-        let recipient_key = ctx.borrow_mut().get_key(&recipient).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to find recipient `{}` for encryption. Error: {}",
-                recipient,
-                e
-            )
-        })?;
-
-        Ok(recipient_key)
     }
+
+    let recipient = std::fs::read_to_string(&locations.recipient)?
+        .trim()
+        .to_string();
+    let recipient_key = ctx.borrow_mut().get_key(&recipient).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to find recipient `{}` for encryption. Error: {}",
+            recipient,
+            e
+        )
+    })?;
+
+    Ok(recipient_key)
 }

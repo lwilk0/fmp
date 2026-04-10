@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use crate::{
     password::{
         PasswordConfig, calculate_password_strength, generate_password, get_strength_color_class,

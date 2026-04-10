@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use crate::{
     gui::{dialogs::common::show_confirmation_dialog, views::vault_view::VaultView},
     totp::{

@@ -1,4 +1,3 @@
-/// All this code is awful, sorry future me. There must be a better way????
 use adw::prelude::*;
 use gtk4::{
     Box as GtkBox, Button, ButtonsType, Dialog, Label, MessageDialog, MessageType, Orientation,
@@ -95,7 +94,7 @@ pub fn show_update_dialog(parent: &adw::ApplicationWindow, latest: check_latest:
     content_box.set_margin_start(20);
     content_box.set_margin_end(20);
 
-    let title = Label::new(Some(&format!("Update Available")));
+    let title = Label::new(Some(&format!("Update {} Available", latest)));
     title.add_css_class("title-2");
     title.set_halign(gtk4::Align::Center);
     content_box.append(&title);

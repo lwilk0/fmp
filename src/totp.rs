@@ -148,14 +148,7 @@ pub fn get_totp_qr_info(
     let secret_buf = decrypt_secret(vault_name, ctx.clone())?;
     let secret_b32 = base32::encode(Alphabet::Rfc4648 { padding: false }, secret_buf.as_slice());
 
-    let issuer = "FMP";
-    let label = format!("{issuer}:{vault_name}");
-    let otpauth_uri = format!(
-        "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
-        urlencoding::encode(&label),
-        secret_b32,
-        urlencoding::encode(issuer)
-    );
+    let otpauth_uri = construct_otpauth_uri(&secret_b32, &vault_name);
 
     Ok((secret_b32, otpauth_uri))
 }
@@ -164,14 +157,12 @@ fn construct_otpauth_uri(secret_b32: &str, vault_name: &str) -> String {
     let issuer = "FMP";
     let label = format!("{issuer}:{vault_name}");
 
-    let otpauth_uri = format!(
+    format!(
         "otpauth://totp/{}?secret={}&issuer={}&period=30&digits=6&algorithm=SHA1",
         urlencoding::encode(&label),
         secret_b32,
         urlencoding::encode(issuer)
-    );
-
-    otpauth_uri
+    )
 }
 
 /// Turns off TOTP for a vault
