@@ -16,9 +16,9 @@ use crate::{
     },
     totp::is_totp_enabled,
 };
-use adw::{ActionRow, PreferencesGroup, prelude::*};
+use adw::{PreferencesGroup, prelude::*};
 use gpgme::Context;
-use gtk4::{Box, Label, Orientation};
+use gtk4::{Box, Label, ListBox, Orientation, SelectionMode, StringObject, gio::ListStore};
 use std::{
     cell::RefCell,
     rc::Rc,
@@ -241,95 +241,102 @@ pub fn create_vault_management_section(
     group
 }
 
-/// Creates a modern list layout for accounts using `PreferencesGroup`
 pub fn create_accounts_grid(
     content_area: &Box,
     vault_name: &str,
     ctx: Rc<RefCell<Context>>,
-) -> PreferencesGroup {
-    let group = PreferencesGroup::new();
-    group.set_title("Accounts");
-    group.set_description(Some("Manage your account credentials"));
+) -> gtk4::Box {
+    let outer = gtk4::Box::new(Orientation::Vertical, 8);
+
+    let header_group = PreferencesGroup::new();
+    header_group.set_title("Accounts");
+    header_group.set_description(Some("Manage your account credentials"));
 
     let all_accounts = get_available_accounts(vault_name);
+
+    let ctx_clone = ctx.clone();
+    let (add_title, add_subtitle, add_label) = if all_accounts.is_empty() {
+        (
+            "No Accounts Yet",
+            "Create your first account to get started",
+            "Add Account",
+        )
+    } else {
+        ("Add New Account", "Create a new account directory", "Add")
+    };
+
+    header_group.add(
+        &CreateActionRow::new()
+            .title(add_title)
+            .subtitle(add_subtitle)
+            .button_label(add_label)
+            .css_class("suggested-action")
+            .callback({
+                let content_area = content_area.clone();
+                let vault_name = vault_name.to_string();
+                move || show_new_account_view(&content_area, &vault_name, ctx_clone.clone())
+            })
+            .build(),
+    );
+
+    outer.append(&header_group);
+
+    if !all_accounts.is_empty() {
+        outer.append(&create_account_list(
+            content_area,
+            vault_name,
+            all_accounts,
+            ctx,
+        ));
+    }
+
+    outer
+}
+
+fn create_account_list(
+    content_area: &Box,
+    vault_name: &str,
+    all_accounts: Vec<String>,
+    ctx: Rc<RefCell<Context>>,
+) -> ListBox {
+    let store = ListStore::new::<StringObject>();
+    for name in &all_accounts {
+        store.append(&StringObject::new(name));
+    }
+
+    let list_box = ListBox::new();
+    list_box.add_css_class("boxed-list");
+    list_box.set_selection_mode(SelectionMode::None);
 
     let content_area_clone = content_area.clone();
     let vault_name_clone = vault_name.to_string();
 
-    let ctx_clone = ctx.clone();
-    let ctx_clone2 = ctx_clone.clone();
-    let ctx_clone3 = ctx_clone2.clone();
+    list_box.bind_model(Some(&store), move |object| {
+        let name = object
+            .downcast_ref::<StringObject>()
+            .unwrap()
+            .string()
+            .to_string();
 
-    if all_accounts.is_empty() {
-        group.add(
-            &CreateActionRow::new()
-                .title("No Accounts Yet")
-                .subtitle("Create your first account to get started")
-                .button_label("Add Account")
-                .css_class("suggested-action")
-                .callback({
-                    let content_area = content_area_clone.clone();
-                    let vault_name = vault_name_clone.clone();
-                    move || show_new_account_view(&content_area, &vault_name, ctx_clone.clone())
-                })
-                .build(),
-        );
-    } else {
-        group.add(
-            &CreateActionRow::new()
-                .title("Add New Account")
-                .subtitle("Create a new account directory")
-                .button_label("Add")
-                .css_class("suggested-action")
-                .callback({
-                    let content_area = content_area_clone.clone();
-                    let vault_name = vault_name_clone.clone();
-                    move || show_new_account_view(&content_area, &vault_name, ctx_clone2.clone())
-                })
-                .build(),
-        );
+        CreateActionRow::new()
+            .title(&name)
+            .subtitle("Password Account")
+            .button_label("View")
+            .css_class("suggested-action")
+            .callback({
+                let content_area = content_area_clone.clone();
+                let vault_name = vault_name_clone.clone();
+                let ctx = ctx.clone();
+                let name = name.clone();
+                move || {
+                    AccountView::new(&content_area, &vault_name, &name, false).create(ctx.clone())
+                }
+            })
+            .build()
+            .upcast::<gtk4::Widget>()
+    });
 
-        for account_name in all_accounts {
-            let account_row = create_account_row(
-                account_name.as_str(),
-                content_area,
-                vault_name,
-                ctx_clone3.clone(),
-            );
-            group.add(&account_row);
-        }
-    }
-
-    group
-}
-
-/// Creates an account row for the preferences group
-fn create_account_row(
-    account_name: &str,
-    content_area: &Box,
-    vault_name: &str,
-    ctx: Rc<RefCell<Context>>,
-) -> ActionRow {
-    CreateActionRow::new()
-        .title(account_name)
-        .subtitle("Password Account")
-        .button_label("View")
-        .css_class("suggested-action")
-        .callback({
-            let account_name_clone = account_name.to_string();
-            let vault_name_clone = vault_name.to_string();
-            let content_area_clone = content_area.clone();
-            move || {
-                AccountView::new(
-                    &content_area_clone,
-                    &vault_name_clone,
-                    &account_name_clone,
-                    false,
-                )
-                .create(ctx.clone())
-            }
-        })
-        .build()
+    list_box
 }
 
 /// Creates the TOTP (2FA) management section for the vault view
