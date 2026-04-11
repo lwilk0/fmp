@@ -98,16 +98,33 @@ pub fn update_account(vault_name: &str, account: &Account) -> Result<(), Error> 
 ///
 /// # Errors
 /// * If the vault directory cannot be created or if the recipient file cannot be written.
+#[cfg(test)]
 pub fn create_vault(
     vault_name: &str,
     recipient: &str,
     ctx: Rc<RefCell<Context>>,
 ) -> Result<(), Error> {
+    create_vault_prepare(vault_name, recipient)?;
+    create_vault_finalize(vault_name, recipient, ctx)?;
+    Ok(())
+}
+
+pub fn create_vault_prepare(vault_name: &str, recipient: &str) -> Result<(), Error> {
     let locations = Locations::new(vault_name, "");
     locations.initialize_vault()?;
 
     let mut recipient_file = File::create(&locations.recipient)?;
     recipient_file.write_all(recipient.as_bytes())?;
+
+    Ok(())
+}
+
+pub fn create_vault_finalize(
+    vault_name: &str,
+    recipient: &str,
+    ctx: Rc<RefCell<Context>>,
+) -> Result<(), Error> {
+    let locations = Locations::new(vault_name, "");
 
     let recipient_key = ctx.borrow_mut().get_key(recipient).map_err(|e| {
         anyhow::anyhow!(

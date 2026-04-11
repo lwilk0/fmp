@@ -8,11 +8,11 @@ use crate::{
         widgets::loading_spinner::{create_loading_button, set_button_loading_state},
     },
     storage::filesystem::{get_available_accounts, get_most_used_vault, get_recent_vaults},
-    vault::create_vault,
+    vault::{create_vault_finalize, create_vault_prepare},
 };
 use adw::{PreferencesGroup, prelude::*};
 use gpgme::Context;
-use gtk4::{Align, Box, Button, Entry, Label, Orientation};
+use gtk4::{Align, Box, Button, Entry, Label, Orientation, glib};
 use std::{cell::RefCell, rc::Rc};
 
 pub struct HomeView<'a> {
@@ -28,21 +28,39 @@ impl<'a> HomeView<'a> {
     pub fn create(&self, ctx: Rc<RefCell<Context>>) {
         self.clear();
 
-        let main_box = CreateBox::new()
-            .new_box(Box::new(Orientation::Vertical, 16))
-            .build();
+        let content_area = self.content_area.clone();
 
-        let scrollable = CreateScrollableView::new()
-            .max_width(800)
-            .tighten_threshold(600)
-            .build();
+        glib::spawn_future_local(async move {
+            let (vaults, total_accounts, most_used, recent) = gtk4::gio::spawn_blocking(|| {
+                let vaults = crate::gui::sidebar::get_available_vaults();
+                let total_accounts: usize = vaults
+                    .iter()
+                    .map(|vault_name| get_available_accounts(vault_name).len())
+                    .sum();
+                let most_used = get_most_used_vault();
+                let recent = get_recent_vaults(5);
 
-        main_box.append(&self.statistics_section());
-        main_box.append(&self.quick_actions_section(ctx.clone()));
-        main_box.append(&self.recent_vaults_section(ctx.clone()));
+                (vaults, total_accounts, most_used, recent)
+            })
+            .await
+            .expect("Failed to get Home data");
 
-        scrollable.set_child(Some(&main_box));
-        self.content_area.append(&scrollable);
+            let main_box = CreateBox::new()
+                .new_box(Box::new(Orientation::Vertical, 16))
+                .build();
+            let scrollable = CreateScrollableView::new()
+                .max_width(800)
+                .tighten_threshold(600)
+                .build();
+
+            let view = HomeView::new(&content_area);
+            main_box.append(&view.statistics_section(vaults, total_accounts, most_used));
+            main_box.append(&view.quick_actions_section(ctx.clone()));
+            main_box.append(&view.recent_vaults_section(ctx.clone(), recent));
+
+            scrollable.set_child(Some(&main_box));
+            content_area.append(&scrollable);
+        });
     }
 
     pub fn clear(&self) {
@@ -50,18 +68,17 @@ impl<'a> HomeView<'a> {
     }
 
     /// Creates the statistics section showing vault and account counts
-    pub fn statistics_section(&self) -> PreferencesGroup {
+    pub fn statistics_section(
+        &self,
+        vaults: Vec<String>,
+        total_accounts: usize,
+        most_used: String,
+    ) -> PreferencesGroup {
         let group = PreferencesGroup::new();
         group.set_title("Overview");
         group.set_description(Some("Your vault statistics"));
 
-        let vaults = crate::gui::sidebar::get_available_vaults();
         let vault_count = vaults.len();
-        let most_used = get_most_used_vault();
-        let total_accounts: usize = vaults
-            .iter()
-            .map(|vault_name| get_available_accounts(vault_name).len())
-            .sum();
 
         let vault_label = Label::new(Some(&vault_count.to_string()));
         vault_label.add_css_class("title-3");
@@ -140,7 +157,11 @@ impl<'a> HomeView<'a> {
     }
 
     /// Creates the recent vaults section for the home view (bottom panel)
-    fn recent_vaults_section(&self, ctx: Rc<RefCell<Context>>) -> PreferencesGroup {
+    fn recent_vaults_section(
+        &self,
+        ctx: Rc<RefCell<Context>>,
+        recent: Vec<String>,
+    ) -> PreferencesGroup {
         let group = PreferencesGroup::new();
 
         let content_area = &self.content_area.clone();
@@ -148,7 +169,6 @@ impl<'a> HomeView<'a> {
         group.set_title("Recently Accessed Vaults");
         group.set_description(Some("Open a vault you used recently"));
 
-        let recent = get_recent_vaults(5);
         if recent.is_empty() {
             group.add(
                 &CreateActionRow::<fn()>::new()
@@ -257,35 +277,40 @@ pub fn show_create_vault_view(content_area: &Box, ctx: Rc<RefCell<Context>>) {
 
         set_button_loading_state(button, true);
 
-        // Use a timeout to simulate async operation and allow UI to update
-        glib::timeout_add_local(std::time::Duration::from_millis(100), {
-            let content_area_clone = content_area_clone.clone();
-            let vault_name = vault_name.clone();
-            let recipient = recipient.clone();
-            let button = button.clone();
+        let content_area_clone2 = content_area_clone.clone();
+        let button = button.clone();
+        let ctx_clone2 = ctx_clone.clone();
 
-            let ctx_clone2 = ctx_clone.clone();
-            let ctx_clone3 = ctx_clone2.clone();
-            move || {
-                match create_vault(&vault_name, &recipient, ctx_clone2.clone()) {
-                    Ok(()) => {
-                        // Refresh sidebar to show new vault
-                        crate::gui::sidebar::refresh_sidebar_from_content_area(
-                            &content_area_clone,
-                            ctx_clone2.clone(),
-                        );
-                        proceed_with_gate_warmup(
-                            &content_area_clone,
-                            &vault_name,
-                            ctx_clone3.clone(),
-                        );
-                    }
-                    Err(e) => {
-                        log::error!("Failed to create vault: {e}");
-                        set_button_loading_state(&button, false);
+        glib::spawn_future_local(async move {
+            let vault_name_background = vault_name.clone();
+            let recipient_background = recipient.clone();
+
+            let result = gtk4::gio::spawn_blocking(move || {
+                create_vault_prepare(&vault_name_background, &recipient_background)
+            })
+            .await
+            .expect("create_vault_prepare panicked");
+
+            match result {
+                Ok(()) => {
+                    match create_vault_finalize(&vault_name, &recipient, ctx_clone2.clone()) {
+                        Ok(()) => {
+                            crate::gui::sidebar::refresh_sidebar_from_content_area(
+                                &content_area_clone2,
+                                ctx_clone2.clone(),
+                            );
+                            proceed_with_gate_warmup(&content_area_clone2, &vault_name, ctx_clone2);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to finalise vault creation: {e}");
+                            set_button_loading_state(&button, false);
+                        }
                     }
                 }
-                glib::ControlFlow::Break
+                Err(e) => {
+                    log::error!("Failed to create vault: {e}");
+                    set_button_loading_state(&button, false);
+                }
             }
         });
     });
