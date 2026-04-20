@@ -36,6 +36,7 @@ fn run_ui(app: &Application) {
     let ctx = match Context::from_protocol(Protocol::OpenPgp) {
         Ok(ctx) => Rc::new(RefCell::new(ctx)),
         Err(e) => {
+            #[allow(deprecated)]
             let dialog = MessageDialog::new(
                 None::<&gtk4::Window>,
                 DialogFlags::MODAL,
@@ -46,9 +47,18 @@ fn run_ui(app: &Application) {
                 ),
             );
             dialog.set_title(Some("GPG Not Available"));
-            dialog.connect_response(move |_, _| {
-                std::process::exit(1);
-            });
+
+            dialog.set_application(Some(app));
+
+            #[allow(deprecated)]
+            dialog.connect_response(glib::clone!(
+                #[weak]
+                app,
+                move |_dialog, _response| {
+                    app.quit();
+                }
+            ));
+
             dialog.present();
             return;
         }
@@ -87,15 +97,12 @@ fn run_ui(app: &Application) {
         show_welcome_dialog(&window);
     }
 
-    // I will not be happy if I get another *mut c_void` cannot be sent between threads safely, I hate async!!!! IT WORKS WOOOO
     glib::spawn_future_local(glib::clone!(
         #[weak]
         window,
         async move {
-            // Spawn the blocking task on GLib's thread pool
             let result = gio::spawn_blocking(move || can_update_blocking()).await;
 
-            // Match on the result in case the thread panicked
             if let Ok((updatable, latest_version)) = result {
                 if updatable {
                     if let Some(version) = latest_version {

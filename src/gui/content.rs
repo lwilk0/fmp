@@ -3,7 +3,7 @@ use crate::{
     totp::is_totp_required,
     vault::{Account, warm_up_gpg_blocking, warm_up_gpg_finalize},
 };
-use adw::{ActionRow, ButtonContent, prelude::*};
+use adw::{ActionRow, ButtonContent, glib::closure::IntoClosureReturnValue, prelude::*};
 use gpgme::Context;
 use gtk4::{
     Align, Box, Button, Entry, Label, Orientation, PolicyType, ScrolledWindow, pango::EllipsizeMode,

@@ -18,7 +18,7 @@ Copyright (C) 2025  Luke Wilkinson
 */
 
 use crate::{
-    crypto::{lock_memory, secure_overwrite},
+    crypto::{lock_memory, secure_overwrite, unlock_memory},
     security::SecureClipboardString,
 };
 use rand::{RngCore, rng};
@@ -117,6 +117,7 @@ impl Drop for SecurePassword {
     fn drop(&mut self) {
         secure_overwrite(&mut self.obfuscation_data);
         self.inner_secret.zeroize();
+        unlock_memory(self.inner_secret.expose_secret().as_bytes());
     }
 }
 

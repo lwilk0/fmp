@@ -17,6 +17,7 @@ Copyright (C) 2025  Luke Wilkinson
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::storage::filesystem::validate_path_new;
 use anyhow::Error;
 use dirs::data_dir;
 use std::fs::{File, create_dir_all};
@@ -75,23 +76,27 @@ impl Locations {
     /// # Errors
     /// * If the vault directory cannot be created or if the recipient file cannot be created, an error is returned.
     pub fn initialize_vault(&self) -> Result<(), Error> {
-        create_dir_all(&self.vault)?;
+        if validate_path_new(&self.vault) {
+            create_dir_all(&self.vault)?;
 
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&self.vault, std::fs::Permissions::from_mode(0o700))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&self.vault, std::fs::Permissions::from_mode(0o700))?;
+            }
+
+            let recipient_file = File::create(&self.recipient)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                recipient_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+            }
+
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Invalid vault directory path"))
         }
-
-        let recipient_file = File::create(&self.recipient)?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            recipient_file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        }
-
-        Ok(())
     }
 
     /// Creates an account directory within the vault.
@@ -102,15 +107,19 @@ impl Locations {
     /// # Errors
     /// * If the account directory cannot be created, an error is returned.
     pub fn create_account_directory(&self) -> Result<(), Error> {
-        create_dir_all(&self.account)?;
+        if validate_path_new(&self.account) {
+            create_dir_all(&self.account)?;
 
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&self.account, std::fs::Permissions::from_mode(0o700))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&self.account, std::fs::Permissions::from_mode(0o700))?;
+            }
+
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Invalid account directory path"))
         }
-
-        Ok(())
     }
 
     /// Checks if a vault with the specified name exists.

@@ -71,12 +71,16 @@ pub fn create_backup(vault_name: &str) -> Result<(), Error> {
         remove_dir_all(&backup_path)?;
     }
 
-    create_dir_all(&locations.backup)?;
+    if validate_path_new(&backup_path) {
+        create_dir_all(&locations.backup)?;
 
-    let options = CopyOptions::new();
-    copy(&locations.vault, &locations.backup, &options)?;
+        let options = CopyOptions::new();
+        copy(&locations.vault, &locations.backup, &options)?;
 
-    Ok(())
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Invalid backup directory path"))
+    }
 }
 
 /// Installs a backup of the specified vault.
@@ -156,31 +160,36 @@ pub fn rename_vault(old_name: &str, new_name: &str) -> Result<(), Error> {
     let old_locations = Locations::new(old_name, "");
     let new_locations = Locations::new(new_name, "");
 
-    if !old_locations.vault.exists() {
-        return Err(anyhow::anyhow!("Vault `{}` does not exist.", old_name));
-    }
-
-    if new_locations.vault.exists() {
-        return Err(anyhow::anyhow!("Vault `{}` already exists.", new_name));
-    }
-
-    rename(&old_locations.vault, &new_locations.vault)?;
-
-    // Also rename backup if it exists
-    let old_backup = old_locations.backup.join(old_name);
-    let new_backup = new_locations.backup.join(new_name);
-    if old_backup.exists() {
-        if let Some(backup_parent) = new_backup.parent() {
-            create_dir_all(backup_parent)?;
+    if validate_path_new(&new_locations.vault) {
+        if !old_locations.vault.exists() {
+            return Err(anyhow::anyhow!("Vault `{}` does not exist.", old_name));
         }
-        rename(&old_backup, &new_backup)?;
+
+        if new_locations.vault.exists() {
+            return Err(anyhow::anyhow!("Vault `{}` already exists.", new_name));
+        }
+
+        rename(&old_locations.vault, &new_locations.vault)?;
+
+        // Also rename backup if it exists
+        let old_backup = old_locations.backup.join(old_name);
+        let new_backup = new_locations.backup.join(new_name);
+
+        if old_backup.exists() {
+            if let Some(backup_parent) = new_backup.parent() {
+                create_dir_all(backup_parent)?;
+            }
+            rename(&old_backup, &new_backup)?;
+        }
+
+        update_vault_stats_on_rename(old_name, new_name)?;
+
+        update_totp_ledgers_on_rename(old_name, new_name)?;
+
+        Ok(())
+    } else {
+        return Err(anyhow::anyhow!("Invalid new vault directory path"));
     }
-
-    update_vault_stats_on_rename(old_name, new_name)?;
-
-    update_totp_ledgers_on_rename(old_name, new_name)?;
-
-    Ok(())
 }
 
 /// Renames an account within a vault from `old_name` to `new_name`.
@@ -467,4 +476,12 @@ pub fn get_available_accounts(vault_name: &str) -> Vec<String> {
 fn get_account_directory(vault_name: &str) -> PathBuf {
     let locations = Locations::new(vault_name, "");
     locations.account
+}
+
+pub fn validate_path_new(path: &PathBuf) -> bool {
+    let p = path.to_str().unwrap();
+    match p {
+        _ if p.contains("..") || path.exists() => false,
+        _ => true,
+    }
 }
