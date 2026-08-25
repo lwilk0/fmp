@@ -5,9 +5,6 @@
 
 A password manager written in memory-safe Rust.
 
-## Note on usage of AI:
-AI was not used for any sensitive backend components. It was somewhat used for GUI stuff but no issues are found. Some documentation was written by AI, but was rewording my writing - I have dyslexia and my writing is sometimes odd. All AI items have been check and edited to the same extent as my own. All AI code is being reworked in the GUI now I have a better understanding of the GTK library.
-
 ## Table of Contents
 - [Requirements](#requirements)
 - [Quickstart](#quickstart)
@@ -88,6 +85,9 @@ Contributions are welcome! Please:
 1. Fork this repository.
 2. Create a new branch for your feature or bug fix.
 3. Submit a pull request with a clear description of your changes.
+
+## Note on usage of AI:
+AI was not used for any sensitive back-end components. It was somewhat used as 'placeholder' code for GUI stuff, and documentation, but has been rewritten by me. All AI items have been check and edited to the same extent as my own. I am working on another rewrite with no AI which should be final.
 
 ## License
 This project is licensed under the GPLv3 License. See the [LICENSE](LICENSE) file for details.
