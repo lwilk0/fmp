@@ -39,13 +39,11 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     welcome_window.set_title(Some("Welcome to FMP"));
     welcome_window.set_modal(true);
     welcome_window.set_transient_for(Some(parent));
-    welcome_window.set_default_size(-1, -1);
     welcome_window.add_css_class("welcome-dialog");
     welcome_window.set_deletable(false);
 
     let header_bar = HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("Welcome"))));
-    header_bar.add_css_class("flat");
 
     let main_container = GtkBox::new(Orientation::Vertical, 0);
     main_container.append(&header_bar);
@@ -72,7 +70,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
 
     let email_box = GtkBox::new(Orientation::Vertical, 8);
     email_box.set_halign(gtk4::Align::Center);
-    email_box.add_css_class("group_background");
+    email_box.add_css_class("card");
 
     let email_title_container = GtkBox::new(Orientation::Horizontal, 12);
     email_title_container.set_halign(gtk4::Align::Center);
@@ -93,7 +91,7 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
 
     let create_box = GtkBox::new(Orientation::Vertical, 8);
     create_box.set_halign(gtk4::Align::Center);
-    create_box.add_css_class("group_background");
+    create_box.add_css_class("card");
 
     let create_title_container = GtkBox::new(Orientation::Horizontal, 12);
     create_title_container.set_halign(gtk4::Align::Center);
@@ -118,9 +116,6 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     check_result_label.set_visible(false);
     check_result_label.set_wrap(true);
     email_box.append(&check_result_label);
-
-    let sep = gtk4::Separator::new(Orientation::Horizontal);
-    content_box.append(&sep);
 
     let action_box = GtkBox::new(Orientation::Horizontal, 12);
     action_box.set_halign(gtk4::Align::Center);
@@ -180,8 +175,17 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
         let text_for_main = text.clone();
         let weak_label_for_main = weak_label.clone();
         glib::spawn_future_local(async move {
+            let result = gio::spawn_blocking(move || {
+                std::process::Command::new("gpg")
+                    .args(["--list-keys", "--with-colons", &email])
+                    .output()
+            })
+            .await;
             if let Some(label) = weak_label_for_main.upgrade() {
-                label.set_text(&text_for_main);
+                match result {
+                    Ok(_) => label.set_text(&text_for_main),
+                    Err(_) => label.set_text("Failled to run thread"),
+                }
             }
         });
     });

@@ -62,8 +62,6 @@ fn create_password_length_preferences_group(
     let length_row = ActionRow::new();
     length_row.set_title("Length");
     length_row.set_subtitle("Number of characters in the password");
-    length_row.set_margin_start(8);
-    length_row.set_margin_end(8);
 
     let length_adjustment = Adjustment::new(16.0, 1.0, 128.0, 1.0, 5.0, 0.0);
     let length_spinner = SpinButton::new(Some(&length_adjustment), 1.0, 0);

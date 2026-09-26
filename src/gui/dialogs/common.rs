@@ -1,11 +1,10 @@
 use adw::prelude::*;
-use gtk4::{
-    Box as GtkBox, Button, ButtonsType, Dialog, Label, MessageDialog, MessageType, Orientation,
-    ResponseType,
-};
 
-/// Shows a confirmation dialog for dangerous actions
-/// Takes a callback that will be executed if the user confirms the action
+/// Gets the parent window from any widget (avoids changing all signatures).
+pub fn root_window(widget: &impl IsA<gtk4::Widget>) -> Option<adw::ApplicationWindow> {
+    widget.root()?.downcast::<adw::ApplicationWindow>().ok()
+}
+
 pub fn show_confirmation_dialog<F>(
     title: &str,
     message: &str,
@@ -15,114 +14,83 @@ pub fn show_confirmation_dialog<F>(
 ) where
     F: Fn() + 'static,
 {
-    let dialog = MessageDialog::new(
-        parent,
-        gtk4::DialogFlags::MODAL | gtk4::DialogFlags::DESTROY_WITH_PARENT,
-        MessageType::Warning,
-        ButtonsType::None,
-        message,
-    );
-
-    dialog.set_title(Some(title));
-    dialog.add_css_class("confirmation-dialog");
-
-    dialog.add_button("Cancel", ResponseType::Cancel);
-    dialog.add_button(confirm_label, ResponseType::Accept);
-
-    if let Some(confirm_button) = dialog.widget_for_response(ResponseType::Accept) {
-        confirm_button.add_css_class("destructive-action");
-    }
-
-    dialog.set_default_response(ResponseType::Cancel);
-
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Accept {
-            on_confirm();
-        }
-        dialog.close();
-    });
-
+    let dialog = adw::MessageDialog::new(parent, Some(title), Some(message));
+    dialog.add_response("cancel", "Cancel");
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+    dialog.add_response("confirm", confirm_label);
+    dialog.set_response_appearance("confirm", adw::ResponseAppearance::Destructive);
+    dialog.connect_response(Some("confirm"), move |_, _| on_confirm());
     dialog.present();
 }
 
-/// Shows a simple error dialog
-pub fn show_error_dialog(title: &str, message: &str) {
-    let dialog = Dialog::new();
-    dialog.set_title(Some(title));
-    dialog.set_modal(true);
-    dialog.set_default_size(300, 150);
-
-    let content_box = GtkBox::new(Orientation::Vertical, 16);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
-
-    let message_label = Label::new(Some(message));
-    message_label.set_wrap(true);
-    message_label.set_halign(gtk4::Align::Center);
-    content_box.append(&message_label);
-
-    let ok_button = Button::new();
-    ok_button.set_label("OK");
-    ok_button.add_css_class("suggested-action");
-    ok_button.set_halign(gtk4::Align::Center);
-
-    let dialog_clone = dialog.clone();
-    ok_button.connect_clicked(move |_| {
-        dialog_clone.close();
-    });
-
-    content_box.append(&ok_button);
-    dialog.set_child(Some(&content_box));
+pub fn show_error_dialog(parent: Option<&impl IsA<gtk4::Window>>, title: &str, message: &str) {
+    let dialog = adw::MessageDialog::new(parent, Some(title), Some(message));
+    dialog.add_response("ok", "OK");
+    dialog.set_default_response(Some("ok"));
     dialog.present();
 }
 
-/// Shows the update dialog when update is available
 pub fn show_update_dialog(parent: &adw::ApplicationWindow, latest: check_latest::Version) {
-    let dialog = Dialog::new();
-
-    dialog.set_title(Some("Update Available"));
-    dialog.set_modal(true);
-    dialog.set_transient_for(Some(parent));
-    dialog.set_default_size(300, 0);
-    dialog.set_resizable(true);
-
-    let content_box = GtkBox::new(Orientation::Vertical, 16);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
-
-    let title = Label::new(Some(&format!("Update {} Available", latest)));
-    title.add_css_class("title-2");
-    title.set_halign(gtk4::Align::Center);
-    content_box.append(&title);
-
-    let warning = Label::new(Some(&format!(
-        "Version {} is available from Codeberg.org and Crates.io",
-        latest
-    )));
-    warning.add_css_class("error");
-    warning.set_wrap(true);
-    warning.set_halign(gtk4::Align::Center);
-    content_box.append(&warning);
-
-    let button_box = GtkBox::new(Orientation::Horizontal, 12);
-    button_box.set_halign(gtk4::Align::End);
-
-    let cancel_button = Button::new();
-    cancel_button.set_label("Close");
-    cancel_button.add_css_class("flat");
-
-    let dialog_clone = dialog.clone();
-    cancel_button.connect_clicked(move |_| {
-        dialog_clone.close();
-    });
-
-    button_box.append(&cancel_button);
-    content_box.append(&button_box);
-
-    dialog.set_child(Some(&content_box));
+    let dialog = adw::MessageDialog::new(
+        Some(parent),
+        Some(&format!("Update {latest} Available")),
+        Some(&format!(
+            "Version {latest} is available from Codeberg.org and Crates.io"
+        )),
+    );
+    dialog.add_response("close", "Close");
+    dialog.set_default_response(Some("close"));
     dialog.present();
+}
+
+/// for dialogs that need custom content:
+/// header bar with Cancel/Confirm, content area below.
+pub struct DialogParts {
+    pub window: adw::Window,
+    pub content: gtk4::Box,
+    pub confirm: gtk4::Button,
+}
+
+pub fn dialog_skeleton(
+    parent: &adw::ApplicationWindow,
+    title: &str,
+    confirm_label: &str,
+    confirm_css: &str, // "suggested-action" or "destructive-action"
+) -> DialogParts {
+    let window = adw::Window::builder()
+        .title(title)
+        .modal(true)
+        .transient_for(parent)
+        .resizable(false)
+        .build();
+
+    let cancel = gtk4::Button::with_label("Cancel");
+    let window_for_cancel = window.clone();
+    cancel.connect_clicked(move |_| window_for_cancel.close());
+
+    let confirm = gtk4::Button::with_label(confirm_label);
+    confirm.add_css_class(confirm_css);
+    confirm.set_receives_default(true);
+
+    let header = adw::HeaderBar::new();
+    header.pack_start(&cancel);
+    header.pack_end(&confirm);
+
+    let content = gtk4::Box::new(gtk4::Orientation::Vertical, 12);
+    content.set_margin_top(24);
+    content.set_margin_bottom(24);
+    content.set_margin_start(18);
+    content.set_margin_end(18);
+
+    let outer = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+    outer.append(&header);
+    outer.append(&content);
+    window.set_content(Some(&outer));
+
+    DialogParts {
+        window,
+        content,
+        confirm,
+    }
 }
