@@ -1,8 +1,8 @@
 [package]
-name = "fmp"
+name = "forgot-my-password"
 description = "A simple and secure password manager written in rust."
 authors = ["Luke Wilkinson <wilkinsonluke@proton.me>"]
-version = "1.5.3"
+version = "1.5.4"
 edition = "2024"
 license = "GPL-3.0"
 keywords = ["password-manager", "crypto", "cryptography", "rust", "gui"]
