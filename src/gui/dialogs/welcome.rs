@@ -1,6 +1,8 @@
-use adw::{HeaderBar, Window as AdwWindow, prelude::*};
+use adw::{
+    ActionRow, Clamp, EntryRow, HeaderBar, PreferencesGroup, Window as AdwWindow, prelude::*,
+};
 use anyhow::Error;
-use gtk4::{Box as GtkBox, Button, Entry, Label, Orientation, glib};
+use gtk4::{Align, Box as GtkBox, Button, Label, Orientation, glib};
 use std::{
     fs::{File, create_dir_all},
     path::PathBuf,
@@ -39,103 +41,91 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
     welcome_window.set_title(Some("Welcome to FMP"));
     welcome_window.set_modal(true);
     welcome_window.set_transient_for(Some(parent));
+    welcome_window.set_default_size(560, -1);
     welcome_window.add_css_class("welcome-dialog");
     welcome_window.set_deletable(false);
 
     let header_bar = HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("Welcome"))));
 
-    let main_container = GtkBox::new(Orientation::Vertical, 0);
-    main_container.append(&header_bar);
+    let content_box = GtkBox::new(Orientation::Vertical, 24);
+    content_box.set_margin_top(24);
+    content_box.set_margin_bottom(24);
+    content_box.set_margin_start(18);
+    content_box.set_margin_end(18);
 
-    let content_box = GtkBox::new(Orientation::Vertical, 20);
-    content_box.set_margin_top(20);
-    content_box.set_margin_bottom(20);
-    content_box.set_margin_start(20);
-    content_box.set_margin_end(20);
+    let clamp = Clamp::new();
+    clamp.set_maximum_size(600);
+    clamp.set_child(Some(&content_box));
 
-    let title_container = GtkBox::new(Orientation::Horizontal, 12);
-    title_container.set_halign(gtk4::Align::Center);
     let dialog_title = Label::new(Some("FMP"));
     dialog_title.add_css_class("title-1");
-    title_container.append(&dialog_title);
-    content_box.append(&title_container);
+    dialog_title.set_halign(Align::Center);
+    content_box.append(&dialog_title);
 
     let intro_label = Label::new(Some(
         "FMP is a secure local password manager.\nCheck for an existing GPG key by email or create one.",
     ));
     intro_label.set_wrap(true);
+    intro_label.set_justify(gtk4::Justification::Center);
     intro_label.add_css_class("body");
     content_box.append(&intro_label);
 
-    let email_box = GtkBox::new(Orientation::Vertical, 8);
-    email_box.set_halign(gtk4::Align::Center);
-    email_box.add_css_class("card");
+    let existing_group = PreferencesGroup::new();
+    existing_group.set_title("Use an Existing Key");
 
-    let email_title_container = GtkBox::new(Orientation::Horizontal, 12);
-    email_title_container.set_halign(gtk4::Align::Center);
-    let email_title = Label::new(Some("Use an Existing Key:"));
-    email_title.add_css_class("title-2");
-    email_title_container.append(&email_title);
-    email_box.append(&email_title_container);
+    let email_row = EntryRow::new();
+    email_row.set_title("Email address");
 
-    let email_entry = Entry::new();
-    email_entry.set_placeholder_text(Some("Enter email associated with GPG key"));
-    email_entry.set_width_chars(45);
-    email_box.append(&email_entry);
+    let check_button = Button::with_label("Check");
+    check_button.set_valign(Align::Center);
+    email_row.add_suffix(&check_button);
 
-    let check_button = Button::with_label("Check Key");
-    email_box.append(&check_button);
-
-    content_box.append(&email_box);
-
-    let create_box = GtkBox::new(Orientation::Vertical, 8);
-    create_box.set_halign(gtk4::Align::Center);
-    create_box.add_css_class("card");
-
-    let create_title_container = GtkBox::new(Orientation::Horizontal, 12);
-    create_title_container.set_halign(gtk4::Align::Center);
-    let create_title = Label::new(Some("Create a New Key:"));
-    create_title.add_css_class("title-2");
-    create_title_container.append(&create_title);
-    create_box.append(&create_title_container);
-
-    let terminal_button = Button::with_label("Run `gpg --full-generate-key`");
-    create_box.append(&terminal_button);
-
-    let create_label = Label::new(Some(
-        "It is recommended to use default settings.\nYou do not need to use a valid email, just remember it!",
-    ));
-    create_label.set_wrap(true);
-    create_label.add_css_class("body");
-    create_box.append(&create_label);
-
-    content_box.append(&create_box);
+    existing_group.add(&email_row);
+    content_box.append(&existing_group);
 
     let check_result_label = Label::new(None);
     check_result_label.set_visible(false);
     check_result_label.set_wrap(true);
-    email_box.append(&check_result_label);
+    check_result_label.set_halign(Align::Start);
+    check_result_label.set_margin_top(6);
+    content_box.append(&check_result_label);
 
-    let action_box = GtkBox::new(Orientation::Horizontal, 12);
-    action_box.set_halign(gtk4::Align::Center);
+    let create_group = PreferencesGroup::new();
+    create_group.set_title("Create a New Key");
+    create_group.set_description(Some(
+        "It is recommended to use default settings.\nYou do not need to use a valid email, just remember it!",
+    ));
 
-    let finish_button = Button::new();
-    finish_button.set_label("Finish");
+    let terminal_row = ActionRow::new();
+    terminal_row.set_title("Run `gpg --full-generate-key`");
+    terminal_row.set_activatable(false);
+
+    let terminal_button = Button::with_label("Open Terminal");
+    terminal_button.set_valign(Align::Center);
+    terminal_row.add_suffix(&terminal_button);
+
+    create_group.add(&terminal_row);
+    content_box.append(&create_group);
+
+    let finish_button = Button::with_label("Finish");
     finish_button.add_css_class("suggested-action");
-    action_box.append(&finish_button);
+    finish_button.add_css_class("pill");
+    finish_button.set_halign(Align::Center);
+    finish_button.set_margin_top(6);
+    content_box.append(&finish_button);
 
-    content_box.append(&action_box);
-
-    main_container.append(&content_box);
-    welcome_window.set_content(Some(&main_container));
+    let outer = GtkBox::new(Orientation::Vertical, 0);
+    outer.append(&header_bar);
+    outer.append(&clamp);
+    welcome_window.set_content(Some(&outer));
     welcome_window.present();
 
     let check_result_label_clone = check_result_label.clone();
-    let email_entry_clone = email_entry.clone();
+    let email_row_clone = email_row.clone();
     check_button.connect_clicked(move |_| {
         check_result_label_clone.set_visible(true);
-        let email = email_entry_clone.text().to_string();
+        let email = email_row_clone.text().to_string();
         if email.trim().is_empty() {
             check_result_label_clone.set_text("Please enter an email.");
             return;
@@ -144,50 +134,48 @@ pub fn show_welcome_dialog(parent: &adw::ApplicationWindow) {
 
         let weak_label = check_result_label_clone.downgrade();
 
-        let output = std::process::Command::new("gpg")
-            .arg("--list-keys")
-            .arg("--with-colons")
-            .arg(&email)
-            .stderr(Stdio::piped())
-            .output();
+        // Move only the plain String into the worker task. Do NOT move the WeakRef into it.
+        let email_for_task = email.clone();
+        let task = gio::spawn_blocking(move || {
+            std::process::Command::new("gpg")
+                .arg("--list-keys")
+                .arg("--with-colons")
+                .arg(&email_for_task)
+                .stderr(Stdio::piped())
+                .output()
+        });
 
-        let text = match output {
-            Ok(out) => {
-                if out.status.success() {
-                    let stdout = String::from_utf8_lossy(&out.stdout);
-                    if stdout.contains("\nuid:")
-                        || stdout.contains("\npub:")
-                        || stdout.contains(":uid:")
-                    {
-                        format!("GPG key found for {}.", email)
-                    } else {
-                        format!("No GPG key found for {}.", email)
-                    }
-                } else {
-                    let stderr = String::from_utf8_lossy(&out.stderr);
-                    format!("gpg returned an error: {}", stderr)
-                }
-            }
-            Err(e) => format!("Failed to run gpg: {}", e),
-        };
-
-        // Move only the plain String into the main-loop task. Do NOT move the WeakRef into the std thread.
-        let text_for_main = text.clone();
-        let weak_label_for_main = weak_label.clone();
         glib::spawn_future_local(async move {
-            let result = gio::spawn_blocking(move || {
-                std::process::Command::new("gpg")
-                    .args(["--list-keys", "--with-colons", &email])
-                    .output()
-            })
-            .await;
-            if let Some(label) = weak_label_for_main.upgrade() {
-                match result {
-                    Ok(_) => label.set_text(&text_for_main),
-                    Err(_) => label.set_text("Failled to run thread"),
+            let text = match task.await {
+                Ok(Ok(out)) => {
+                    if out.status.success() {
+                        let stdout = String::from_utf8_lossy(&out.stdout);
+                        if stdout.contains("\nuid:")
+                            || stdout.contains("\npub:")
+                            || stdout.contains(":uid:")
+                        {
+                            format!("GPG key found for {email}.")
+                        } else {
+                            format!("No GPG key found for {email}.")
+                        }
+                    } else {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        format!("gpg returned an error: {stderr}")
+                    }
                 }
+                Ok(Err(e)) => format!("Failed to run gpg: {e}"),
+                Err(e) => format!("Failed to run gpg task: {:?}", e),
+            };
+
+            if let Some(label) = weak_label.upgrade() {
+                label.set_text(&text);
             }
         });
+    });
+
+    let check_for_enter = check_button.clone();
+    email_row.connect_entry_activated(move |_| {
+        check_for_enter.activate();
     });
 
     terminal_button.connect_clicked(move |_| {

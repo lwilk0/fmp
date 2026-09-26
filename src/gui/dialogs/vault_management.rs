@@ -152,7 +152,7 @@ pub fn show_rename_vault_dialog(
     let vault_name = vault_name.to_string();
 
     let parts = dialog_skeleton(&parent, "Rename Vault", "Rename", "suggested-action");
-    parts.window.set_default_size(360, -1); // width only; height is natural
+    parts.window.set_default_size(360, -1);
 
     let name_row = adw::EntryRow::new();
     name_row.set_title("New vault name");
