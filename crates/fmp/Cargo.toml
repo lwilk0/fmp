@@ -1,0 +1,9 @@
+[package]
+name = "fmp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+fmp_backend = { workspace = true }
