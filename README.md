@@ -1,5 +1,7 @@
 # FMP (Forgot My Password)
 
+### Check [rewrite](https://github.com/lwilk0/fmp/tree/rewrite) branch for new codebase status
+
 [![Latest Version](https://img.shields.io/crates/v/forgot-my-password.svg?logo=rust)](https://crates.io/crates/forgot-my-password)
 [![GPLv3 License](https://img.shields.io/badge/license-GPLv3-red.svg)](https://codeberg.org/lwilko/fmp/-/blob/main/LICENSE?ref_type=heads)
 
